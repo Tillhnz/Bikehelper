@@ -21,7 +21,7 @@ MIN_MOVING_SPEED = 0.5    # m/s, darunter gilt als Stillstand
 MAX_PLAUSIBLE_SPEED = 40  # m/s (144 km/h): schnellere Sprünge sind GPS-Fehler
 ELEVATION_THRESHOLD_M = 3.0
 
-CYCLING_HINTS = ("ride", "cycl", "bik", "velo")
+CYCLING_HINTS = ("ride", "cycl", "bik", "velo", "vélo", "rad", "cicl", "bici", "gravel")  # auch deutsche, französische, spanische Typen
 
 
 class ParseError(Exception):

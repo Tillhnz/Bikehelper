@@ -31,6 +31,8 @@ class Summary:
     skipped_other_sport: int = 0
     skipped_no_file: int = 0
     assigned: int = 0
+    updated: int = 0
+    notes: list[str] = field(default_factory=list)
     errors: list[dict] = field(default_factory=list)
     created_bikes: list[str] = field(default_factory=list)
     unmatched_gear: dict[str, int] = field(default_factory=dict)
@@ -46,6 +48,8 @@ class Summary:
             "skipped_other_sport": self.skipped_other_sport,
             "skipped_no_file": self.skipped_no_file,
             "assigned": self.assigned,
+            "updated": self.updated,
+            "notes": self.notes,
             "errors": self.errors,
             "created_bikes": self.created_bikes,
             "unmatched_gear": self.unmatched_gear,
@@ -54,17 +58,39 @@ class Summary:
 
 # ---------- Speichern einer einzelnen Fahrt ----------
 
-def is_duplicate(db: Session, user_id: int, parsed: ParsedActivity, strava_id: int | None) -> bool:
-    if strava_id is not None and db.scalar(
-        select(Activity.id).where(Activity.user_id == user_id, Activity.strava_id == strava_id)
-    ):
-        return True
+def find_duplicate(db: Session, user_id: int, parsed: ParsedActivity, strava_id: int | None) -> Activity | None:
+    if strava_id is not None:
+        found = db.scalar(select(Activity).where(Activity.user_id == user_id, Activity.strava_id == strava_id))
+        if found:
+            return found
     lo, hi = parsed.start - timedelta(seconds=90), parsed.start + timedelta(seconds=90)
     candidates = db.scalars(
         select(Activity).where(Activity.user_id == user_id, Activity.start_date.between(lo, hi))
     )
     tolerance = max(0.3, 0.03 * parsed.distance_km)
-    return any(abs(a.distance_km - parsed.distance_km) <= tolerance for a in candidates)
+    return next((a for a in candidates if abs(a.distance_km - parsed.distance_km) <= tolerance), None)
+
+
+def is_duplicate(db: Session, user_id: int, parsed: ParsedActivity, strava_id: int | None) -> bool:
+    return find_duplicate(db, user_id, parsed, strava_id) is not None
+
+
+def backfill_existing(existing: Activity, strava_id: int | None, gear_name: str | None, bike: Bike | None) -> bool:
+    """Ergänzt bei einer schon vorhandenen Fahrt fehlende Angaben (Strava-ID, Radname, Rad).
+
+    Bereits gesetzte Werte bleiben unberührt, damit manuelle Zuordnungen nicht überschrieben werden.
+    """
+    changed = False
+    if gear_name and not existing.gear_name:
+        existing.gear_name = gear_name[:160]
+        changed = True
+    if strava_id is not None and existing.strava_id is None:
+        existing.strava_id = strava_id
+        changed = True
+    if bike is not None and existing.bike_id is None:
+        existing.bike_id = bike.id
+        changed = True
+    return changed
 
 
 def store_activity(
@@ -78,9 +104,10 @@ def store_activity(
     bike: Bike | None,
     sport_type: str | None,
     source: str,
+    check_duplicate: bool = True,
 ) -> bool:
     """Legt die Fahrt an. Gibt False zurück, wenn sie schon vorhanden ist."""
-    if is_duplicate(db, user_id, parsed, strava_id):
+    if check_duplicate and is_duplicate(db, user_id, parsed, strava_id):
         return False
     label = name or parsed.name or f"Fahrt vom {parsed.start:%d.%m.%Y}"
     activity = Activity(
@@ -232,6 +259,15 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
                     "mit .fit-, .gpx- oder .tcx-Dateien."
                 )
             summary.skipped_no_file = index.rows_without_file
+            if not index.used_csv:
+                summary.notes.append(
+                    "Die Datei activities.csv konnte nicht gelesen werden. Es wurden nur die Dateien im Ordner "
+                    "activities/ importiert, ohne Zuordnung zu Rädern."
+                )
+            elif not index.gear_column:
+                summary.notes.append(
+                    "In activities.csv wurde keine Spalte mit dem Rad gefunden. Die Fahrten wurden ohne Radzuordnung importiert."
+                )
             job.total = len(index.entries)
             bikes = {gear_key(b.name): b for b in db.scalars(select(Bike).where(Bike.user_id == job.user_id))}
 
@@ -254,17 +290,30 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
                     summary.skipped_other_sport += 1
                     continue
 
-                bike = _resolve_bike(db, job.user_id, entry, bikes, index.bikes, create_bikes, summary)
-                stored = store_activity(
-                    db, job.user_id, parsed, name=entry.name, strava_id=entry.strava_id,
-                    gear_name=entry.gear, bike=bike, sport_type=entry.type, source="strava_export",
-                )
-                if stored:
-                    summary.imported += 1
-                    if bike:
-                        summary.assigned += 1
-                else:
+                existing = find_duplicate(db, job.user_id, parsed, entry.strava_id)
+                if existing is not None:
+                    # Schon vorhanden: nur fehlendes Rad und Radname nachtragen
+                    bike = None
+                    if existing.bike_id is None:
+                        bike = _resolve_bike(db, job.user_id, entry, bikes, index.bikes, create_bikes, summary)
+                    if backfill_existing(existing, entry.strava_id, entry.gear, bike):
+                        summary.updated += 1
+                        if bike is not None:
+                            summary.assigned += 1
                     summary.duplicates += 1
+                else:
+                    bike = _resolve_bike(db, job.user_id, entry, bikes, index.bikes, create_bikes, summary)
+                    stored = store_activity(
+                        db, job.user_id, parsed, name=entry.name, strava_id=entry.strava_id,
+                        gear_name=entry.gear, bike=bike, sport_type=entry.type, source="strava_export",
+                        check_duplicate=False,
+                    )
+                    if stored:
+                        summary.imported += 1
+                        if bike:
+                            summary.assigned += 1
+                    else:
+                        summary.duplicates += 1
                 if job.processed % COMMIT_EVERY == 0:
                     db.commit()
             db.commit()

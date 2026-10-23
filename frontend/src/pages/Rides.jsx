@@ -45,6 +45,8 @@ function ResultSummary({ s }) {
         <strong>{s.imported}</strong> {s.imported === 1 ? "Fahrt" : "Fahrten"} importiert
         {s.duplicates > 0 && `, ${s.duplicates} waren schon vorhanden`}.
       </p>
+      {s.updated > 0 && <p>Bei {s.updated} vorhandenen Fahrten wurden Rad und Radname nachgetragen.</p>}
+      {s.notes?.map((n) => <p key={n} className="error">{n}</p>)}
       {s.created_bikes?.length > 0 && <p>Neue Räder angelegt: {s.created_bikes.join(", ")}.</p>}
       {s.skipped_other_sport > 0 && (
         <p className="muted small">{s.skipped_other_sport} andere Aktivitäten (zum Beispiel Laufen) wurden übersprungen.</p>

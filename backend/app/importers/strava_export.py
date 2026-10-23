@@ -15,13 +15,80 @@ from dataclasses import dataclass
 
 SUPPORTED_SUFFIXES = (".fit", ".gpx", ".tcx", ".fit.gz", ".gpx.gz", ".tcx.gz")
 
+# Bekannte Spaltennamen (Englisch, Deutsch, Französisch, Spanisch). Was hier nicht steht, wird über den
+# Inhalt der Spalte erkannt (siehe _detect_columns), damit der Import nicht von der Kontosprache abhängt.
 _COLUMNS = {
-    "id": ("activity id",),
-    "name": ("activity name",),
-    "type": ("activity type",),
-    "gear": ("activity gear",),
-    "filename": ("filename",),
+    "id": ("activity id", "aktivitäts-id", "aktivitäts id", "aktivitaets-id", "id de l'activité", "id de la actividad"),
+    "name": ("activity name", "aktivitätsname", "name der aktivität", "nom de l'activité", "nombre de la actividad"),
+    "type": ("activity type", "aktivitätsart", "aktivitätstyp", "art der aktivität", "type d'activité", "tipo de actividad"),
+    "gear": (
+        "activity gear", "ausrüstung der aktivität", "aktivitätsausrüstung", "ausrüstung", "equipement de l'activité",
+        "équipement de l'activité", "matériel de l'activité", "equipo de la actividad", "equipo",
+    ),
+    "filename": ("filename", "dateiname", "nom du fichier", "nombre del archivo", "nome file"),
 }
+_GEAR_WORDS = ("gear", "ausrüst", "ausruest", "equip", "matériel", "materiel", "material", "bike", "fahrrad", "vélo", "velo")
+
+
+def _looks_like_file(value: str) -> bool:
+    v = value.strip().lower()
+    return bool(v) and (v.endswith(SUPPORTED_SUFFIXES) or v.startswith("activities/"))
+
+
+def _detect_columns(header: list[str], rows: list[list[str]], bike_keys: frozenset[str]) -> dict[str, int | None]:
+    """Findet die Spalten zuerst über bekannte Namen, dann über ihren Inhalt."""
+    idx = {k: _find_index(header, v) for k, v in _COLUMNS.items()}
+    used = {v for v in idx.values() if v is not None}
+    sample = rows[:2000]
+
+    def column(i: int) -> list[str]:
+        return [r[i].strip() for r in sample if i < len(r) and r[i].strip()]
+
+    if idx["filename"] is None:  # Spalte, in der fast nur Pfade zu Aktivitätsdateien stehen
+        best, best_n = None, 0
+        for i in range(len(header)):
+            if i in used:
+                continue
+            n = sum(1 for v in column(i) if _looks_like_file(v))
+            if n > best_n:
+                best, best_n = i, n
+        idx["filename"] = best
+        if best is not None:
+            used.add(best)
+
+    if idx["id"] is None:  # erste Spalte aus reinen Zahlen
+        for i in range(len(header)):
+            vals = column(i)
+            if i not in used and vals and all(v.isdigit() for v in vals) and min(len(v) for v in vals) >= 6:
+                idx["id"] = i
+                used.add(i)
+                break
+
+    if idx["gear"] is None:
+        best, best_score = None, 0.0
+        for i, h in enumerate(header):
+            if i in used:
+                continue
+            vals = column(i)
+            if not vals:
+                continue
+            hit = sum(1 for v in vals if gear_key(v) in bike_keys) / len(vals) if bike_keys else 0.0
+            score = hit + (0.5 if any(w in h.casefold() for w in _GEAR_WORDS) else 0.0)
+            if score > best_score:
+                best, best_score = i, score
+        idx["gear"] = best if best_score >= 0.5 else None
+        if idx["gear"] is not None:
+            used.add(idx["gear"])
+
+    for key, words in (("name", ("name", "nom", "nombre", "titel")), ("type", ("type", "typ", "art", "tipo"))):
+        if idx[key] is None:
+            for i, h in enumerate(header):
+                tokens = h.casefold().replace("-", " ").split()
+                if i not in used and any(w in tokens for w in words):
+                    idx[key] = i
+                    used.add(i)
+                    break
+    return idx
 
 
 @dataclass
@@ -39,6 +106,7 @@ class ExportIndex:
     rows_without_file: int    # Aktivitäten ohne GPS-Datei (z. B. manuell eingetragen)
     used_csv: bool
     bikes: dict[str, tuple[str, str | None, str | None]]  # gear_key -> (Name, Marke, Modell)
+    gear_column: bool = False  # wurde in der CSV eine Spalte mit dem Rad gefunden?
 
 
 def clean_gear_name(value: str | None) -> str:
@@ -78,13 +146,15 @@ def _find_index(names: list[str], wanted: tuple[str, ...]) -> int | None:
     return None
 
 
-def read_activities_csv(text: str, zip_names: set[str]) -> tuple[list[ExportEntry], int] | None:
-    """Gibt (Einträge, Zeilen ohne Datei) zurück oder None, wenn die CSV nicht lesbar ist."""
+def read_activities_csv(
+    text: str, zip_names: set[str], bike_keys: frozenset[str] = frozenset()
+) -> tuple[list[ExportEntry], int, bool] | None:
+    """Gibt (Einträge, Zeilen ohne Datei, Radspalte gefunden) zurück oder None, wenn die CSV nicht lesbar ist."""
     rows = list(csv.reader(io.StringIO(text)))
     if len(rows) < 2:
         return None
     header = rows[0]
-    idx = {k: _find_index(header, v) for k, v in _COLUMNS.items()}
+    idx = _detect_columns(header, rows[1:], bike_keys)
     if idx["filename"] is None:
         return None
 
@@ -113,7 +183,7 @@ def read_activities_csv(text: str, zip_names: set[str]) -> tuple[list[ExportEntr
             path=path, strava_id=sid, name=cell(row, "name"), type=cell(row, "type"),
             gear=clean_gear_name(cell(row, "gear")) or None,
         ))
-    return entries, without_file
+    return entries, without_file, idx["gear"] is not None
 
 
 def read_bikes_csv(text: str) -> dict[str, tuple[str, str | None, str | None]]:
@@ -121,11 +191,17 @@ def read_bikes_csv(text: str) -> dict[str, tuple[str, str | None, str | None]]:
     if len(rows) < 2:
         return {}
     header = rows[0]
-    i_name = _find_index(header, ("bike name",))
-    i_brand = _find_index(header, ("bike brand",))
-    i_model = _find_index(header, ("bike model",))
+    def find(words: tuple[str, ...]) -> int | None:
+        for i, h in enumerate(header):
+            if any(w in h.casefold() for w in words):
+                return i
+        return None
+
+    i_name = find(("name", "nom", "nombre"))
+    i_brand = find(("brand", "marke", "marque", "marca"))
+    i_model = find(("model", "modell", "modèle", "modelo"))
     if i_name is None:
-        return {}
+        i_name = 0  # in bikes.csv steht der Name in der ersten Spalte
     out = {}
     for row in rows[1:]:
         if i_name >= len(row) or not row[i_name].strip():
@@ -156,10 +232,10 @@ def index_export(zf: zipfile.ZipFile) -> ExportIndex:
     csv_member = _find_member(names, "activities.csv")
     if csv_member:
         activity_names = {n for n in names if _is_supported(n)}
-        parsed = read_activities_csv(_decode(zf.read(csv_member)), activity_names)
+        parsed = read_activities_csv(_decode(zf.read(csv_member)), activity_names, frozenset(bikes))
     if parsed is not None:
-        entries, without_file = parsed
-        return ExportIndex(entries, without_file, True, bikes)
+        entries, without_file, has_gear = parsed
+        return ExportIndex(entries, without_file, True, bikes, has_gear)
 
     # Rückfall: alle Aktivitätsdateien im Ordner activities/ lesen, ohne Zusatzinfos
     entries = [

@@ -166,7 +166,7 @@ def test_strava_export_with_csv():
     assert idx.bikes[gear_key("Canyon Endurace")] == ("Canyon Endurace", "Canyon", "Endurace CF SL")
 
 
-def test_strava_export_with_unknown_columns_falls_back_to_files():
+def test_strava_export_without_filename_column_falls_back_to_files():
     csv_text = "Aktivitäts-ID,Datum,Name,Typ\n1,x,y,Fahrt\n"
     zf = make_export(csv_text, {"activities/555.fit.gz": b"x", "activities/556.gpx": b"x", "media/foto.jpg": b"x"})
     idx = index_export(zf)
@@ -179,3 +179,44 @@ def test_gear_name_cleaning():
     assert clean_gear_name("Canyon+Endurace+CF") == "Canyon Endurace CF"
     assert clean_gear_name("Rad 7+") == "Rad 7+"  # echtes Pluszeichen bleibt erhalten
     assert gear_key("  Canyon Endurace ") == gear_key("canyon+endurace")
+
+
+def test_german_export_is_read_by_content_not_by_header_language():
+    csv_text = "\n".join([
+        "Aktivitäts-ID,Aktivitätsdatum,Aktivitätsname,Aktivitätsart,Beschreibung,Ausrüstung der Aktivität,Dateiname",
+        '16000000001,"23.10.2026, 07:15:00",Morgenrunde,Radfahrt,,Canyon Endurace,activities/16000000001.fit.gz',
+        '16000000002,"24.10.2026, 07:15:00",Abendrunde,Radfahrt,,Canyon Endurace,activities/16000000002.fit.gz',
+    ])
+    zf = make_export(csv_text, {"activities/16000000001.fit.gz": b"x", "activities/16000000002.fit.gz": b"x"},
+                     "Name des Fahrrads,Marke,Modell\nCanyon Endurace,Canyon,CF SL\n")
+    idx = index_export(zf)
+    assert idx.used_csv and idx.gear_column
+    assert [e.gear for e in idx.entries] == ["Canyon Endurace", "Canyon Endurace"]
+    assert idx.entries[0].name == "Morgenrunde"
+    assert idx.bikes[gear_key("Canyon Endurace")] == ("Canyon Endurace", "Canyon", "CF SL")
+
+
+def test_gear_column_found_by_matching_bike_names_with_odd_header():
+    csv_text = "\n".join([
+        "Id,Datum,Titel,Sorte,Zeug,Datei",
+        '16000000001,x,A,Fahrt,Canyon Endurace,activities/16000000001.gpx',
+        '16000000002,x,B,Fahrt,,activities/16000000002.gpx',
+    ])
+    zf = make_export(csv_text, {"activities/16000000001.gpx": b"x", "activities/16000000002.gpx": b"x"},
+                     "Bike Name\nCanyon Endurace\n")
+    idx = index_export(zf)
+    assert idx.gear_column
+    assert [e.gear for e in idx.entries] == ["Canyon Endurace", None]
+
+
+def test_csv_without_gear_column_is_reported():
+    csv_text = "Activity ID,Activity Name,Filename\n16000000001,A,activities/16000000001.gpx\n"
+    idx = index_export(make_export(csv_text, {"activities/16000000001.gpx": b"x"}))
+    assert idx.used_csv and not idx.gear_column
+
+
+def test_is_cycling_localized_types():
+    for t in ("Radfahrt", "Fahrradfahrt", "Virtuelle Radfahrt", "Cyclisme", "Vélo", "Ciclismo"):
+        assert is_cycling(t), t
+    for t in ("Lauf", "Run", "Wanderung", "Schwimmen", "Treadmill"):
+        assert not is_cycling(t), t
