@@ -340,3 +340,25 @@ def test_notification_settings_roundtrip():
         assert r["ntfy_topic"] == "bikehelper-abc123"
         assert c.put("/api/settings/notifications", headers=h, json={"email": False, "ntfy_topic": "zu kurz!"}).status_code == 422
         assert c.post("/api/settings/notifications/test", headers=_user(c, "n2@example.com")).status_code == 422
+
+
+def test_goals_and_extra_stats_endpoints():
+    with TestClient(app) as c:
+        h = _user(c, "goals@example.com")
+        uid = c.get("/api/me", headers=h).json()["id"]
+        with SessionLocal() as db:
+            for i in range(3):
+                db.add(Activity(user_id=uid, name=f"r{i}", distance_km=50.0, moving_time_s=7200, elevation_m=400.0,
+                                start_date=datetime(date.today().year, 1, 5 + i, 9)))
+            db.commit()
+        year = date.today().year
+        g = c.put("/api/stats/goals", headers=h, json={"year": year, "targets": {"km": 1000, "rides": 2}}).json()
+        assert {p["metric"] for p in g["progress"]} == {"km", "rides"}
+        assert [p for p in g["progress"] if p["metric"] == "rides"][0]["reached_on"] is not None
+        assert c.put("/api/stats/goals", headers=h, json={"year": year, "targets": {"foo": 1}}).status_code == 422
+        g = c.put("/api/stats/goals", headers=h, json={"year": year, "targets": {"km": None}}).json()
+        assert "km" not in g["targets"]
+        ex = c.get("/api/stats/extra", headers=h).json()
+        assert ex["totals"]["rides"] == 3 and len(ex["load"]["weekly"]) == 26
+        rv = c.get(f"/api/stats/review?year={year}", headers=h).json()
+        assert rv["totals"]["km"] == 150.0 and rv["years_available"] == [year]

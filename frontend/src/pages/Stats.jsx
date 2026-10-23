@@ -3,27 +3,11 @@ import { Link } from "react-router-dom";
 import { api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import { Bars, CalendarHeat, CumulativeLines, HBars } from "../components/charts.jsx";
 import { EmptyState } from "../components/ui.jsx";
+import { Kpi, Panel } from "../components/statsui.jsx";
+import { CompareView, GoalsView, LoadView, ReviewView } from "../components/StatsExtra.jsx";
 
+const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-
-function Kpi({ value, unit, label }) {
-  return (
-    <div className="kpi">
-      <div className="kpi-value">{value}{unit && <small>{unit}</small>}</div>
-      <div className="kpi-label">{label}</div>
-    </div>
-  );
-}
-
-function Panel({ title, sub, children, className = "" }) {
-  return (
-    <section className={`panel ${className}`}>
-      <h2>{title}</h2>
-      {sub && <p className="muted small">{sub}</p>}
-      {children}
-    </section>
-  );
-}
 
 export default function Stats() {
   const [filters, setFilters] = useState({ year: "", bike_id: "" });
@@ -31,6 +15,7 @@ export default function Stats() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [calYear, setCalYear] = useState(null);
+  const [tab, setTab] = useState("overview");
 
   useEffect(() => {
     const qs = new URLSearchParams();
@@ -56,10 +41,12 @@ export default function Stats() {
     <header className="page-head">
       <h1>Statistik</h1>
       <div className="filter-bar">
-        <select value={filters.year} onChange={set("year")} aria-label="Jahr">
-          <option value="">Alle Jahre</option>
-          {options.years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        {tab === "overview" && (
+          <select value={filters.year} onChange={set("year")} aria-label="Jahr">
+            <option value="">Alle Jahre</option>
+            {options.years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
         <select value={filters.bike_id} onChange={set("bike_id")} aria-label="Rad">
           <option value="">Alle Räder</option>
           {options.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -67,11 +54,24 @@ export default function Stats() {
       </div>
     </header>
   );
+  const tabs = (
+    <nav className="stat-tabs" aria-label="Statistikbereiche">
+      {TABS.map(([k, l]) => (
+        <button key={k} className={tab === k ? "on" : ""} aria-pressed={tab === k} onClick={() => setTab(k)}>{l}</button>
+      ))}
+    </nav>
+  );
+  const years = options.years.length ? options.years : (d.years ? d.years.map((y) => y.year) : []);
+  if (tab === "load") return <>{header}{tabs}<LoadView bikeId={filters.bike_id} /></>;
+  if (tab === "review") return <>{header}{tabs}<ReviewView bikeId={filters.bike_id} years={years} /></>;
+  if (tab === "goals") return <>{header}{tabs}<GoalsView /></>;
+  if (tab === "compare") return <>{header}{tabs}<CompareView bikeId={filters.bike_id} /></>;
 
   if (d.empty) {
     return (
       <>
         {header}
+        {tabs}
         <EmptyState title="Keine Fahrten gefunden" text="Importiere Fahrten oder ändere den Filter.">
           <Link className="btn primary" to="/rides">Fahrten importieren</Link>
         </EmptyState>
@@ -86,6 +86,7 @@ export default function Stats() {
   return (
     <>
       {header}
+      {tabs}
 
       <div className="kpis">
         <Kpi value={fmtKm(t.km)} unit="km" label="Gesamtstrecke" />

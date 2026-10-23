@@ -106,6 +106,17 @@ Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCera
 
 **Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
 
+## Statistik
+
+Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wetter), **Belastung**, **Jahresrückblick**, **Ziele** und **Vergleiche**.
+
+- **Belastung:** Fitness (Mittel der letzten 6 Wochen), Ermüdung (7 Tage) und Form (Fitness minus Ermüdung) nach dem Prinzip der gängigen Trainingsplattformen. Weil Strava-Exporte und Dateien nicht immer Puls oder Leistung enthalten, schätzt BikeHelper die Belastung einer Fahrt aus Fahrzeit, Höhenmetern und Tempo. Die Zahlen sind ein Gefühl für Tendenzen, keine Messung. Dazu Wochenwerte für Belastung, Kilometer und Höhenmeter.
+- **Jahresrückblick:** Kennzahlen mit Vergleich zum Vorjahr, stärkster Monat, Lieblingstag, meistgefahrenes Rad, Fahrten über 100 und 150 km, Frühstarter, Winterfahrten, Pausen, Extreme beim Wetter, neue Kacheln und die fünf längsten Fahrten.
+- **Ziele:** Jahresziele für Kilometer, Höhenmeter, Fahrten und Fahrzeit mit Vergleich zum gleichmäßigen Plan, Hochrechnung aufs Jahresende und dem nötigen Wochenwert.
+- **Vergleiche:** Kilometer pro Monat und Jahr, Räder pro Jahr, Tempo, Profil, Tageszeit, Jahreszeiten, Tempo pro Monat, Meilensteine (500 bis 100.000 km), Bestenlisten und Vergleiche wie Erdumrundungen.
+
+Die Heatmap zoomt beim Öffnen auf dein Heimatgebiet; „Alles anzeigen“ zeigt auch Ausreißer wie Urlaubsfahrten.
+
 ## Kettenlehre, Erinnerungen und App
 
 **Kettenlehre.** In der Kettenkarte trägst du über „Messwert eintragen“ die gemessene Längung in Prozent ein (Grenzwert 0,5 % bei 10-fach und mehr, 0,75 % bei 9-fach und weniger). Ab dann rechnet die Regel „Kette wechseln“ mit dem gemessenen Zustand statt nur mit Kilometern: Aus Messwert und gefahrenen Kilometern wird die Längung bis heute fortgeschrieben und die Restkilometer bis zum Grenzwert angezeigt. Nach einem Kettenwechsel zählen alte Messwerte nicht mehr.

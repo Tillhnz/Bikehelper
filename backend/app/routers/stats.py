@@ -1,15 +1,17 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
 from ..importers import polyline
-from ..models import Activity, Bike, User
+from ..models import Activity, Bike, Goal, User
 from ..security import current_user
 from ..stats import tiles as T
+from ..stats import extra as X
 from ..stats.overview import Row, build_overview, get_tz, local
 
 router = APIRouter(prefix="/api", tags=["stats"])
@@ -87,3 +89,71 @@ def heatmap(
         _, _, n, e = T.tile_bounds(at[0], at[1])
         square = {"size": size, "bounds": [[s, w], [n, e]]}
     return {"lines": lines, "tiles": [list(t) for t in sorted(tiles)], "zoom": T.ZOOM, "max_square": square}
+
+
+def _today(tz):
+    return local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
+
+
+def _bike_names(db: Session, user: User) -> dict[int, str]:
+    return {b.id: b.name for b in db.scalars(select(Bike).where(Bike.user_id == user.id))}
+
+
+@router.get("/stats/extra")
+def stats_extra(
+    bike_id: int | None = Query(default=None),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Belastung, Vergleiche, Meilensteine und weitere Auswertungen über alle Jahre."""
+    tz, rows = _load(db, user, bike_id, None, with_tiles=False)
+    return X.build_extra([r for _, r in rows], tz, _today(tz), _bike_names(db, user))
+
+
+@router.get("/stats/review")
+def stats_review(
+    year: int = Query(),
+    bike_id: int | None = Query(default=None),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    tz, rows = _load(db, user, bike_id, None)
+    data = X.build_review([r for _, r in rows], tz, year, _today(tz), _bike_names(db, user))
+    data["years_available"] = sorted({local(a.start_date, tz).year for a, _ in rows})
+    return data
+
+
+class GoalsIn(BaseModel):
+    year: int
+    targets: dict[str, float | None]  # Metrik -> Zielwert; None oder 0 löscht das Ziel
+
+
+def _goal_targets(db: Session, user: User, year: int) -> dict[str, float]:
+    return {g.metric: g.target for g in db.scalars(select(Goal).where(Goal.user_id == user.id, Goal.year == year))}
+
+
+@router.get("/stats/goals")
+def get_goals(year: int = Query(), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    tz, rows = _load(db, user, None, None, with_tiles=False)
+    targets = _goal_targets(db, user, year)
+    return {"year": year, "targets": targets,
+            "progress": X.goals_progress([r for _, r in rows], tz, year, _today(tz), targets)}
+
+
+@router.put("/stats/goals")
+def save_goals(data: GoalsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    for metric, value in data.targets.items():
+        if metric not in X.GOAL_METRICS:
+            raise HTTPException(422, f"Unbekanntes Ziel: {metric}")
+        if value is not None and value < 0:
+            raise HTTPException(422, "Ziele müssen positiv sein.")
+        g = db.scalar(select(Goal).where(Goal.user_id == user.id, Goal.year == data.year, Goal.metric == metric))
+        if not value:
+            if g:
+                db.delete(g)
+        elif g:
+            g.target = value
+        else:
+            db.add(Goal(user_id=user.id, year=data.year, metric=metric, target=value))
+    db.commit()
+    return get_goals(data.year, user, db)

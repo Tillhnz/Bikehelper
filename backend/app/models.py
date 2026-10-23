@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, func,
+    BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -196,3 +196,15 @@ class RuleNotice(Base):
     rule_id: Mapped[int] = mapped_column(ForeignKey("maintenance_rules.id", ondelete="CASCADE"), primary_key=True)
     status: Mapped[str] = mapped_column(String(10))
     notified_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Goal(Base):
+    """Jahresziel eines Nutzers: Kilometer, Höhenmeter, Fahrten oder Fahrzeit (Stunden)."""
+    __tablename__ = "goals"
+    __table_args__ = (UniqueConstraint("user_id", "year", "metric"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    year: Mapped[int] = mapped_column(Integer)
+    metric: Mapped[str] = mapped_column(String(10))  # km | elev_m | rides | time_h
+    target: Mapped[float] = mapped_column(Float)
