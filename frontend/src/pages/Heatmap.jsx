@@ -174,15 +174,29 @@ export default function Heatmap() {
     st.tiles = data.tiles;
     st.zoomTile = data.zoom;
     st.square = data.max_square;
-    if (st.lines.length) {
+    st.fit = (everything) => {
+      if (!st.lines.length) return;
+      let use = st.lines;
+      if (!everything && st.lines.length >= 8) {
+        // Heimatgebiet: Ausreißer wie eine Urlaubsfahrt ausklammern (Mittelpunkte zwischen 8. und 92. Prozent)
+        const cx = st.lines.map((l) => (l.box[0] + l.box[2]) / 2).sort((u, v) => u - v);
+        const cy = st.lines.map((l) => (l.box[1] + l.box[3]) / 2).sort((u, v) => u - v);
+        const q = (arr, f) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))];
+        const [lx, hx, ly, hy] = [q(cx, 0.08), q(cx, 0.92), q(cy, 0.08), q(cy, 0.92)];
+        use = st.lines.filter((l) => {
+          const mx = (l.box[0] + l.box[2]) / 2, my = (l.box[1] + l.box[3]) / 2;
+          return mx >= lx && mx <= hx && my >= ly && my <= hy;
+        });
+      }
       let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
-      for (const l of st.lines) {
+      for (const l of use) {
         x0 = Math.min(x0, l.box[0]); y0 = Math.min(y0, l.box[1]);
         x1 = Math.max(x1, l.box[2]); y1 = Math.max(y1, l.box[3]);
       }
       const toLL = (x, y) => [(Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180) / Math.PI, x * 360 - 180];
-      st.map.fitBounds([toLL(x0, y1), toLL(x1, y0)], { padding: [30, 30], maxZoom: 13 });
-    }
+      st.map.fitBounds([toLL(x0, y1), toLL(x1, y0)], { padding: [30, 30], maxZoom: 13, animate: false });
+    };
+    st.fit(false);
     st.schedule();
   }, [data, cfg]);
 
@@ -210,6 +224,7 @@ export default function Heatmap() {
           <button className={`chip ${showTiles ? "on" : ""}`} onClick={() => setShowTiles(!showTiles)} aria-pressed={showTiles}>
             Erkundete Kacheln
           </button>
+          <button className="chip" onClick={() => state.current.fit?.(true)}>Alles anzeigen</button>
         </div>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
