@@ -8,6 +8,7 @@ import Login from "./pages/Login.jsx";
 import Home from "./pages/Home.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
+import Inventory from "./pages/Inventory.jsx";
 import Rides from "./pages/Rides.jsx";
 import Advisor from "./pages/Advisor.jsx";
 import RideDetail from "./pages/RideDetail.jsx";
@@ -63,6 +64,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/garage" element={<Garage />} />
+        <Route path="/inventory" element={<Inventory />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/advisor" element={<Advisor />} />
         <Route path="/rides" element={<Rides />} />

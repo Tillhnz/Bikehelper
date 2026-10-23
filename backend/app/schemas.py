@@ -111,6 +111,7 @@ class RuleOut(RuleIn):
     id: int
     variant: str | None = None  # Wachsart der letzten Wartung (nur Wachsregel)
     variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
+    guides: list[dict] | None = None  # Anleitungen und Videos zur Aufgabe
     measure: dict | None = None  # Hochrechnung aus der letzten Kettenmessung (nur Verschleißregel der Kette)
     km_since: float
     wet_km: float
@@ -257,3 +258,28 @@ class MeasurementOut(BaseModel):
     wear_pct: float
     note: str | None = None
     km: float  # gefahrene Kilometer der Kette bis zur Messung
+
+
+class InventoryIn(BaseModel):
+    category: str = Field(max_length=40)
+    name: str = Field(min_length=1, max_length=160)
+    brand: str | None = None
+    spec: str | None = None
+    quantity: int = Field(default=1, ge=0, le=9999)
+    min_quantity: int | None = Field(default=None, ge=0, le=9999)
+    price_eur: float | None = Field(default=None, ge=0, le=100000)
+    purchased_at: date | None = None
+    location: str | None = None
+    notes: str | None = None
+    bike_id: int | None = None
+
+
+class InventoryOut(InventoryIn):
+    id: int
+    low: bool = False
+
+
+class InstallIn(BaseModel):
+    bike_id: int
+    installed_at: date
+    with_rules: bool = True

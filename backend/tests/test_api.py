@@ -362,3 +362,27 @@ def test_goals_and_extra_stats_endpoints():
         assert ex["totals"]["rides"] == 3 and len(ex["load"]["weekly"]) == 26
         rv = c.get(f"/api/stats/review?year={year}", headers=h).json()
         assert rv["totals"]["km"] == 150.0 and rv["years_available"] == [year]
+
+
+def test_inventory_install_replaces_part_and_counts_down():
+    with TestClient(app) as c:
+        h = _user(c, "inv@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Gravel", "type": "gravel", "with_defaults": True}).json()
+        old = [x for x in c.get(f"/api/components?bike_id={bike['id']}", headers=h).json() if x["category"] == "chain"]
+        assert len(old) == 1 and old[0]["retired_at"] is None
+        item = c.post("/api/inventory", headers=h, json={"category": "chain", "name": "KMC X11", "quantity": 2, "min_quantity": 2, "price_eur": 30}).json()
+        assert item["low"] is False
+        r = c.post(f"/api/inventory/{item['id']}/install", headers=h, json={"bike_id": bike["id"], "installed_at": date.today().isoformat()}).json()
+        assert r["replaced"] == old[0]["name"] and r["item"]["quantity"] == 1 and r["item"]["low"] is True
+        comps = c.get(f"/api/components?bike_id={bike['id']}", headers=h).json()
+        chains = [x for x in comps if x["category"] == "chain"]
+        assert sum(1 for x in chains if x["retired_at"] is None) == 1
+        rules = c.get(f"/api/components/{r['component_id']}/rules", headers=h).json()
+        assert any(x["label"] == "Kette wechseln" and x["guides"] for x in rules)
+        inv = c.get("/api/inventory", headers=h).json()
+        assert inv["totals"]["value_eur"] == 30.0 and inv["totals"]["low"] == 1
+        # nicht vorhandenes Lager und fremdes Rad
+        c.post(f"/api/inventory/{item['id']}/install", headers=h, json={"bike_id": bike["id"], "installed_at": date.today().isoformat()})
+        assert c.post(f"/api/inventory/{item['id']}/install", headers=h, json={"bike_id": bike["id"], "installed_at": date.today().isoformat()}).status_code == 409
+        other = _user(c, "inv2@example.com")
+        assert c.delete(f"/api/inventory/{item['id']}", headers=other).status_code == 404

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..catalog import WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload
+from ..catalog import WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload, guides_for
 from ..database import get_db
 from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, User
 from ..schemas import (
@@ -78,7 +78,7 @@ def _rule_out(db: Session, c: Component, r: MaintenanceRule) -> RuleOut:
     )
     return RuleOut(
         id=r.id, label=r.label, interval_km=interval_km, interval_months=r.interval_months,
-        wet_factor=r.wet_factor or 1.0, hint=r.hint, variants=variants, **st,
+        wet_factor=r.wet_factor or 1.0, hint=r.hint, variants=variants, guides=guides_for(r.label), **st,
     )
 
 

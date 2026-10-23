@@ -95,7 +95,12 @@ export default function Garage() {
     <>
       <header className="page-head">
         <h1>Garage</h1>
-        {!adding && <button className="btn primary" onClick={() => setAdding(true)}>Rad hinzufügen</button>}
+        {!adding && (
+          <div className="actions" style={{ margin: 0 }}>
+            <Link className="btn" to="/inventory">Inventar</Link>
+            <button className="btn primary" onClick={() => setAdding(true)}>Rad hinzufügen</button>
+          </div>
+        )}
       </header>
 
       {adding && (

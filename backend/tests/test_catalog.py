@@ -46,3 +46,15 @@ def test_chain_rules_by_lube():
     assert wax_interval_km(WAX_LUBE_LABEL, "drip_wax", 500) == 250
     assert wax_interval_km(WAX_LUBE_LABEL, None, 500) == 500
     assert wax_interval_km("Kette wechseln", "drip_wax", 5000) == 5000
+
+
+def test_every_catalog_rule_has_guides():
+    from app.catalog import CATALOG, CHAIN_LUBES, GUIDES, guides_for
+    labels = {r.label for c in CATALOG.values() for r in c.rules}
+    for spec in CHAIN_LUBES.values():
+        labels |= {spec["lube"].label, spec["wear"].label}
+    assert not [l for l in labels if l not in GUIDES]
+    for gs in GUIDES.values():
+        for g in gs:
+            assert g.url.startswith("https://") and g.title and g.source
+    assert guides_for("gibt es nicht") == []

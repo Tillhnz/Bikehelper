@@ -95,6 +95,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax" });
   const [hintOpen, setHintOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const unknown = rule.status === "unknown";
   const wet = rule.wet_factor > 1;
 
@@ -129,6 +130,11 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               {hintOpen ? "Hinweis ausblenden" : "Hinweis"}
             </button>
           )}
+          {rule.guides?.length > 0 && (
+            <button className="link small" onClick={() => setGuideOpen(!guideOpen)} aria-expanded={guideOpen}>
+              {guideOpen ? "Anleitungen ausblenden" : "Anleitung"}
+            </button>
+          )}
           {!disabled && <button className="link small" onClick={() => setOpen(!open)}>Erledigt</button>}
           <button className="link small" onClick={onDelete}>Regel löschen</button>
         </span>
@@ -140,6 +146,19 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
         </p>
       )}
       {hintOpen && rule.hint && <p className="hint-box small">{rule.hint}</p>}
+      {guideOpen && (
+        <ul className="guide-list">
+          {rule.guides.map((g) => (
+            <li key={g.url}>
+              <a href={g.url} target="_blank" rel="noopener noreferrer">{g.title}</a>
+              <span className="muted small">
+                {g.source}{g.lang === "en" ? ", Englisch" : ""}{g.video ? " · mit Video" : ""}
+              </span>
+            </li>
+          ))}
+          <li className="muted small">Die Links führen zu fremden Seiten. Bei Bremsen und Steuersatz im Zweifel eine Werkstatt fragen.</li>
+        </ul>
+      )}
       {open && (
         <form className="inline-form" onSubmit={submit}>
           <label>Datum<input type="date" value={done.performed_at} onChange={(e) => setDone({ ...done, performed_at: e.target.value })} required /></label>

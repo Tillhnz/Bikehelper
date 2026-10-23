@@ -208,3 +208,23 @@ class Goal(Base):
     year: Mapped[int] = mapped_column(Integer)
     metric: Mapped[str] = mapped_column(String(10))  # km | elev_m | rides | time_h
     target: Mapped[float] = mapped_column(Float)
+
+
+class InventoryItem(Base):
+    """Teil im Lager (Ersatzteile, Verschleißteile, Verbrauchsmaterial)."""
+    __tablename__ = "inventory_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bike_id: Mapped[int | None] = mapped_column(ForeignKey("bikes.id", ondelete="SET NULL"), nullable=True)  # passt zu
+    category: Mapped[str] = mapped_column(String(40))  # Kategorie des Katalogs oder "other"
+    name: Mapped[str] = mapped_column(String(160))
+    brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    spec: Mapped[str | None] = mapped_column(String(160), nullable=True)  # Größe, Typ, Breite …
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    min_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)  # darunter erscheint eine Warnung
+    price_eur: Mapped[float | None] = mapped_column(Float, nullable=True)  # Preis je Stück
+    purchased_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

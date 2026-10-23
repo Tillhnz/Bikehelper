@@ -221,3 +221,100 @@ def catalog_payload() -> dict:
         "wax_variants": WAX_VARIANTS,
         "bike_templates": {k: list(v) for k, v in BIKE_TEMPLATES.items()},
     }
+
+
+# ---------- Anleitungen und Videos ----------
+# Ausgewählt und einzeln geprüft (Stand Oktober 2026). Hauptquelle sind die Reparaturanleitungen von Park Tool, einem
+# großen Werkzeughersteller; sie sind auf Englisch, mit Bildern und teils mit Video. Für Wachs die Anleitungen von Silca.
+# `video` ist nur gesetzt, wenn auf der Seite ein Video eingebettet war. Zugeordnet wird über den Namen der Wartungsregel.
+@dataclass(frozen=True)
+class Guide:
+    title: str
+    url: str
+    source: str
+    video: bool = False
+    lang: str = "en"
+
+
+PT = "Park Tool"
+_PT = "https://www.parktool.com/en-us/blog/repair-help/"
+SILCA = "https://silca.cc/"
+
+_G_CLEAN = (
+    Guide("Kette reinigen und schmieren", _PT.replace("en-us", "en-int") + "chain-cleaning-with-a-park-tool-chain-scrubber", PT, True),
+    Guide("Welches Schmiermittel wofür? (Öl, Wachs, Fett)", _PT.replace("en-us", "en-int") + "the-park-tool-guide-to-bicycle-lubricants-and-compounds", PT),
+)
+_G_WAX = (
+    Guide("Kette reinigen und wachsen (Video)", SILCA + "pages/how-to-apply-chain-lube", "Silca", True),
+    Guide("Gewachste Kette in jedem Wetter pflegen", SILCA + "blogs/silca/how-to-maintain-a-waxed-chain", "Silca"),
+    Guide("Kette entfetten: Wachs vorbereiten", SILCA + "pages/ultimate-chain-stripper-and-wax-prep", "Silca"),
+)
+_G_CHAIN = (
+    Guide("Wann die Kette gewechselt werden muss", _PT + "when-to-replace-a-chain-on-a-bicycle", PT, True),
+    Guide("Kette wechseln (Kettenschaltung)", _PT + "chain-replacement-derailleur-bikes", PT),
+    Guide("Kettenlänge bestimmen", _PT + "chain-length-sizing", PT),
+)
+_G_PADS = (
+    Guide("Scheibenbremsbeläge aus- und einbauen", _PT.replace("en-us", "en-int") + "disc-brake-pad-removal-installation", PT, True),
+    Guide("Hydraulische Scheibenbremse ausrichten", _PT + "hydraulic-disc-brake-alignment", PT),
+    Guide("Bremsbeläge bei Felgenbremsen wechseln", _PT + "brake-pad-replacement-rim-brakes", PT),
+)
+_G_TUBELESS = (
+    Guide("Tubeless-Reifen montieren und reparieren", _PT + "tubeless-tire-mounting-and-repair", PT, True),
+    Guide("Auf Tubeless umrüsten", _PT + "tubeless-tire-conversion", PT),
+)
+
+GUIDES: dict[str, tuple[Guide, ...]] = {
+    "Kette reinigen und schmieren": _G_CLEAN,
+    WAX_LUBE_LABEL: _G_WAX,
+    "Kette neu wachsen (Heißwachs)": _G_WAX,
+    "Kette nachwachsen (Tropfwachs)": _G_WAX,
+    "Kette wechseln": _G_CHAIN,
+    "Kassette wechseln": (
+        Guide("Kassette aus- und einbauen", _PT + "cassette-removal-and-installation", PT),
+        Guide("Antrieb: Geräusche finden", _PT + "troubleshooting-a-noisy-drivetrain", PT),
+    ),
+    "Kettenblätter wechseln": (
+        Guide("Kurbel aus- und einbauen (dreiteilig)", _PT + "crank-removal-and-installation-three-piece", PT),
+        Guide("Wahl des Werkzeugs für den Kettenblatt-Verschlussring", _PT + "chainring-lockring-tool-selection", PT),
+    ),
+    "Reifen vorn wechseln": (
+        Guide("Reifen und Schlauch aus- und einbauen", _PT + "tire-and-tube-removal-and-installation", PT, True),
+    ) + _G_TUBELESS[:1],
+    "Reifen hinten wechseln": (
+        Guide("Reifen und Schlauch aus- und einbauen", _PT + "tire-and-tube-removal-and-installation", PT, True),
+    ) + _G_TUBELESS[:1],
+    "Belagstärke prüfen": _G_PADS[:2],
+    "Bremsbeläge wechseln": _G_PADS,
+    "Bremse entlüften, Flüssigkeit wechseln": (
+        Guide("Shimano-Bremsen entlüften (Mineralöl)", _PT + "shimano-hydraulic-brake-service-and-adjustment", PT),
+        Guide("SRAM-Bremsen entlüften (DOT)", _PT + "brake-bleeding-for-sram-hydraulic-brakes-using-the-bkd-1", PT, True),
+    ),
+    "Züge und Hüllen prüfen oder erneuern": (
+        Guide("Schaltzug wechseln (Rennlenker)", _PT + "shift-cable-replacement-drop-bars", PT, True),
+        Guide("Bremszug und -hülle einbauen (Rennlenker)", _PT.replace("en-us", "en-int") + "brake-housing-cable-installation-drop-bars", PT),
+        Guide("Zughüllen richtig ablängen", _PT + "cutting-and-sizing-cable-housing", PT),
+    ),
+    "Lenkerband erneuern": (
+        Guide("Lenkerband wickeln (Rennlenker)", _PT + "handlebar-tape-installation-drop-bars", PT, True),
+    ),
+    "Dichtmilch nachfüllen": _G_TUBELESS,
+    "Dichtmilch komplett erneuern": _G_TUBELESS,
+    "Steuersatz warten": (
+        Guide("Gewindeloser Steuersatz: warten und fetten", _PT.replace("en-us", "en-int") + "threadless-headset-service", PT, True),
+        Guide("Gewindeloser Steuersatz: einstellen", _PT.replace("en-us", "en-int") + "how-to-adjust-a-threadless-headset", PT),
+    ),
+    "Innenlager prüfen und warten": (
+        Guide("Pressfit-Innenlager aus- und einbauen", _PT + "bottom-bracket-removal-installation-press-fit", PT, True),
+        Guide("Innenlager zum Einschrauben aus- und einbauen", _PT + "bottom-bracket-removal-installation-thread-together", PT),
+        Guide("Innenlager mit Konuslager warten", _PT + "bottom-bracket-service-adjustable-cup-and-cone", PT),
+    ),
+    "Nabenlager warten": (
+        Guide("Nabe warten und einstellen (Konuslager)", _PT.replace("en-us", "en-int") + "hub-overhaul-and-adjustment", PT, True),
+        Guide("Freilaufkörper warten", _PT.replace("en-us", "en-int") + "freehub-service", PT),
+    ),
+}
+
+
+def guides_for(label: str) -> list[dict]:
+    return [asdict(g) for g in GUIDES.get(label, ())]

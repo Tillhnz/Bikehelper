@@ -828,3 +828,26 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
 .home-bike-info{display:flex;flex-direction:column;gap:.25rem;align-items:flex-start;min-width:0}
 .home-bike-info strong{font-family:var(--font-display);font-size:1.3rem}
 @media (prefers-reduced-motion:reduce){.week-fill{animation:none}.home-bike{transition:none}.home-bike:hover{transform:none}}
+
+/* Anleitungen */
+.guide-list{list-style:none;margin:.5rem 0 0;padding:.6rem .9rem;background:var(--ink-2);border-radius:var(--r-ctl);display:grid;gap:.5rem}
+.guide-list li{display:flex;flex-direction:column;gap:.1rem}
+.guide-list a{color:var(--celeste);text-decoration:none}
+.guide-list a:hover{text-decoration:underline}
+
+/* Inventar */
+.inv-list{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.75rem}
+.inv-item{margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.75rem 1.25rem;align-items:center}
+.inv-item.gone{opacity:.6}
+.inv-main{display:flex;flex-direction:column;gap:.15rem;min-width:0}
+.inv-main strong{font-family:var(--font-display);font-size:1.25rem}
+.inv-qty{display:flex;align-items:center;gap:.5rem;font-family:var(--font-display);font-size:1.5rem}
+.inv-qty .low{color:var(--amber)}
+.qty-btn{width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:var(--ink-2);color:var(--chalk);font-size:1.2rem;cursor:pointer;line-height:1;transition:border-color .2s}
+.qty-btn:hover:not(:disabled){border-color:var(--celeste)}
+.qty-btn:disabled{opacity:.4;cursor:default}
+.inv-actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+.inv-install{grid-column:1 / -1}
+.inv-item > form{grid-column:1 / -1}
+@media (max-width:800px){.inv-item{grid-template-columns:minmax(0,1fr) auto}.inv-actions{grid-column:1 / -1}}
+@media (prefers-reduced-motion:reduce){.qty-btn{transition:none}}
