@@ -30,7 +30,7 @@ Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413�
 
 ## Ratgeber
 
-Die Seite „Ratgeber“ beantwortet für die nächste Tour zwei Fragen. Du wählst Rad, Start, Dauer, Tempo und Ort. Das Wetter kommt aus der 15-Tage-Vorhersage von Open-Meteo (nur gerundeter Ort und Zeit werden gesendet) oder von Hand.
+Die Seite „Ratgeber“ beantwortet für die nächste Tour zwei Fragen. Du wählst Rad, Start (vorbelegt mit jetzt), Dauer, Durchschnittsgeschwindigkeit und Ort. Reifenbreite, Radgewicht und Felge kommen aus der Garage (montierter Reifensatz und Radangaben), der Untergrund ist je Radtyp vorbelegt (Rennrad Asphalt, Gravel fester Schotter). Das Wetter kommt aus der 15-Tage-Vorhersage von Open-Meteo (nur gerundeter Ort und Zeit werden gesendet) oder von Hand.
 
 Die Oberfläche arbeitet mit Reglern und Bildkarten: Du wählst dein Rad (oder einen Radtyp) als Zeichnung, stellst Reifenbreite, Untergrund, Start, Dauer, Tempo und Gewicht per Schieberegler ein, und Reifendruck, Kleidung und Wetter passen sich sofort an. Die Garage zeigt jedes Rad als schlichte Strichzeichnung je nach Typ (Rennrad, Gravel, Mountainbike, Sonstiges). Bewegung (Zeichnen, rollender Kilometerzähler, Messuhren) wird abgeschaltet, wenn dein System „Bewegung reduzieren“ eingestellt hat.
 

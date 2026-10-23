@@ -75,3 +75,18 @@ def test_temperature_swing_darkness_and_ice():
 def test_invalid():
     with pytest.raises(ValueError):
         advise(temp_avg=10, intensity="rasant")
+
+
+def test_average_speed_replaces_intensity_steps():
+    from app.advisor.clothing import SPEED_KMH
+
+    easy = base(temp_avg=12.0, intensity="easy")
+    slow = base(temp_avg=12.0, speed_kmh=SPEED_KMH["easy"])
+    assert slow.effective_temp == easy.effective_temp  # gleiche Stufe wie "locker"
+    normal = base(temp_avg=12.0, speed_kmh=SPEED_KMH["normal"])
+    assert normal.effective_temp == base(temp_avg=12.0).effective_temp
+    fast = base(temp_avg=12.0, speed_kmh=40.0)
+    assert fast.effective_temp > normal.effective_temp  # schneller: wärmer, also leichtere Kleidung
+    assert fast.effective_temp - normal.effective_temp <= 3.0 + 3.0  # begrenzt, Fahrtwind zählt extra
+    # Für den Mountainbiker ist 20 km/h schon flott, für den Rennradfahrer locker
+    assert base(temp_avg=12.0, speed_kmh=20.0, bike_type="mtb").effective_temp > base(temp_avg=12.0, speed_kmh=20.0).effective_temp

@@ -738,3 +738,15 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
   .bike-card .odo-digit { width: 32px; --h: 50px; font-size: 2.1rem; }
 }
 .advisor-controls, .advisor-results { min-width: 0; }
+
+/* ---------- Ratgeber: Angaben aus der Garage ---------- */
+
+.garage-facts { background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 1rem; }
+.garage-facts-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 0.3rem; }
+.garage-facts .field-label { margin: 0; }
+.garage-facts dl { margin: 0; display: grid; gap: 0.35rem; }
+.garage-facts dl > div { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.9rem; }
+.garage-facts dt { color: var(--mute); flex: none; }
+.garage-facts dd { margin: 0; text-align: right; }
+.garage-facts .missing dd { color: var(--amber); }
+@media (max-width: 800px) { .garage-facts dl > div { flex-direction: column; gap: 0; } .garage-facts dd { text-align: left; } }

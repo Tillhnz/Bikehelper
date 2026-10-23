@@ -15,11 +15,15 @@ const SURFACES = [
   { value: "gravel", label: "Lockerer Schotter", short: "Locker" },
   { value: "chunky", label: "Grober Schotter, Trail", short: "Grob" },
 ];
-const INTENSITIES = [
-  { value: "easy", label: "Locker", hint: "Grundlage oder Ausflug" },
-  { value: "normal", label: "Normal" },
-  { value: "hard", label: "Zügig", hint: "Intervalle, Rennen oder ein hartes Training" },
-];
+// Standard je Radtyp: Untergrund und Durchschnittsgeschwindigkeit (das "normale" Tempo des Radtyps im Backend)
+const SURFACE_DEFAULT = { road: "asphalt", gravel: "hardpack", mtb: "chunky", other: "asphalt" };
+const SPEED_DEFAULT = { road: 27, gravel: 23, mtb: 19, other: 21 };
+const speedHint = (speed, type) => {
+  const d = speed - (SPEED_DEFAULT[type] ?? 25);
+  if (d <= -3) return "Lockeres Tempo: Du erzeugst weniger Wärme, die Kleidung fällt wärmer aus.";
+  if (d >= 3) return "Zügiges Tempo: Dir wird wärmer, die Kleidung fällt leichter aus.";
+  return "Normales Tempo für dieses Rad.";
+};
 const SENSITIVITIES = [
   { value: "cold", label: "Ich friere schnell", short: "Friert schnell" },
   { value: "normal", label: "Normal" },
@@ -44,19 +48,17 @@ const dayLabel = (offset) => {
   d.setDate(d.getDate() + offset);
   return d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" });
 };
-const fmtHour = (h) => `${pad(Math.floor(h))}:${h % 1 ? "30" : "00"} Uhr`;
+const fmtClock = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)} Uhr`;
+const nowMinutes = () => {
+  const d = new Date();
+  return Math.min(1435, Math.floor((d.getHours() * 60 + d.getMinutes()) / 5) * 5);
+};
 const fmtDur = (m) => {
   const h = Math.floor(m / 60);
   const r = m % 60;
   if (!h) return `${r} Min.`;
   return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
 };
-
-function defaultWhen() {
-  const d = new Date();
-  if (d.getHours() >= 17) return { day: 1, hour: 9 };
-  return { day: 0, hour: Math.min(21, d.getHours() + 1) };
-}
 
 function loadSaved() {
   try {
@@ -249,22 +251,62 @@ function PickCard({ type, title, sub, selected, onClick, tireMm }) {
   );
 }
 
+/** Angaben, die vom gewählten Rad aus der Garage kommen. */
+const TYPICAL_BIKE_KG = { road: 8, gravel: 10, mtb: 13, other: 11 };
+
+function GarageFacts({ bike }) {
+  const set = bike.tire_set;
+  const width = set?.width_mm ?? bike.tire_width_mm;
+  const rows = [
+    {
+      label: "Reifen",
+      value: set ? `${set.name}${set.width_mm ? `, ${fmtNum(set.width_mm, 0)} mm` : ""}${bike.tubeless === false ? ", mit Schlauch" : ", tubeless"}` : width ? `${fmtNum(width, 0)} mm` : null,
+      missing: "Kein Reifensatz montiert",
+    },
+    {
+      label: "Gewicht des Rads",
+      value: bike.bike_weight_kg ? `${fmtNum(bike.bike_weight_kg)} kg` : null,
+      missing: `nicht eingetragen, gerechnet wird mit ${TYPICAL_BIKE_KG[bike.type] ?? 11} kg`,
+    },
+    {
+      label: "Innenweite der Felge",
+      value: bike.rim_inner_mm ? `${fmtNum(bike.rim_inner_mm)} mm${bike.hookless ? ", hookless" : ""}` : null,
+      missing: "nicht eingetragen, gerechnet wird mit einem typischen Wert",
+    },
+  ];
+  return (
+    <div className="garage-facts">
+      <div className="garage-facts-head">
+        <span className="field-label">Aus der Garage</span>
+        <Link className="link small" to={`/bikes/${bike.id}`}>Ändern</Link>
+      </div>
+      <dl>
+        {rows.map((r) => (
+          <div key={r.label} className={r.value ? "" : "missing"}>
+            <dt>{r.label}</dt>
+            <dd>{r.value ?? r.missing}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 // ---------- Seite ----------
 
 export default function Advisor() {
   const saved = useMemo(loadSaved, []);
-  const when = useMemo(defaultWhen, []);
   const [defs, setDefs] = useState(null);
   const [form, setForm] = useState({
     bike_id: saved.bike_id ?? "",
     bike_type: saved.bike_type ?? "road",
-    day: when.day,
-    hour: when.hour,
+    day: 0,
+    minutes: nowMinutes(),
     duration_min: saved.duration_min ?? 120,
-    intensity: saved.intensity ?? "normal",
+    speed: SPEED_DEFAULT[saved.bike_type ?? "road"],
     sensitivity: saved.sensitivity ?? "normal",
     elevation_gain_m: "",
-    surface: saved.surface ?? "asphalt",
+    surface: SURFACE_DEFAULT[saved.bike_type ?? "road"],
     casing: saved.casing ?? "standard",
     wetness: "auto",
     rider_kg: saved.rider_kg ?? "",
@@ -302,12 +344,13 @@ export default function Advisor() {
     patch({
       bike_id: b.id,
       bike_type: b.type,
-      tire_width_mm: b.tire_width_mm ?? TYPICAL_WIDTH[b.type] ?? 28,
+      tire_width_mm: b.tire_set?.width_mm ?? b.tire_width_mm ?? TYPICAL_WIDTH[b.type] ?? 28,
       rim_inner_mm: b.rim_inner_mm ?? "",
       bike_kg: b.bike_weight_kg ?? "",
       tubeless: b.tubeless,
       hookless: b.hookless,
-      surface: b.type === "gravel" && form.surface === "asphalt" ? "hardpack" : form.surface,
+      surface: SURFACE_DEFAULT[b.type] ?? "asphalt",
+      speed: SPEED_DEFAULT[b.type] ?? 25,
     });
   }
 
@@ -319,7 +362,8 @@ export default function Advisor() {
     patch({
       bike_type: type,
       tire_width_mm: TYPICAL_WIDTH[type],
-      surface: type === "gravel" && form.surface === "asphalt" ? "hardpack" : form.surface,
+      surface: SURFACE_DEFAULT[type] ?? "asphalt",
+      speed: SPEED_DEFAULT[type] ?? 25,
     });
   }
 
@@ -340,9 +384,9 @@ export default function Advisor() {
   const request = useMemo(() => {
     const date = isoDay(form.day);
     const body = {
-      start: `${date}T${pad(Math.floor(form.hour))}:${form.hour % 1 ? "30" : "00"}:00`,
+      start: `${date}T${pad(Math.floor(form.minutes / 60))}:${pad(form.minutes % 60)}:00`,
       duration_min: Number(form.duration_min),
-      intensity: form.intensity,
+      avg_speed_kmh: Number(form.speed),
       sensitivity: form.sensitivity,
       elevation_gain_m: num(form.elevation_gain_m),
       bike_id: form.bike_id ? Number(form.bike_id) : null,
@@ -400,9 +444,9 @@ export default function Advisor() {
   useEffect(() => {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        bike_id: form.bike_id, bike_type: form.bike_type, duration_min: form.duration_min, intensity: form.intensity,
-        sensitivity: form.sensitivity, surface: form.surface, casing: form.casing, luggage_kg: form.luggage_kg,
-        rider_kg: form.rider_kg, tire_width_mm: form.tire_width_mm, place, manual, manualWx,
+        bike_id: form.bike_id, bike_type: form.bike_type, duration_min: form.duration_min,
+        sensitivity: form.sensitivity, casing: form.casing, luggage_kg: form.luggage_kg,
+        rider_kg: form.rider_kg, place, manual, manualWx,
       }));
     } catch { /* ohne Speicher weiter */ }
   }, [form, place, manual, manualWx]);
@@ -443,6 +487,8 @@ export default function Advisor() {
 
   const bikes = defs?.bikes ?? [];
   const showTypes = !form.bike_id;
+  const bike = bikes.find((b) => String(b.id) === String(form.bike_id)) ?? null;
+  const widthKnown = !!(bike && (bike.tire_set?.width_mm ?? bike.tire_width_mm));
 
   return (
     <>
@@ -476,7 +522,14 @@ export default function Advisor() {
             </div>
 
             <div className="stage-controls">
-              <Slider label="Reifenbreite" value={form.tire_width_mm} onChange={(v) => patch({ tire_width_mm: v })} min={23} max={65} format={(v) => `${v} mm`} marks={["23", "35", "50", "65"]} />
+              {!widthKnown && (
+                <Slider
+                  label="Reifenbreite" value={form.tire_width_mm} onChange={(v) => patch({ tire_width_mm: v })} min={23} max={65}
+                  format={(v) => `${v} mm`} marks={["23", "35", "50", "65"]}
+                  hint={bike ? "Für dieses Rad ist kein Reifensatz montiert. Trage ihn in der Garage ein, dann gilt seine Breite automatisch." : undefined}
+                />
+              )}
+              {bike && <GarageFacts bike={bike} />}
               <StopSlider label="Untergrund" value={form.surface} onChange={(v) => patch({ surface: v })} options={SURFACES} />
             </div>
             {bikes.length === 0 && <p className="hint">Tipp: Lege in der <Link to="/">Garage</Link> ein Rad mit Reifenbreite an, dann füllt sich vieles von selbst.</p>}
@@ -493,9 +546,12 @@ export default function Advisor() {
               ))}
             </div>
             <div className="slider-stack">
-              <Slider label="Start" value={form.hour} onChange={(v) => patch({ hour: v })} min={0} max={23.5} step={0.5} format={fmtHour} />
+              <div>
+                <Slider label="Start" value={form.minutes} onChange={(v) => patch({ minutes: v })} min={0} max={1435} step={5} format={fmtClock} marks={["0 Uhr", "12 Uhr", "24 Uhr"]} />
+                <button type="button" className="link small" onClick={() => patch({ day: 0, minutes: nowMinutes() })}>Auf jetzt setzen</button>
+              </div>
               <Slider label="Dauer" value={form.duration_min} onChange={(v) => patch({ duration_min: v })} min={30} max={600} step={15} format={fmtDur} marks={["30 Min.", "5 Std.", "10 Std."]} />
-              <StopSlider label="Tempo" value={form.intensity} onChange={(v) => patch({ intensity: v })} options={INTENSITIES} />
+              <Slider label="Durchschnittsgeschwindigkeit" value={form.speed} onChange={(v) => patch({ speed: v })} min={8} max={45} step={1} format={(v) => `${v} km/h`} hint={speedHint(form.speed, form.bike_type)} />
               <StopSlider label="Kälteempfinden" value={form.sensitivity} onChange={(v) => patch({ sensitivity: v })} options={SENSITIVITIES} />
               <Slider label="Höhenmeter" optional autoText="nicht angegeben" fallback={0} value={form.elevation_gain_m} onChange={(v) => patch({ elevation_gain_m: v })} min={0} max={3000} step={50} format={(v) => `${v} m`} />
             </div>
@@ -545,8 +601,12 @@ export default function Advisor() {
               <Slider label="Dein Gewicht" optional autoText="noch nicht angegeben" fallback={75} value={form.rider_kg} onChange={(v) => patch({ rider_kg: v })} min={40} max={140} step={0.5} format={(v) => `${fmtNum(v)} kg`} />
               {form.rider_kg !== "" && <button type="button" className="link small save-weight" onClick={saveWeight}>Im Profil speichern</button>}
               <Slider label="Gepäck, Flaschen, Kleidung" value={Number(form.luggage_kg)} onChange={(v) => patch({ luggage_kg: v })} min={0} max={12} step={0.5} format={(v) => `${fmtNum(v)} kg`} />
-              <Slider label="Gewicht des Rads" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "mtb" ? 13 : 9} value={form.bike_kg} onChange={(v) => patch({ bike_kg: v })} min={6} max={22} step={0.1} format={(v) => `${fmtNum(v)} kg`} />
-              <Slider label="Innenweite der Felge" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "road" ? 19 : 24} value={form.rim_inner_mm} onChange={(v) => patch({ rim_inner_mm: v })} min={15} max={32} step={0.5} format={(v) => `${fmtNum(v)} mm`} />
+              {!bike && (
+                <>
+                  <Slider label="Gewicht des Rads" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "mtb" ? 13 : 9} value={form.bike_kg} onChange={(v) => patch({ bike_kg: v })} min={6} max={22} step={0.1} format={(v) => `${fmtNum(v)} kg`} />
+                  <Slider label="Innenweite der Felge" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "road" ? 19 : 24} value={form.rim_inner_mm} onChange={(v) => patch({ rim_inner_mm: v })} min={15} max={32} step={0.5} format={(v) => `${fmtNum(v)} mm`} />
+                </>
+              )}
             </div>
             <Segmented
               label="Reifenkarkasse"
@@ -560,10 +620,12 @@ export default function Advisor() {
               onChange={(v) => patch({ wetness: v })}
               options={[{ value: "auto", label: "Nach Wetter" }, { value: "dry", label: "Trocken" }, { value: "damp", label: "Feucht" }, { value: "wet", label: "Nass" }]}
             />
-            <div className="switch-row">
-              <Switch checked={form.tubeless} onChange={(v) => patch({ tubeless: v })}>Tubeless</Switch>
-              <Switch checked={form.hookless} onChange={(v) => patch({ hookless: v })}>Hookless-Felgen</Switch>
-            </div>
+            {!bike && (
+              <div className="switch-row">
+                <Switch checked={form.tubeless} onChange={(v) => patch({ tubeless: v })}>Tubeless</Switch>
+                <Switch checked={form.hookless} onChange={(v) => patch({ hookless: v })}>Hookless-Felgen</Switch>
+              </div>
+            )}
           </section>
         </div>
 

@@ -12,6 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import Activity, Bike, User
 from ..security import current_user
+from ..services import current_tire_set
 from .garage import _own_bike
 
 router = APIRouter(prefix="/api", tags=["advisor"])
@@ -46,6 +47,7 @@ def defaults(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "bikes": [
             {
                 "id": b.id, "name": b.name, "type": b.type, "tire_width_mm": b.tire_width_mm,
+                "tire_set": ({"name": ts.name, "width_mm": ts.width_mm} if (ts := current_tire_set(db, b.id)) else None),
                 "rim_inner_mm": b.rim_inner_mm, "bike_weight_kg": b.bike_weight_kg,
                 "tubeless": True if b.tubeless is None else b.tubeless, "hookless": bool(b.hookless),
             }
@@ -82,6 +84,7 @@ class PlanIn(BaseModel):
     lng: float | None = Field(default=None, ge=-180, le=180)
     manual: ManualWeather | None = None
     intensity: Literal["easy", "normal", "hard"] = "normal"
+    avg_speed_kmh: float | None = Field(default=None, ge=5, le=60)  # hat Vorrang vor intensity
     sensitivity: Literal["cold", "normal", "warm"] = "normal"
     elevation_gain_m: float | None = Field(default=None, ge=0, le=10000)
     # Reifen
@@ -156,7 +159,7 @@ def plan(data: PlanIn, user: User = Depends(current_user), db: Session = Depends
         temp_avg=rw.temp_avg, temp_start=rw.temp_start, temp_min=rw.temp_min, temp_max=rw.temp_max,
         wind_kmh=rw.wind_kmh or 0.0, gust_kmh=rw.gust_kmh, precip_mm=rw.precip_mm or 0.0,
         precip_prob=rw.precip_prob, wet_minutes=rw.wet_minutes or 0.0, uv=rw.uv,
-        duration_min=data.duration_min, intensity=data.intensity, sensitivity=data.sensitivity,
+        duration_min=data.duration_min, intensity=data.intensity, speed_kmh=data.avg_speed_kmh, sensitivity=data.sensitivity,
         bike_type=bike_type, elevation_gain_m=data.elevation_gain_m, dark_minutes=rw.dark_minutes,
     )
 

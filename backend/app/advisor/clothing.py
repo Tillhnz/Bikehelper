@@ -65,6 +65,7 @@ def advise(
     uv: float | None = None,
     duration_min: float = 90.0,
     intensity: str = "normal",
+    speed_kmh: float | None = None,
     sensitivity: str = "normal",
     bike_type: str = "road",
     elevation_gain_m: float | None = None,
@@ -78,7 +79,14 @@ def advise(
 
     reasons: list[str] = []
     ref = (start + temp_avg) / 2
-    speed = max(10.0, SPEED_KMH[intensity] + SPEED_BY_TYPE.get(bike_type, 0.0))
+    normal_speed = SPEED_KMH["normal"] + SPEED_BY_TYPE.get(bike_type, 0.0)
+    intensity_adj = INTENSITY_ADJ[intensity]
+    if speed_kmh is not None:
+        # Durchschnittsgeschwindigkeit statt Stufe: Abweichung vom normalen Tempo dieses Radtyps, 0,6 °C je km/h
+        delta = speed_kmh - normal_speed
+        intensity_adj = max(INTENSITY_ADJ["easy"], min(INTENSITY_ADJ["hard"], 0.6 * delta))
+        intensity = "easy" if delta <= -3 else "hard" if delta >= 3 else "normal"
+    speed = max(10.0, speed_kmh if speed_kmh is not None else SPEED_KMH[intensity] + SPEED_BY_TYPE.get(bike_type, 0.0))
     # Die Stufen der Quellen gelten schon für normalen Fahrtwind. Zusätzlich zählt nur, was der echte Wind dazu beiträgt
     # (im Schnitt die Hälfte des Windes als Gegen- oder Seitenwind).
     loss = wind_chill_loss(ref, speed + 0.5 * wind_kmh) - wind_chill_loss(ref, speed)
@@ -96,7 +104,7 @@ def advise(
         te += RAIN_LIGHT_ADJ
         reasons.append("Leichter Regen möglich: etwas wärmer anziehen.")
 
-    te += INTENSITY_ADJ[intensity] + SENSITIVITY_ADJ[sensitivity]
+    te += intensity_adj + SENSITIVITY_ADJ[sensitivity]
     if intensity == "hard":
         reasons.append("Bei hoher Intensität wird dir warm: eine Schicht weniger.")
     elif intensity == "easy":
