@@ -4,9 +4,9 @@ import { api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import { Bars, CalendarHeat, CumulativeLines, HBars } from "../components/charts.jsx";
 import { EmptyState } from "../components/ui.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
-import { CompareView, GoalsView, LoadView, ReviewView } from "../components/StatsExtra.jsx";
+import { CompareView, GoalsView, LoadView, PlacesView, ReviewView } from "../components/StatsExtra.jsx";
 
-const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"]];
+const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
 export default function Stats() {
@@ -65,6 +65,7 @@ export default function Stats() {
   if (tab === "load") return <>{header}{tabs}<LoadView bikeId={filters.bike_id} /></>;
   if (tab === "review") return <>{header}{tabs}<ReviewView bikeId={filters.bike_id} years={years} /></>;
   if (tab === "goals") return <>{header}{tabs}<GoalsView /></>;
+  if (tab === "places") return <>{header}{tabs}<PlacesView /></>;
   if (tab === "compare") return <>{header}{tabs}<CompareView bikeId={filters.bike_id} /></>;
 
   if (d.empty) {

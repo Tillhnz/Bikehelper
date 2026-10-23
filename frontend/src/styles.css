@@ -851,3 +851,15 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
 .inv-item > form{grid-column:1 / -1}
 @media (max-width:800px){.inv-item{grid-template-columns:minmax(0,1fr) auto}.inv-actions{grid-column:1 / -1}}
 @media (prefers-reduced-motion:reduce){.qty-btn{transition:none}}
+
+/* Orte */
+.home-city{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap}
+.home-city p{margin:.2rem 0}
+.home-city-line{font-size:1.2rem}
+.home-city-line strong{font-family:var(--font-display);font-size:2rem}
+.ring-text{fill:var(--chalk);font-family:var(--font-display);font-size:1.7rem;font-weight:600}
+.ring-fill{transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+.country-list,.city-list{list-style:none;margin:0;padding:0;display:grid;gap:.9rem}
+.country-head{display:flex;justify-content:space-between;gap:.75rem;align-items:baseline}
+.country-list .goal-bar,.city-list .goal-bar{margin:.35rem 0 .3rem;height:8px}
+@media (prefers-reduced-motion:reduce){.ring-fill{transition:none}}

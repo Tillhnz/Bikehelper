@@ -228,3 +228,46 @@ class InventoryItem(Base):
     location: Mapped[str | None] = mapped_column(String(160), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Place(Base):
+    """Ort (Stadt, Gemeinde) mit Fläche aus OpenStreetMap, einmal geholt und für alle Nutzer wiederverwendet."""
+    __tablename__ = "places"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    osm_key: Mapped[str] = mapped_column(String(24), unique=True, index=True)  # z. B. R62422
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(10))  # city | town | village | county | area
+    state: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    country_code: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    geometry: Mapped[str] = mapped_column(Text)  # GeoJSON
+    total_tiles: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PlaceVisit(Base):
+    """Wie viel ein Nutzer von einem Ort erkundet hat (wird vom Hintergrundlauf berechnet)."""
+    __tablename__ = "place_visits"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    place_id: Mapped[int] = mapped_column(ForeignKey("places.id", ondelete="CASCADE"), primary_key=True)
+    tiles: Mapped[int] = mapped_column(Integer, default=0)
+    rides: Mapped[int] = mapped_column(Integer, default=0)  # Fahrten, die in diesem Ort starten
+
+
+class GeoMiss(Base):
+    """Kacheln, für die kein Ort gefunden wurde (Meer, Ausland ohne Treffer), damit nicht ständig neu gefragt wird."""
+    __tablename__ = "geo_misses"
+
+    x: Mapped[int] = mapped_column(Integer, primary_key=True)
+    y: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class GeoState(Base):
+    __tablename__ = "geo_state"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    unresolved: Mapped[int] = mapped_column(Integer, default=0)
+    explored: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)

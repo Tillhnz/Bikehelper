@@ -106,6 +106,13 @@ Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCera
 
 **Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
 
+## Startseite, Inventar, Anleitungen und Orte
+
+- **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche, die wichtigsten Wartungen, deine Räder mit Kilometerstand und Wochenkilometern, Jahresstand mit Ziel und die letzten Fahrten.
+- **Inventar** (in der Garage über „Inventar“): Ersatzteile mit Anzahl, Warnschwelle, Preis, Lagerort und passendem Rad. „Einbauen“ legt das Teil als Komponente am Rad an, mustert ein Teil derselben Art aus und verringert den Bestand.
+- **Anleitungen:** Bei jeder Wartungsregel öffnet „Anleitung“ geprüfte Links, hauptsächlich die Reparaturanleitungen von Park Tool (Englisch, teils mit Video) und für Wachs die von Silca. Die Links liegen im Katalog (`backend/app/catalog.py`, `GUIDES`) und lassen sich dort ändern.
+- **Orte** (Statistik, Reiter „Orte“): Deine Hauptstadt (die Stadt mit den meisten Fahrtstarts) mit Anteil erkundeter Kacheln, weitere Städte und Länder. Grenzen holt BikeHelper einmalig je Ort von OpenStreetMap (Nominatim, höchstens eine Anfrage pro Sekunde) und speichert sie. Dabei gehen nur die Mittelpunkte einzelner Kacheln hinaus. Der Anteil eines Landes ist geschätzt (erkundete Kacheln geteilt durch Landfläche). Mit `GEO_ENABLED=false` ausschalten oder `NOMINATIM_URL` auf einen eigenen Server setzen.
+
 ## Statistik
 
 Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wetter), **Belastung**, **Jahresrückblick**, **Ziele** und **Vergleiche**.

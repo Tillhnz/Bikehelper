@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     ntfy_server: str = "https://ntfy.sh"
     reminders_enabled: bool = True
+    # Orte und Länder: Städte werden einmalig bei OpenStreetMap (Nominatim) nachgeschlagen und gespeichert
+    geo_enabled: bool = True
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
 
     class Config:
         env_file = ".env"

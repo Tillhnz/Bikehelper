@@ -354,3 +354,115 @@ export function GoalsView() {
     </>
   );
 }
+
+
+function PercentRing({ percent, size = 120 }) {
+  const r = size / 2 - 8, c = 2 * Math.PI * r, v = Math.min(100, percent ?? 0);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${fmtNum(percent ?? 0, 1)} Prozent erkundet`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ink-2)" strokeWidth="10" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--celeste)" strokeWidth="10" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} transform={`rotate(-90 ${size / 2} ${size / 2})`} className="ring-fill" />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="ring-text">{fmtNum(percent ?? 0, 0)} %</text>
+    </svg>
+  );
+}
+
+const KIND = { city: "Stadt", town: "Stadt", village: "Dorf", county: "Landkreis", area: "Gebiet" };
+
+export function PlacesView() {
+  const [d, error, setD] = useData("/stats/places", []);
+  const [busy, setBusy] = useState(false);
+
+  // Während die Zuordnung läuft, alle paar Sekunden nachladen
+  useEffect(() => {
+    if (!d?.status?.running) return undefined;
+    const id = setInterval(() => api.get("/stats/places").then(setD).catch(() => {}), 5000);
+    return () => clearInterval(id);
+  }, [d?.status?.running, setD]);
+
+  if (error) return <p className="error" role="alert">{error}</p>;
+  if (!d) return <p className="muted">Lade …</p>;
+  if (!d.enabled) return <EmptyState title="Orte sind ausgeschaltet" text="Der Server hat die Ortssuche abgeschaltet (GEO_ENABLED=false in der .env)." />;
+
+  async function refresh() {
+    setBusy(true);
+    try {
+      await api.post("/stats/places/refresh");
+      setD(await api.get("/stats/places"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const st = d.status;
+  const home = d.home;
+  const noData = d.cities.length === 0;
+
+  return (
+    <>
+      <Panel
+        title={home ? `Deine Hauptstadt: ${home.name}` : "Städte und Länder"}
+        sub="Eine Kachel (ca. 1,5 × 1,5 km) zählt als erkundet, wenn eine Fahrt hindurchführt. Grenzen kommen von OpenStreetMap."
+      >
+        {home ? (
+          <div className="home-city">
+            <PercentRing percent={home.percent} />
+            <div>
+              <p className="home-city-line"><strong>{fmtKm(home.tiles)}</strong> von {fmtKm(home.total)} Kacheln erkundet</p>
+              <p className="muted small">{home.rides} Fahrten starten hier{home.state ? `, ${home.state}` : ""}</p>
+              {home.percent != null && home.percent < 100 && (
+                <p className="small">Noch {fmtKm(home.total - home.tiles)} Kacheln bis zur ganzen Stadt.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="muted">
+            {noData ? "Noch keine Orte zugeordnet. Starte die Zuordnung, dann erscheinen hier deine Städte." : "Noch keine Hauptstadt erkennbar."}
+          </p>
+        )}
+        <div className="actions">
+          <button className="btn" disabled={busy || st.running} onClick={refresh}>
+            {st.running ? `Suche läuft, ${st.requests ?? 0} Orte geprüft …` : "Orte jetzt zuordnen"}
+          </button>
+          {st.unresolved > 0 && !st.running && <span className="muted small">{fmtKm(st.unresolved)} Kacheln noch ohne Ort, die Suche macht automatisch weiter.</span>}
+          {st.error && <span className="error small">{st.error}</span>}
+        </div>
+      </Panel>
+
+      {!noData && (
+        <div className="grid-2">
+          <Panel title="Länder" sub="Anteil an der Landfläche, geschätzt">
+            <ul className="country-list">
+              {d.countries.map((c) => (
+                <li key={c.code}>
+                  <div className="country-head">
+                    <strong>{c.name}</strong>
+                    <span>{fmtKm(c.tiles)} Kacheln{c.percent != null ? ` · ${fmtNum(c.percent, 2)} %` : ""}</span>
+                  </div>
+                  {c.percent != null && <div className="goal-bar"><span style={{ width: `${Math.max(1, Math.min(100, c.percent))}%` }} /></div>}
+                  <span className="muted small">{c.places} {c.places === 1 ? "Ort" : "Orte"}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          <Panel title="Städte und Gemeinden" sub="Sortiert nach erkundeten Kacheln">
+            <ul className="city-list">
+              {d.cities.slice(0, 40).map((c) => (
+                <li key={c.id}>
+                  <div className="country-head">
+                    <span><strong>{c.name}</strong> <span className="muted small">{KIND[c.kind]}{c.state ? `, ${c.state}` : ""}</span></span>
+                    <span>{c.percent != null ? `${fmtNum(c.percent, 0)} %` : ""}</span>
+                  </div>
+                  <div className="goal-bar"><span style={{ width: `${Math.max(2, Math.min(100, c.percent ?? 0))}%` }} /></div>
+                  <span className="muted small">{fmtKm(c.tiles)} von {fmtKm(c.total)} Kacheln{c.rides ? ` · ${c.rides} Starts` : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </div>
+      )}
+      <p className="muted small" style={{ marginTop: "1rem" }}>{d.source}. Beim Zuordnen sendet BikeHelper nur die Mittelpunkte einzelner Kacheln an OpenStreetMap, jeden Ort nur einmal.</p>
+    </>
+  );
+}
