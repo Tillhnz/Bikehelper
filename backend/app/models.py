@@ -73,6 +73,8 @@ class MaintenanceRule(Base):
     label: Mapped[str] = mapped_column(String(160))  # z. B. "Kette wechseln"
     interval_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     interval_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wet_factor: Mapped[float | None] = mapped_column(Float, nullable=True, default=1.0)  # 1 Nass-km zählt wie x km
+    hint: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     component: Mapped[Component] = relationship(back_populates="rules")
 
@@ -82,6 +84,10 @@ class MaintenanceLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), index=True)
+    # Leer: gilt für alle Regeln der Komponente. Gesetzt: nur für diese eine Regel (z. B. "Kette schmieren").
+    rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("maintenance_rules.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     performed_at: Mapped[date] = mapped_column(Date)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -106,7 +112,11 @@ class Activity(Base):
     start_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     gear_name: Mapped[str | None] = mapped_column(String(160), nullable=True)  # Radname laut Strava-Export
     source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "upload" oder "strava_export"
+    tiles: Mapped[str | None] = mapped_column(Text, nullable=True)  # erkundete z14-Kacheln, '' = keine, NULL = offen
     # Wetter (wird später angereichert)
     temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
     wind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
+    wet_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Regen oder nasser Straße
+    weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # WMO-Wettercode (höchster während der Fahrt)
+    weather_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | prelim | none; leer = offen

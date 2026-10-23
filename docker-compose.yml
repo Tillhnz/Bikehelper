@@ -25,6 +25,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       PUBLIC_URL: ${PUBLIC_URL}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      WEATHER_ENABLED: ${WEATHER_ENABLED:-true}
+      TIMEZONE: ${TIMEZONE:-Europe/Berlin}
 
   frontend:
     build: ./frontend

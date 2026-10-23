@@ -91,25 +91,16 @@ export const CATEGORIES = {
   bar_tape: "Lenkerband",
   cables: "Brems- und Schaltzüge",
   sealant: "Dichtmilch",
+  brake_fluid: "Bremsflüssigkeit",
+  headset: "Steuersatz",
+  bottom_bracket: "Tretlager",
+  hubs: "Naben",
   other: "Sonstiges",
 };
 
 export const BIKE_TYPES = { road: "Rennrad", gravel: "Gravel", mtb: "Mountainbike", other: "Sonstiges" };
 
-// Vorschläge für Wartungsregeln, die beim Anlegen einer Komponente mit erstellt werden können
-export const DEFAULT_RULES = {
-  chain: { label: "Kette wechseln", interval_km: 3000 },
-  cassette: { label: "Kassette wechseln", interval_km: 9000 },
-  chainring: { label: "Kettenblatt wechseln", interval_km: 20000 },
-  tire_front: { label: "Reifen wechseln", interval_km: 5000 },
-  tire_rear: { label: "Reifen wechseln", interval_km: 4000 },
-  brake_pads: { label: "Bremsbeläge prüfen", interval_km: 4000, interval_months: 12 },
-  bar_tape: { label: "Lenkerband erneuern", interval_months: 24 },
-  cables: { label: "Züge erneuern", interval_months: 24 },
-  sealant: { label: "Dichtmilch auffüllen", interval_months: 6 },
-};
-
-export const STATUS_LABEL = { ok: "In Ordnung", soon: "Bald fällig", due: "Fällig" };
+export const STATUS_LABEL = { ok: "In Ordnung", soon: "Bald fällig", due: "Fällig", unknown: "Einbaudatum fehlt" };
 
 export const fmtKm = (km) =>
   new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(Math.round(km ?? 0));
@@ -133,4 +124,21 @@ export const fmtDuration = (s) => {
   const h = Math.floor((s ?? 0) / 3600);
   const m = Math.floor(((s ?? 0) % 3600) / 60);
   return `${h}:${String(m).padStart(2, "0")} h`;
+};
+
+export const fmtNum = (v, digits = 1) =>
+  v == null ? "–" : new Intl.NumberFormat("de-DE", { maximumFractionDigits: digits }).format(v);
+
+export const WEATHER_TEXT = (code) => {
+  if (code == null) return null;
+  if (code === 0) return "klar";
+  if (code <= 3) return "bewölkt";
+  if (code === 45 || code === 48) return "Nebel";
+  if (code >= 51 && code <= 57) return "Nieselregen";
+  if (code >= 61 && code <= 67) return "Regen";
+  if (code >= 71 && code <= 77) return "Schnee";
+  if (code >= 80 && code <= 82) return "Regenschauer";
+  if (code === 85 || code === 86) return "Schneeschauer";
+  if (code >= 95) return "Gewitter";
+  return null;
 };

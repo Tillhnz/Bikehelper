@@ -10,6 +10,7 @@ from ..importers import service
 from ..models import Activity, User
 from ..schemas import ActivityOut, ActivityPage, ActivityUpdate, AssignIn, GearOut
 from ..security import current_user
+from ..weather import service as weather_service
 from .garage import _own_bike
 
 router = APIRouter(prefix="/api", tags=["activities"])
@@ -22,6 +23,8 @@ def _out(a: Activity, has_track: bool) -> ActivityOut:
         id=a.id, name=a.name, sport_type=a.sport_type, start_date=a.start_date,
         distance_km=a.distance_km, moving_time_s=a.moving_time_s, elevation_m=a.elevation_m,
         bike_id=a.bike_id, gear_name=a.gear_name, source=a.source, has_track=has_track,
+        temp_c=a.temp_c, precip_mm=a.precip_mm, wind_kmh=a.wind_kmh, wet_minutes=a.wet_minutes,
+        weather_code=a.weather_code, weather_status=a.weather_status,
     )
 
 
@@ -59,6 +62,8 @@ def upload_activities(
     summary = service.import_files(db, user.id, loaded, bike)
     for name in too_big:
         summary.add_error(name, "Die Datei ist zu groß.")
+    if summary.imported:
+        weather_service.trigger(user.id)
     return summary.as_dict()
 
 

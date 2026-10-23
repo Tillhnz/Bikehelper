@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BIKE_TYPES, CATEGORIES, DEFAULT_RULES, api, fmtDate, fmtKm, today } from "../api.js";
+import { BIKE_TYPES, CATEGORIES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 
-function ComponentForm({ bikeId, onCreated, onCancel }) {
+function ruleIntervalText(r) {
+  return [r.interval_km && `${fmtKm(r.interval_km)} km`, r.interval_months && `${r.interval_months} Monate`]
+    .filter(Boolean).join(" oder ");
+}
+
+function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
   const [form, setForm] = useState({
-    category: "chain", name: "", brand: "", installed_at: today(), start_km: 0, withRule: true,
+    category: "chain", name: "", brand: "", installed_at: today(), start_km: 0, withRules: true,
   });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const preset = DEFAULT_RULES[form.category];
+  const template = catalog?.components?.[form.category];
 
   async function submit(e) {
     e.preventDefault();
@@ -23,17 +28,19 @@ function ComponentForm({ bikeId, onCreated, onCancel }) {
         installed_at: form.installed_at || null,
         start_km: Number(form.start_km) || 0,
       });
-      if (form.withRule && preset) await api.post(`/components/${comp.id}/rules`, preset);
+      if (form.withRules && template) {
+        for (const r of template.rules) {
+          await api.post(`/components/${comp.id}/rules`, {
+            label: r.label, interval_km: r.interval_km, interval_months: r.interval_months,
+            wet_factor: r.wet_factor, hint: r.hint || null,
+          });
+        }
+      }
       onCreated();
     } catch (err) {
       setError(err.message);
     }
   }
-
-  const presetText = preset
-    ? [preset.interval_km && `${fmtKm(preset.interval_km)} km`, preset.interval_months && `${preset.interval_months} Monate`]
-        .filter(Boolean).join(" oder ")
-    : "";
 
   return (
     <form className="panel form-grid" onSubmit={submit}>
@@ -61,14 +68,14 @@ function ComponentForm({ bikeId, onCreated, onCancel }) {
         <input type="number" min="0" step="1" value={form.start_km} onChange={set("start_km")} />
         <span className="hint">Nur bei gebrauchten Teilen, sonst 0.</span>
       </label>
-      {preset && (
+      {template && (
         <label className="check span-all">
           <input
             type="checkbox"
-            checked={form.withRule}
-            onChange={(e) => setForm({ ...form, withRule: e.target.checked })}
+            checked={form.withRules}
+            onChange={(e) => setForm({ ...form, withRules: e.target.checked })}
           />
-          Wartungsregel anlegen: {preset.label} nach {presetText}
+          Standard-Wartungsregeln anlegen: {template.rules.map((r) => `${r.label} (${ruleIntervalText(r)})`).join("; ")}
         </label>
       )}
       {error && <p className="error span-all" role="alert">{error}</p>}
@@ -80,22 +87,61 @@ function ComponentForm({ bikeId, onCreated, onCancel }) {
   );
 }
 
-function RuleRow({ rule, onDelete }) {
+function RuleRow({ rule, onDelete, onDone, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState({ performed_at: today(), note: "" });
+  const [hintOpen, setHintOpen] = useState(false);
+  const unknown = rule.status === "unknown";
+  const wet = rule.wet_factor > 1;
+
   const limits = [
     rule.interval_km && `${fmtKm(rule.km_since)} von ${fmtKm(rule.interval_km)} km`,
-    rule.interval_months && `${rule.months_since.toLocaleString("de-DE")} von ${rule.interval_months} Monaten`,
+    rule.interval_months && `${fmtNum(rule.months_since)} von ${rule.interval_months} Monaten`,
   ].filter(Boolean).join(" · ");
+
+  async function submit(e) {
+    e.preventDefault();
+    await onDone(done);
+    setOpen(false);
+    setDone({ performed_at: today(), note: "" });
+  }
+
   return (
     <li className="rule-row">
       <div className="rule-top">
         <strong>{rule.label}</strong>
         <StatusPill status={rule.status} />
       </div>
-      <Gauge progress={rule.progress} status={rule.status} />
+      {!unknown && <Gauge progress={rule.progress} status={rule.status} />}
       <div className="rule-bottom">
-        <span className="muted small">{limits}</span>
-        <button className="link small" onClick={onDelete}>Regel löschen</button>
+        <span className="muted small">
+          {unknown ? "Trage unten ein Einbaudatum ein oder hake die Aufgabe als erledigt ab." : limits}
+        </span>
+        <span className="rule-actions">
+          {rule.hint && (
+            <button className="link small" onClick={() => setHintOpen(!hintOpen)}>
+              {hintOpen ? "Hinweis ausblenden" : "Hinweis"}
+            </button>
+          )}
+          {!disabled && <button className="link small" onClick={() => setOpen(!open)}>Erledigt</button>}
+          <button className="link small" onClick={onDelete}>Regel löschen</button>
+        </span>
       </div>
+      {wet && !unknown && rule.interval_km && (
+        <p className="muted small wet-line">
+          Nässe zählt ×{fmtNum(rule.wet_factor)}: {fmtKm(rule.wet_km)} km bei Nässe, damit zählen {fmtKm(rule.effective_km)} km
+          statt {fmtKm(rule.km_since)} km.
+        </p>
+      )}
+      {hintOpen && rule.hint && <p className="hint-box small">{rule.hint}</p>}
+      {open && (
+        <form className="inline-form" onSubmit={submit}>
+          <label>Datum<input type="date" value={done.performed_at} onChange={(e) => setDone({ ...done, performed_at: e.target.value })} required /></label>
+          <label className="grow">Notiz<input value={done.note} onChange={(e) => setDone({ ...done, note: e.target.value })} /></label>
+          <button className="btn primary">Als erledigt eintragen</button>
+          <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
+        </form>
+      )}
     </li>
   );
 }
@@ -103,9 +149,11 @@ function RuleRow({ rule, onDelete }) {
 function ComponentCard({ comp, onChanged }) {
   const [rules, setRules] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [panel, setPanel] = useState(null); // "log" | "rule" | null
+  const [panel, setPanel] = useState(null); // "log" | "rule" | "replace" | "date" | null
   const [log, setLog] = useState({ performed_at: today(), note: "" });
-  const [rule, setRule] = useState({ label: "", interval_km: "", interval_months: "" });
+  const [rule, setRule] = useState({ label: "", interval_km: "", interval_months: "", wet_factor: 1 });
+  const [repl, setRepl] = useState({ performed_at: today(), name: comp.name, brand: comp.brand ?? "" });
+  const [installed, setInstalled] = useState(today());
   const [error, setError] = useState("");
 
   const loadDetails = useCallback(async () => {
@@ -124,50 +172,89 @@ function ComponentCard({ comp, onChanged }) {
     onChanged();
   }
 
-  async function addLog(e) {
-    e.preventDefault();
+  async function guarded(fn) {
     setError("");
     try {
+      await fn();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const addLog = (e) => {
+    e.preventDefault();
+    return guarded(async () => {
       await api.post(`/components/${comp.id}/logs`, { performed_at: log.performed_at, note: log.note || null });
       setPanel(null);
       setLog({ performed_at: today(), note: "" });
       await refresh();
-    } catch (err) { setError(err.message); }
-  }
+    });
+  };
 
-  async function addRule(e) {
+  const addRule = (e) => {
     e.preventDefault();
-    setError("");
-    try {
+    return guarded(async () => {
       await api.post(`/components/${comp.id}/rules`, {
         label: rule.label,
         interval_km: rule.interval_km ? Number(rule.interval_km) : null,
         interval_months: rule.interval_months ? Number(rule.interval_months) : null,
+        wet_factor: Number(rule.wet_factor) || 1,
       });
       setPanel(null);
-      setRule({ label: "", interval_km: "", interval_months: "" });
+      setRule({ label: "", interval_km: "", interval_months: "", wet_factor: 1 });
       await refresh();
-    } catch (err) { setError(err.message); }
-  }
+    });
+  };
 
-  async function removeRule(id) {
-    await api.del(`/rules/${id}`);
-    await refresh();
-  }
+  const ruleDone = (r, data) =>
+    guarded(async () => {
+      await api.post(`/rules/${r.id}/done`, { performed_at: data.performed_at, note: data.note || null });
+      await refresh();
+    });
 
-  async function retire() {
-    const { id, km, status, ...rest } = comp;
-    await api.put(`/components/${id}`, { ...rest, retired_at: today() });
-    onChanged();
-  }
+  const removeRule = (id) =>
+    guarded(async () => {
+      await api.del(`/rules/${id}`);
+      await refresh();
+    });
 
-  async function remove() {
-    if (!window.confirm(`„${comp.name}“ wirklich löschen?`)) return;
-    await api.del(`/components/${comp.id}`);
-    onChanged();
-  }
+  const replace = (e) => {
+    e.preventDefault();
+    return guarded(async () => {
+      await api.post(`/components/${comp.id}/replace`, {
+        performed_at: repl.performed_at, name: repl.name || null, brand: repl.brand || null,
+      });
+      setPanel(null);
+      onChanged();
+    });
+  };
+
+  const saveInstallDate = (e) => {
+    e.preventDefault();
+    return guarded(async () => {
+      const { id, km, status, ...rest } = comp;
+      await api.put(`/components/${id}`, { ...rest, installed_at: installed });
+      setPanel(null);
+      onChanged();
+    });
+  };
+
+  const retire = () =>
+    guarded(async () => {
+      const { id, km, status, ...rest } = comp;
+      await api.put(`/components/${id}`, { ...rest, retired_at: today() });
+      onChanged();
+    });
+
+  const remove = () =>
+    guarded(async () => {
+      if (!window.confirm(`„${comp.name}“ wirklich löschen?`)) return;
+      await api.del(`/components/${comp.id}`);
+      onChanged();
+    });
 
   const retired = !!comp.retired_at;
+  const noDate = !comp.installed_at;
 
   return (
     <article className={`component ${retired ? "retired" : ""}`}>
@@ -183,13 +270,22 @@ function ComponentCard({ comp, onChanged }) {
         </div>
       </header>
       <p className="muted small">
-        {comp.brand ? `${comp.brand} · ` : ""}eingebaut am {fmtDate(comp.installed_at)}
+        {comp.brand ? `${comp.brand} · ` : ""}
+        {noDate ? "Einbaudatum unbekannt" : `eingebaut am ${fmtDate(comp.installed_at)}`}
         {retired ? `, ausgemustert am ${fmtDate(comp.retired_at)}` : ""}
       </p>
 
       {rules.length > 0 && (
         <ul className="rule-list">
-          {rules.map((r) => <RuleRow key={r.id} rule={r} onDelete={() => removeRule(r.id)} />)}
+          {rules.map((r) => (
+            <RuleRow
+              key={r.id}
+              rule={r}
+              disabled={retired}
+              onDelete={() => removeRule(r.id)}
+              onDone={(d) => ruleDone(r, d)}
+            />
+          ))}
         </ul>
       )}
 
@@ -197,6 +293,14 @@ function ComponentCard({ comp, onChanged }) {
         <p className="muted small">
           Letzte Wartung: {fmtDate(logs[0].performed_at)}{logs[0].note ? ` – ${logs[0].note}` : ""}
         </p>
+      )}
+
+      {panel === "date" && (
+        <form className="inline-form" onSubmit={saveInstallDate}>
+          <label>Eingebaut am<input type="date" value={installed} onChange={(e) => setInstalled(e.target.value)} required /></label>
+          <button className="btn primary">Datum speichern</button>
+          <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+        </form>
       )}
 
       {panel === "log" && (
@@ -208,11 +312,23 @@ function ComponentCard({ comp, onChanged }) {
         </form>
       )}
 
+      {panel === "replace" && (
+        <form className="inline-form" onSubmit={replace}>
+          <label>Gewechselt am<input type="date" value={repl.performed_at} onChange={(e) => setRepl({ ...repl, performed_at: e.target.value })} required /></label>
+          <label className="grow">Neues Teil<input value={repl.name} onChange={(e) => setRepl({ ...repl, name: e.target.value })} /></label>
+          <label>Marke<input value={repl.brand} onChange={(e) => setRepl({ ...repl, brand: e.target.value })} /></label>
+          <button className="btn primary">Teil wechseln</button>
+          <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+          <p className="hint span-all">Das alte Teil wird ausgemustert, das neue übernimmt alle Wartungsregeln und zählt ab 0 km.</p>
+        </form>
+      )}
+
       {panel === "rule" && (
         <form className="inline-form" onSubmit={addRule}>
           <label className="grow">Aufgabe<input value={rule.label} onChange={(e) => setRule({ ...rule, label: e.target.value })} placeholder="z. B. Kette wechseln" required /></label>
           <label>Alle … km<input type="number" min="1" value={rule.interval_km} onChange={(e) => setRule({ ...rule, interval_km: e.target.value })} /></label>
           <label>Oder alle … Monate<input type="number" min="1" value={rule.interval_months} onChange={(e) => setRule({ ...rule, interval_months: e.target.value })} /></label>
+          <label>Nässefaktor<input type="number" min="1" max="5" step="0.1" value={rule.wet_factor} onChange={(e) => setRule({ ...rule, wet_factor: e.target.value })} /></label>
           <button className="btn primary">Regel speichern</button>
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
         </form>
@@ -222,6 +338,8 @@ function ComponentCard({ comp, onChanged }) {
 
       {!retired && (
         <div className="actions">
+          {noDate && <button className="btn small primary" onClick={() => setPanel("date")}>Einbaudatum eintragen</button>}
+          <button className="btn small" onClick={() => setPanel("replace")}>Teil gewechselt</button>
           <button className="btn small" onClick={() => setPanel("log")}>Wartung eintragen</button>
           <button className="btn small" onClick={() => setPanel("rule")}>Regel hinzufügen</button>
           <button className="btn small" onClick={retire}>Ausmustern</button>
@@ -243,6 +361,7 @@ export default function BikeDetail() {
   const [bike, setBike] = useState(null);
   const [components, setComponents] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [catalog, setCatalog] = useState(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -256,9 +375,20 @@ export default function BikeDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.get("/catalog").then(setCatalog).catch(() => {}); }, []);
+
+  async function addStandard() {
+    setError("");
+    try {
+      await api.post(`/bikes/${bike.id}/standard-components`, {});
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function toggleRetired() {
-    const { id: _id, total_km, component_count, due_count, ...rest } = bike;
+    const { id: _id, total_km, component_count, due_count, unknown_count, ...rest } = bike;
     await api.put(`/bikes/${bike.id}`, { ...rest, retired: !bike.retired });
     load();
   }
@@ -269,7 +399,7 @@ export default function BikeDetail() {
     navigate("/");
   }
 
-  if (error) return <p className="error" role="alert">{error}</p>;
+  if (error && !bike) return <p className="error" role="alert">{error}</p>;
   if (!bike) return <p className="muted">Lade …</p>;
 
   const active = components.filter((c) => !c.retired_at);
@@ -298,11 +428,17 @@ export default function BikeDetail() {
 
       <header className="page-head">
         <h2>Komponenten</h2>
-        {!adding && <button className="btn primary" onClick={() => setAdding(true)}>Komponente hinzufügen</button>}
+        {!adding && (
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button className="btn" onClick={addStandard}>Standardkomponenten ergänzen</button>
+            <button className="btn primary" onClick={() => setAdding(true)}>Komponente hinzufügen</button>
+          </div>
+        )}
       </header>
+      {error && <p className="error" role="alert">{error}</p>}
 
       {adding && (
-        <ComponentForm bikeId={bike.id} onCreated={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />
+        <ComponentForm bikeId={bike.id} catalog={catalog} onCreated={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />
       )}
 
       {active.length === 0 && !adding ? (
@@ -310,7 +446,10 @@ export default function BikeDetail() {
           title="Noch keine Komponenten"
           text="Füge Kette, Kassette, Reifen und weitere Teile hinzu, damit BikeHelper den Verschleiß mitzählt."
         >
-          <button className="btn primary" onClick={() => setAdding(true)}>Erste Komponente anlegen</button>
+          <div className="actions" style={{ justifyContent: "center" }}>
+            <button className="btn primary" onClick={addStandard}>Standardkomponenten anlegen</button>
+            <button className="btn" onClick={() => setAdding(true)}>Eigene Komponente anlegen</button>
+          </div>
         </EmptyState>
       ) : (
         <div className="component-list">

@@ -42,11 +42,16 @@ class BikeIn(BaseModel):
     retired: bool = False
 
 
+class BikeCreate(BikeIn):
+    with_defaults: bool = True  # Standardkomponenten mit Wartungsintervallen mit anlegen
+
+
 class BikeOut(BikeIn):
     id: int
     total_km: float
     component_count: int
     due_count: int
+    unknown_count: int = 0  # Komponenten ohne Einbaudatum, bei denen noch nichts gezählt werden kann
 
 
 class ComponentIn(BaseModel):
@@ -70,14 +75,34 @@ class RuleIn(BaseModel):
     label: str = Field(min_length=1, max_length=160)
     interval_km: float | None = Field(default=None, gt=0)
     interval_months: int | None = Field(default=None, gt=0)
+    wet_factor: float = Field(default=1.0, ge=1.0, le=5.0)  # 1 km bei Nässe zählt wie x km
+    hint: str | None = None
 
 
 class RuleOut(RuleIn):
     id: int
     km_since: float
+    wet_km: float
+    effective_km: float  # gefahrene km inklusive Nässe-Zuschlag
     months_since: float
     progress: float  # 0..1+ (Anteil des Intervalls, der verbraucht ist)
-    status: str
+    status: str  # ok | soon | due | unknown
+    last_done: date | None = None
+
+
+class RuleDoneIn(BaseModel):
+    performed_at: date
+    note: str | None = None
+
+
+class ReplaceIn(BaseModel):
+    performed_at: date
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    brand: str | None = None
+
+
+class StandardComponentsIn(BaseModel):
+    categories: list[str] | None = None  # leer: Standardsatz passend zum Radtyp
 
 
 class LogIn(BaseModel):
@@ -101,6 +126,12 @@ class ActivityOut(BaseModel):
     gear_name: str | None
     source: str | None
     has_track: bool
+    temp_c: float | None = None
+    precip_mm: float | None = None
+    wind_kmh: float | None = None
+    wet_minutes: float | None = None
+    weather_code: int | None = None
+    weather_status: str | None = None
 
 
 class ActivityPage(BaseModel):

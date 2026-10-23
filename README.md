@@ -1,13 +1,16 @@
 # BikeHelper
 
 Verwaltung für Rennrad, Gravel & Co.: Garage mit Komponenten, Kilometerzähler, Wartungsintervalle mit Warnungen.
-Geplant: Heatmap, Statistiken, Wetter pro Tour.
+Dazu Heatmap, Statistiken und Wetter pro Fahrt, das die Wartungsintervalle beeinflusst.
 
 ## Stand
 
 - Login und Registrierung (mehrbenutzerfähig)
 - Garage: Räder, Komponenten (Kette, Kassette, Reifen …), Kilometerstände
 - Wartungsregeln (nach km und/oder Monaten), Wartungsprotokoll, Anzeige „Das steht an“
+- Neue Räder bekommen Standardkomponenten mit Wartungsintervallen (siehe unten), die Nässe berücksichtigen
+- Wetter pro Fahrt (Temperatur, Regen, Wind, Zeit auf nasser Straße) von Open-Meteo
+- Heatmap aller Fahrten und Statistik mit Kachel-Erkundung wie bei Statshunters
 - Fahrten-Import ohne Strava-Abo: Strava-Datenexport (ZIP) und GPX-/FIT-/TCX-Dateien, mit automatischer Zuordnung zu den Rädern
 
 ## Fahrten importieren
@@ -24,6 +27,45 @@ Aus dem Export werden nur Radfahrten übernommen. Kilometer, Zeit, Höhenmeter u
 **Einzelne Dateien**: GPX, FIT und TCX (auch als `.gz`) lassen sich beliebig oft und gleich mehrfach hochladen und direkt einem Rad zuordnen. Reine Routen ohne Zeitstempel (zum Beispiel geplante Touren) werden abgelehnt.
 
 Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413“ scheitern. Trage dann beim Proxy Host unter „Advanced“ die Zeile `client_max_body_size 8g;` ein.
+
+## Wartungsintervalle und Nässe
+
+Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entstehen Komponenten mit Regeln, passend zum Radtyp. Alle Werte lassen sich je Regel ändern.
+
+| Teil | Aufgabe | Intervall | Nässefaktor |
+|---|---|---|---|
+| Kette | reinigen und schmieren | 200 km | 2,0 |
+| Kette | wechseln (Kettenlehre) | 3.000 km | 2,0 |
+| Kassette | wechseln | 9.000 km | 1,5 |
+| Kettenblätter | wechseln | 20.000 km | 1,5 |
+| Reifen vorn / hinten | wechseln | 6.000 / 4.000 km | – |
+| Bremsbeläge | prüfen / wechseln | 500 / 1.500 km | 2,0 |
+| Bremsflüssigkeit | wechseln | 12 Monate | – |
+| Züge | erneuern | 5.000 km oder 12 Monate | 1,3 |
+| Lenkerband | erneuern | 12 Monate | – |
+| Dichtmilch (Tubeless) | auffüllen / erneuern | 4 / 15 Monate | – |
+| Steuersatz, Tretlager, Naben | warten | 5.000 km oder 12 Monate | 1,5 |
+
+**Wie Nässe zählt:** Ein Kilometer bei Nässe zählt wie *Nässefaktor* Kilometer. Eine Fahrt gilt für die Zeit als nass, in der es regnete oder die Straße noch feucht war (mindestens 0,1 mm in der Stunde oder 0,5 mm in den zwei Stunden davor). Der Anteil nasser Fahrzeit wird auf die Strecke der Fahrt umgelegt.
+
+**Wie belastbar die Zahlen sind:** Für die Kette gibt es einen Labortest eines Schmierstoffherstellers (nass etwa 1,5-fach, sehr nass etwa 2,3-fach Verschleiß). Die Intervalle der übrigen Teile sind Richtwerte aus Werkstatt-Ratgebern und Herstellerangaben und streuen stark; die übrigen Nässefaktoren sind begründete Schätzungen. Wer es genauer weiß, ändert sie an der Regel. Die Kettenlehre schlägt jede Rechnung.
+
+Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum fehlt“, bis du ein Datum einträgst oder eine Regel als erledigt abhakst. Erst dann kann gezählt werden. Mit „Teil gewechselt“ wird das alte Teil ausgemustert und das neue übernimmt alle Regeln.
+
+Quellen: Park Tool (Kettenverschleiß), BikeGremlin, Slowtwitch, Zero Friction Cycling, Geekay, BikeRadar, Lennard Zinn, CX Magazine, Michelin sowie Herstellerangaben von SRAM, Shimano und TRP.
+
+## Wetter
+
+Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [Open-Meteo](https://open-meteo.com) (Daten unter CC BY 4.0, kostenlos, ohne Schlüssel). Alle sechs Stunden wird nach neuen Fahrten gesucht; Fahrten der letzten Tage werden vorläufig ausgewertet und später aus dem Archiv korrigiert.
+
+**Datenschutz:** Gesendet werden nur gerundete Startkoordinaten (0,1 Grad, rund 10 km) und Zeiträume, keine Namen oder Konten. Wer das nicht möchte, setzt `WEATHER_ENABLED=false` in der `.env`; dann gibt es kein Wetter und keine Nässe-Korrektur.
+
+## Heatmap und Statistik
+
+- **Heatmap:** alle Strecken auf dunkler Karte, oft gefahrene Wege leuchten heller. Filter nach Jahr und Rad, optional mit den erkundeten Kacheln und dem größten Quadrat. Kartendaten: OpenStreetMap-Mitwirkende, CARTO. Die Kartenkacheln lädt der Browser von carto.com.
+- **Statistik:** Kennzahlen, Jahre und Monate, Kalender der Fahrtage, Wochentage, Startzeiten, Fahrtlängen, Rekorde, Serien, Räder, Temperatur und Nässe.
+- **Kacheln:** Zoomstufe 14 (rund 1,5 km). Das größte Quadrat zählt nur vollständig erkundete Kacheln; ein „Gebiet“ umfasst auch diagonal verbundene Kacheln. Das kann von Statshunters leicht abweichen.
+- Zeiten werden in der Zeitzone `TIMEZONE` ausgewertet (Standard `Europe/Berlin`).
 
 ## Schnellinstallation
 

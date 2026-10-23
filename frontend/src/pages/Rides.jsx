@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, fmtDateTime, fmtDuration, fmtKm1, upload } from "../api.js";
+import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 
 // ---------- Hilfsbausteine ----------
@@ -294,6 +294,78 @@ function GearAssign({ gear, bikes, onDone }) {
   );
 }
 
+// ---------- Wetter ----------
+
+function WeatherCell({ a }) {
+  if (a.weather_status == null) return <span className="muted small">offen</span>;
+  if (a.weather_status === "none" || a.temp_c == null) return <span className="muted small">–</span>;
+  const wet = a.wet_minutes != null && a.wet_minutes >= 5;
+  const text = WEATHER_TEXT(a.weather_code);
+  return (
+    <span title={`Wind ${fmtNum(a.wind_kmh, 0)} km/h, Regen ${fmtNum(a.precip_mm)} mm${a.weather_status === "prelim" ? " (vorläufig)" : ""}`}>
+      {fmtNum(a.temp_c)} °C{text ? `, ${text}` : ""}
+      {wet && <span className="pill pill-soon" style={{ marginLeft: "0.4rem" }}>{Math.round(a.wet_minutes)} min nass</span>}
+    </span>
+  );
+}
+
+function WeatherPanel({ refreshKey }) {
+  const [st, setSt] = useState(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setSt(await api.get("/weather/status"));
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => {
+    if (!st?.running) return undefined;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [st?.running, load]);
+
+  async function start() {
+    setError("");
+    try {
+      setSt(await api.post("/weather/enrich"));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  if (!st) return null;
+  if (!st.enabled) {
+    return <section className="panel"><h2>Wetter</h2><p className="muted">Die Wetterabfrage ist auf diesem Server abgeschaltet.</p></section>;
+  }
+  const open = st.pending;
+  return (
+    <section className="panel">
+      <h2>Wetter zu deinen Fahrten</h2>
+      <p className="muted">
+        {st.ok + st.prelim} von {st.with_location} Fahrten mit Ort haben Wetterdaten
+        {st.without_location > 0 ? ` (${st.without_location} Fahrten ohne GPS-Position werden übersprungen)` : ""}.
+        Die Daten stammen von Open-Meteo; dorthin werden nur gerundete Startkoordinaten und Zeiträume gesendet.
+      </p>
+      {st.running && (
+        <div className="progress-wrap">
+          <div className="progress"><div className="progress-bar" style={{ width: `${st.progress_total ? (st.progress_done / st.progress_total) * 100 : 5}%` }} /></div>
+          <span className="muted small">Wetter wird abgerufen … {st.progress_done} von {st.progress_total}</span>
+        </div>
+      )}
+      {(st.error || error) && <p className="error" role="alert">{st.error || error}</p>}
+      {!st.running && (open > 0 || st.prelim > 0) && (
+        <div className="actions">
+          <button className="btn primary" onClick={start}>{open > 0 ? `Wetter für ${open} Fahrten abrufen` : "Vorläufige Daten aktualisieren"}</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ---------- Liste der Fahrten ----------
 
 const PAGE = 50;
@@ -383,6 +455,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                 <th className="num">Strecke</th>
                 <th className="num">Zeit</th>
                 <th className="num">Höhenmeter</th>
+                <th>Wetter</th>
                 <th>Rad</th>
                 <th><span className="sr-only">Aktionen</span></th>
               </tr>
@@ -395,6 +468,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                   <td className="num nowrap">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap">{fmtDuration(a.moving_time_s)}</td>
                   <td className="num nowrap">{Math.round(a.elevation_m)} m</td>
+                  <td className="nowrap"><WeatherCell a={a} /></td>
                   <td>
                     <select aria-label={`Rad für ${a.name}`} value={a.bike_id ?? ""} onChange={(e) => changeBike(a, e.target.value)}>
                       <option value="">Kein Rad</option>
@@ -450,6 +524,7 @@ export default function Rides() {
         <FileImport bikes={bikes} onDone={refresh} />
       </div>
       <GearAssign gear={gear} bikes={bikes} onDone={refresh} />
+      <WeatherPanel refreshKey={refreshKey} />
       <ActivityList bikes={bikes} refreshKey={refreshKey} onChanged={refresh} />
     </>
   );

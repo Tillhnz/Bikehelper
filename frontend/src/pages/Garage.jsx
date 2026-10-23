@@ -4,7 +4,7 @@ import { BIKE_TYPES, api } from "../api.js";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
-  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0 });
+  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -51,6 +51,14 @@ function BikeForm({ onCreated, onCancel }) {
         Kilometer vor der App
         <input type="number" min="0" step="1" value={form.start_km} onChange={set("start_km")} />
         <span className="hint">Bisher gefahrene Kilometer, die nicht in Strava stehen.</span>
+      </label>
+      <label className="check span-all">
+        <input
+          type="checkbox"
+          checked={form.with_defaults}
+          onChange={(e) => setForm({ ...form, with_defaults: e.target.checked })}
+        />
+        Standardkomponenten mit Wartungsintervallen anlegen (Kette, Reifen, Bremsen …)
       </label>
       {error && <p className="error span-all" role="alert">{error}</p>}
       <div className="actions span-all">
@@ -159,6 +167,7 @@ function BikeCard({ bike }) {
       <Odometer km={bike.total_km} />
       <div className="bike-card-foot">
         <span className="muted small">{bike.component_count} Komponenten</span>
+        {bike.unknown_count > 0 && <span className="pill pill-unknown">{bike.unknown_count} ohne Einbaudatum</span>}
         {bike.due_count > 0 ? (
           <span className="pill pill-due">{bike.due_count} fällig</span>
         ) : (

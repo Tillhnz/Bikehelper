@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
 from ..models import Activity, Bike
+from ..services import create_default_components
 from .parsers import ParsedActivity, ParseError, is_cycling, parse_activity_file
 from .strava_export import ExportEntry, clean_gear_name, gear_key, index_export
 
@@ -201,6 +202,7 @@ def _resolve_bike(
         bike = Bike(user_id=user_id, name=name[:120], type=_guess_bike_type(entry.type), brand=brand, model=model)
         db.add(bike)
         db.flush()
+        create_default_components(db, user_id, bike)
         bikes[key] = bike
         summary.created_bikes.append(bike.name)
     if bike is None:
@@ -279,3 +281,7 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
             os.unlink(zip_path)
         except OSError:
             pass
+        if job.status == "done":
+            from ..weather import service as weather_service
+
+            weather_service.trigger(job.user_id)

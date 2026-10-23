@@ -7,6 +7,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{tempfile.mkdtemp()}/test.db")
+os.environ.setdefault("WEATHER_ENABLED", "false")
 
 from fastapi.testclient import TestClient  # noqa: E402
 

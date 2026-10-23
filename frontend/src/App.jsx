@@ -5,6 +5,8 @@ import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Rides from "./pages/Rides.jsx";
+import Heatmap from "./pages/Heatmap.jsx";
+import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
 
 function Shell({ user, onLogout, children }) {
@@ -18,6 +20,8 @@ function Shell({ user, onLogout, children }) {
         <nav>
           <NavLink to="/" end>Garage</NavLink>
           <NavLink to="/rides">Fahrten</NavLink>
+          <NavLink to="/heatmap">Heatmap</NavLink>
+          <NavLink to="/stats">Statistik</NavLink>
           <NavLink to="/settings">Einstellungen</NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -76,6 +80,8 @@ export default function App() {
         <Route path="/" element={<Garage />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/rides" element={<Rides />} />
+        <Route path="/heatmap" element={<Heatmap />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

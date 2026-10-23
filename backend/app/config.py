@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     public_url: str = "http://localhost:8080"
     allow_registration: bool = True
     token_expire_days: int = 30
+    weather_enabled: bool = True
+    timezone: str = "Europe/Berlin"
 
     class Config:
         env_file = ".env"

@@ -3,6 +3,7 @@ import tempfile
 from datetime import date, datetime, timedelta
 
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/test.db"
+os.environ["WEATHER_ENABLED"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
