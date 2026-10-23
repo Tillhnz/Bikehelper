@@ -106,6 +106,14 @@ Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCera
 
 **Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
 
+## Kettenlehre, Erinnerungen und App
+
+**Kettenlehre.** In der Kettenkarte trägst du über „Messwert eintragen“ die gemessene Längung in Prozent ein (Grenzwert 0,5 % bei 10-fach und mehr, 0,75 % bei 9-fach und weniger). Ab dann rechnet die Regel „Kette wechseln“ mit dem gemessenen Zustand statt nur mit Kilometern: Aus Messwert und gefahrenen Kilometern wird die Längung bis heute fortgeschrieben und die Restkilometer bis zum Grenzwert angezeigt. Nach einem Kettenwechsel zählen alte Messwerte nicht mehr.
+
+**Erinnerungen.** Unter Einstellungen wählst du E-Mail und/oder Push per ntfy. BikeHelper meldet jede Wartung einmal, wenn sie „bald“ und einmal, wenn sie „fällig“ wird, nur zwischen 8 und 21 Uhr. Für ntfy installierst du die App ntfy aufs Handy und abonnierst dasselbe Thema (am besten zufällig, das Thema ist wie ein Passwort). Für E-Mail trägst du in der `.env` einen SMTP-Server ein (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`). Mit „Testnachricht senden“ prüfst du beides.
+
+**Als App installieren.** Über https (also über den Reverse Proxy) bietet der Browser „App installieren“ an, in den Einstellungen gibt es dafür einen Knopf. Die App öffnet ohne Browserleiste; ohne Verbindung erscheint die zuletzt geladene Oberfläche, Daten kommen immer live vom Server.
+
 ## Wetter
 
 Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [Open-Meteo](https://open-meteo.com) (Daten unter CC BY 4.0, kostenlos, ohne Schlüssel). Alle sechs Stunden wird nach neuen Fahrten gesucht; Fahrten der letzten Tage werden vorläufig ausgewertet und später aus dem Archiv korrigiert.

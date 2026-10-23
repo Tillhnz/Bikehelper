@@ -3,7 +3,8 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .catalog import CATALOG, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from . import wear as wear_model
+from .catalog import CATALOG, CHAIN_WEAR_LABEL, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
 from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
@@ -100,7 +101,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         return {
             "km_since": 0.0, "wet_km": 0.0, "effective_km": 0.0, "months_since": 0.0,
             "progress": 0.0, "status": "unknown", "last_done": None, "interval_km_eff": interval_km,
-            "variant": variant,
+            "variant": variant, "measure": None,
         }
 
     km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
@@ -110,7 +111,27 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     months_since = months_between(base, today)
 
     ratios = []
-    if interval_km:
+    measure = None
+    # Messwerte einer früheren Kette (vor dem letzten Kettenwechsel) zählen nicht
+    mine = [m for m in comp.measurements if last is None or m.measured_at >= last]
+    latest = max(mine, key=lambda m: (m.measured_at, m.id or 0), default=None) if (
+        comp.category == "chain" and rule.label == CHAIN_WEAR_LABEL
+    ) else None
+    if latest is not None:
+        # Gemessener Verschleiß ersetzt die Kilometerschätzung
+        eff_at = wear_between(db, comp.bike_id, since, latest.measured_at, rule.wet_factor)[2]
+        if last is None:
+            eff_at += comp.start_km
+        proj = wear_model.project(latest.wear_pct, eff_at, effective, comp.wear_limit_pct, interval_km)
+        ratios.append(proj.ratio)
+        factor = effective / km if km > 0 else 1.0
+        measure = {
+            "measured_at": latest.measured_at.isoformat(), "wear_pct": proj.measured_pct,
+            "projected_pct": round(proj.projected_pct, 3), "limit_pct": proj.limit_pct,
+            "km_left": round(proj.km_left / factor) if proj.km_left is not None else None,
+            "rate_pct_per_1000": round(proj.rate_pct_per_1000, 3),
+        }
+    elif interval_km:
         ratios.append(effective / interval_km)
     if rule.interval_months:
         ratios.append(months_since / rule.interval_months)
@@ -134,6 +155,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         "last_done": last,
         "interval_km_eff": interval_km,
         "variant": variant,
+        "measure": measure,
     }
 
 
@@ -289,3 +311,18 @@ def find_overlap(db: Session, bike_id: int, from_date: date, to_date: date | Non
             if from_date <= (m.to_date or date.max) and m.from_date <= (to_date or date.max):
                 return ts, m
     return None
+
+
+def measurement_points(db: Session, comp: Component) -> list[dict]:
+    """Messwerte mit den bis dahin gefahrenen Kilometern der Kette (für Liste und Diagramm)."""
+    rule = next((r for r in comp.rules if r.label == CHAIN_WEAR_LABEL), None)
+    entry = last_log(comp, rule) if rule else None
+    base = comp.installed_at if entry is None else entry.performed_at
+    out = []
+    since = entry.performed_at if entry else None
+    for m in sorted(comp.measurements, key=lambda m: (m.measured_at, m.id)):
+        if since and m.measured_at < since:
+            continue
+        km = km_between(db, comp.bike_id, base, m.measured_at) + (comp.start_km if entry is None else 0.0)
+        out.append({"id": m.id, "measured_at": m.measured_at, "wear_pct": m.wear_pct, "note": m.note, "km": round(km, 1)})
+    return out

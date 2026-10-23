@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     map_tile_url: str = ""
     map_tile_dark: bool = True
 
+    # Erinnerungen per E-Mail (eigener SMTP-Server) und per ntfy (Push aufs Handy, https://ntfy.sh)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    ntfy_server: str = "https://ntfy.sh"
+    reminders_enabled: bool = True
+
     class Config:
         env_file = ".env"
 

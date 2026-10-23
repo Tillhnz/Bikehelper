@@ -28,6 +28,10 @@ class User(Base):
     # Kartenhintergrund: eigener CARTO-Schlüssel (hat Vorrang vor dem Schlüssel des Servers)
     carto_api_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
+    # Erinnerungen, wenn eine Wartung bald oder jetzt fällig ist
+    remind_email: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ntfy_topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     bikes: Mapped[list["Bike"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
@@ -103,10 +107,25 @@ class Component(Base):
     retired_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_km: Mapped[float] = mapped_column(Float, default=0)  # Kilometer, die das Teil schon hatte
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    wear_limit_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # Kette: 0,5 (11/12-fach) oder 0,75 %
 
     bike: Mapped[Bike | None] = relationship(back_populates="components")
+    measurements: Mapped[list["ChainMeasurement"]] = relationship(back_populates="component", cascade="all, delete-orphan")
     rules: Mapped[list["MaintenanceRule"]] = relationship(back_populates="component", cascade="all, delete-orphan")
     logs: Mapped[list["MaintenanceLog"]] = relationship(back_populates="component", cascade="all, delete-orphan")
+
+
+class ChainMeasurement(Base):
+    """Messwert der Kettenlehre: Längung der Kette in Prozent."""
+    __tablename__ = "chain_measurements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), index=True)
+    measured_at: Mapped[date] = mapped_column(Date)
+    wear_pct: Mapped[float] = mapped_column(Float)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    component: Mapped[Component] = relationship(back_populates="measurements")
 
 
 class MaintenanceRule(Base):
@@ -168,3 +187,12 @@ class Activity(Base):
     wet_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Regen oder nasser Straße
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # WMO-Wettercode (höchster während der Fahrt)
     weather_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | prelim | none; leer = offen
+
+
+class RuleNotice(Base):
+    """Merkt sich, bei welchem Status zuletzt erinnert wurde, damit jede Fälligkeit nur einmal gemeldet wird."""
+    __tablename__ = "rule_notices"
+
+    rule_id: Mapped[int] = mapped_column(ForeignKey("maintenance_rules.id", ondelete="CASCADE"), primary_key=True)
+    status: Mapped[str] = mapped_column(String(10))
+    notified_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

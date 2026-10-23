@@ -37,6 +37,7 @@ WEAR_HINT = (
 # und streuen stark: Heißwachs 300 bis 600 km, Tropfwachs 200 bis 400 km. Nach Regen immer früher. Zur Lebensdauer gibt es
 # nur Herstellerangaben (bis zu dreimal so lang wie geölt, unabhängige Messungen fehlen), deshalb rechnen wir vorsichtig.
 WAX_LUBE_LABEL = "Kette wachsen"
+CHAIN_WEAR_LABEL = "Kette wechseln"
 WAX_VARIANTS: dict[str, dict] = {
     "hot_wax": {
         "name": "Heißwachs (Tauchbad)", "interval_km": 500,

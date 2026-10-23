@@ -4,14 +4,15 @@ from sqlalchemy.orm import Session
 
 from ..catalog import WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload
 from ..database import get_db
-from ..models import Bike, Component, MaintenanceLog, MaintenanceRule, User
+from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, User
 from ..schemas import (
     BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
-    MountedTireSet, RuleOut, StandardComponentsIn, WaxVariantOut,
+    MeasurementIn, MeasurementOut, MountedTireSet, RuleOut, StandardComponentsIn, WaxVariantOut,
 )
 from ..security import current_user
 from ..services import (
     apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
+    measurement_points,
     rule_state, tire_set_km, worst_status,
 )
 
@@ -64,7 +65,7 @@ def _component_out(db: Session, c: Component) -> ComponentOut:
     return ComponentOut(
         id=c.id, bike_id=c.bike_id, category=c.category, name=c.name, brand=c.brand,
         installed_at=c.installed_at, retired_at=c.retired_at, start_km=c.start_km, notes=c.notes,
-        km=round(component_km(db, c), 1), status=component_status(db, c),
+        wear_limit_pct=c.wear_limit_pct, km=round(component_km(db, c), 1), status=component_status(db, c),
     )
 
 
@@ -275,6 +276,39 @@ def delete_log(log_id: int, user: User = Depends(current_user), db: Session = De
         raise HTTPException(404, "Wartungseintrag nicht gefunden")
     db.delete(log)
     db.commit()
+
+
+# ---------- Kettenmessung ----------
+
+@router.get("/components/{comp_id}/measurements", response_model=list[MeasurementOut])
+def list_measurements(comp_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return measurement_points(db, _own_component(db, user, comp_id))
+
+
+@router.post("/components/{comp_id}/measurements", response_model=list[MeasurementOut], status_code=201)
+def add_measurement(comp_id: int, data: MeasurementIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Trägt einen Messwert der Kettenlehre ein. Die Verschleißregel der Kette rechnet danach mit dem Messwert."""
+    comp = _own_component(db, user, comp_id)
+    if comp.category != "chain":
+        raise HTTPException(422, "Messwerte gibt es nur für Ketten.")
+    if data.limit_pct is not None:
+        comp.wear_limit_pct = data.limit_pct
+    db.add(ChainMeasurement(component_id=comp.id, measured_at=data.measured_at, wear_pct=data.wear_pct, note=data.note))
+    db.commit()
+    db.refresh(comp)
+    return measurement_points(db, comp)
+
+
+@router.delete("/measurements/{m_id}", response_model=list[MeasurementOut])
+def delete_measurement(m_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    m = db.get(ChainMeasurement, m_id)
+    if not m or m.component.user_id != user.id:
+        raise HTTPException(404, "Messwert nicht gefunden")
+    comp = m.component
+    db.delete(m)
+    db.commit()
+    db.refresh(comp)
+    return measurement_points(db, comp)
 
 
 # ---------- Übersicht: fällige Wartungen ----------

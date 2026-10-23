@@ -295,3 +295,48 @@ def test_maintenance_time_of_day_decides_which_rides_count():
         # Früh am Morgen gewachst: die Tour kam danach und zählt
         c.post(f"/api/rules/{rule['id']}/done", headers=h, json={"performed_at": today, "performed_time": "06:00:00"})
         assert km_since() == 80
+
+
+def test_chain_measurement_drives_the_wear_rule():
+    with TestClient(app) as c:
+        h = _user(c, "chain@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        uid = c.get("/api/me", headers=h).json()["id"]
+        start = date.today() - timedelta(days=30)
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "chain", "name": "Kette", "installed_at": start.isoformat(),
+        }).json()
+        rule = c.post(f"/api/components/{comp['id']}/rules", headers=h, json={"label": "Kette wechseln", "interval_km": 3000}).json()
+        with SessionLocal() as db:
+            for i in range(3):
+                db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=500.0,
+                                start_date=datetime.combine(start + timedelta(days=i + 1), datetime.min.time())))
+            db.commit()
+        before = [r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json() if r["id"] == rule["id"]][0]
+        assert before["measure"] is None
+
+        m = c.post(f"/api/components/{comp['id']}/measurements", headers=h,
+                   json={"measured_at": date.today().isoformat(), "wear_pct": 0.45, "limit_pct": 0.5}).json()
+        assert m[0]["wear_pct"] == 0.45 and m[0]["km"] == 1500.0
+        after = [r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json() if r["id"] == rule["id"]][0]
+        assert after["measure"]["limit_pct"] == 0.5
+        assert after["progress"] >= 0.89  # 0,45 von 0,5 %: bald fällig, obwohl erst 1500 von 3000 km
+
+        # Messung löschen: zurück zur Kilometerschätzung
+        c.delete(f"/api/measurements/{m[0]['id']}", headers=h)
+        back = [r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json() if r["id"] == rule["id"]][0]
+        assert back["measure"] is None and back["progress"] < 0.6
+
+        other = _user(c, "chain-other@example.com")
+        assert c.post(f"/api/components/{comp['id']}/measurements", headers=other,
+                      json={"measured_at": date.today().isoformat(), "wear_pct": 0.1}).status_code == 404
+
+
+def test_notification_settings_roundtrip():
+    with TestClient(app) as c:
+        h = _user(c, "notify@example.com")
+        assert c.get("/api/settings/notifications", headers=h).json()["ntfy_topic"] == ""
+        r = c.put("/api/settings/notifications", headers=h, json={"email": False, "ntfy_topic": "bikehelper-abc123"}).json()
+        assert r["ntfy_topic"] == "bikehelper-abc123"
+        assert c.put("/api/settings/notifications", headers=h, json={"email": False, "ntfy_topic": "zu kurz!"}).status_code == 422
+        assert c.post("/api/settings/notifications/test", headers=_user(c, "n2@example.com")).status_code == 422

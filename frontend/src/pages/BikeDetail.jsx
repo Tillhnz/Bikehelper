@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, nowTime, toTime, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
+import ChainMeasure from "../components/ChainMeasure.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
@@ -328,6 +329,10 @@ function ComponentCard({ comp, onChanged }) {
             />
           ))}
         </ul>
+      )}
+
+      {comp.category === "chain" && (
+        <ChainMeasure comp={comp} rule={rules.find((r) => r.measure !== undefined && r.measure !== null) ?? rules.find((r) => r.label === "Kette wechseln")} disabled={retired} onChanged={refresh} />
       )}
 
       {logs.length > 0 && (

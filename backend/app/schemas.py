@@ -84,6 +84,7 @@ class ComponentIn(BaseModel):
     retired_at: date | None = None
     start_km: float = 0
     notes: str | None = None
+    wear_limit_pct: float | None = None  # Kette: Grenzwert der Kettenlehre
 
 
 class ComponentOut(ComponentIn):
@@ -110,6 +111,7 @@ class RuleOut(RuleIn):
     id: int
     variant: str | None = None  # Wachsart der letzten Wartung (nur Wachsregel)
     variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
+    measure: dict | None = None  # Hochrechnung aus der letzten Kettenmessung (nur Verschleißregel der Kette)
     km_since: float
     wet_km: float
     effective_km: float  # gefahrene km inklusive Nässe-Zuschlag
@@ -240,3 +242,18 @@ class MountDateIn(BaseModel):
 class MountRangeIn(BaseModel):
     from_date: date
     to_date: date | None = None
+
+
+class MeasurementIn(BaseModel):
+    measured_at: date
+    wear_pct: float = Field(ge=0, le=3)
+    note: str | None = None
+    limit_pct: Literal[0.5, 0.75] | None = None  # Grenzwert der Kettenlehre; ändert die Einstellung der Kette
+
+
+class MeasurementOut(BaseModel):
+    id: int
+    measured_at: date
+    wear_pct: float
+    note: str | None = None
+    km: float  # gefahrene Kilometer der Kette bis zur Messung

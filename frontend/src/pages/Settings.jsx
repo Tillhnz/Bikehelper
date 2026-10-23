@@ -130,6 +130,115 @@ function MapSettings() {
   );
 }
 
+function NotifySettings() {
+  const [st, setSt] = useState(null);
+  const [email, setEmail] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings/notifications").then((r) => { setSt(r); setEmail(r.email); setTopic(r.ntfy_topic); }).catch((e) => setError(e.message));
+  }, []);
+
+  async function run(fn, done) {
+    setMsg(""); setError(""); setBusy(true);
+    try { await fn(); setMsg(done); } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  const save = (e) => {
+    e.preventDefault();
+    return run(async () => setSt(await api.put("/settings/notifications", { email, ntfy_topic: topic })), "Gespeichert.");
+  };
+  const test = () => run(() => api.post("/settings/notifications/test"), "Testnachricht gesendet. Prüfe dein Postfach und dein Handy.");
+  const randomTopic = () => {
+    const a = new Uint8Array(9);
+    crypto.getRandomValues(a);
+    setTopic("bikehelper-" + Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 14));
+  };
+
+  if (!st) return <section className="panel"><h2>Erinnerungen</h2>{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Lade …</p>}</section>;
+
+  return (
+    <section className="panel">
+      <h2>Erinnerungen</h2>
+      <p className="muted">
+        BikeHelper meldet sich, sobald eine Wartung bald oder fällig ist. Jede Fälligkeit kommt nur einmal, tagsüber zwischen 8 und 21 Uhr.
+      </p>
+      <form className="notify-form" onSubmit={save}>
+        <label className="check">
+          <input type="checkbox" checked={email} disabled={!st.smtp_available} onChange={(e) => setEmail(e.target.checked)} />
+          <span>Per E-Mail an dich senden</span>
+        </label>
+        {!st.smtp_available && <p className="hint">Dafür muss auf dem Server ein E-Mail-Versand eingerichtet sein (SMTP_HOST in der .env).</p>}
+        <label>
+          Push aufs Handy mit ntfy, Thema
+          <span className="topic-row">
+            <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="z. B. bikehelper-k3j9x2" autoCapitalize="none" />
+            <button type="button" className="btn small" onClick={randomTopic}>Zufälliges Thema</button>
+          </span>
+        </label>
+        <p className="hint">
+          Installiere die kostenlose App ntfy auf dem Handy und abonniere dort dasselbe Thema (Server {st.ntfy_server}).
+          Wer das Thema kennt, kann mitlesen, nimm also ein zufälliges.
+        </p>
+        <div className="actions">
+          <button className="btn primary" disabled={busy}>Speichern</button>
+          <button type="button" className="btn" disabled={busy} onClick={test}>Testnachricht senden</button>
+        </div>
+      </form>
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+function InstallSettings() {
+  const [prompt, setPrompt] = useState(null);
+  const [installed, setInstalled] = useState(false);
+  const standalone = typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone);
+  const ios = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setPrompt(e); };
+    const onInstalled = () => setInstalled(true);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  async function install() {
+    prompt.prompt();
+    await prompt.userChoice;
+    setPrompt(null);
+  }
+
+  return (
+    <section className="panel">
+      <h2>Als App installieren</h2>
+      {standalone || installed ? (
+        <p className="ok">BikeHelper läuft schon als App.</p>
+      ) : prompt ? (
+        <>
+          <p className="muted">BikeHelper bekommt ein eigenes Symbol und öffnet ohne Browserleiste.</p>
+          <div className="actions"><button className="btn primary" onClick={install}>App installieren</button></div>
+        </>
+      ) : ios ? (
+        <p className="muted">Tippe in Safari auf Teilen und dann auf „Zum Home-Bildschirm“.</p>
+      ) : (
+        <p className="muted">
+          Öffne das Browsermenü und wähle „App installieren“ oder „Zum Startbildschirm hinzufügen“. Das geht nur über eine
+          https-Adresse, also über deinen Reverse Proxy.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function Settings({ user, onChange }) {
   return (
     <>
@@ -143,6 +252,10 @@ export default function Settings({ user, onChange }) {
       </section>
 
       <ProfileSettings user={user} onChange={onChange} />
+
+      <NotifySettings />
+
+      <InstallSettings />
 
       <MapSettings />
 
