@@ -9,6 +9,38 @@ const PROVIDER_TEXT = {
   custom: "Eigene Kachel-URL des Servers",
 };
 
+function ProfileSettings({ user, onChange }) {
+  const [weight, setWeight] = useState(user.weight_kg ?? "");
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  async function save(e) {
+    e.preventDefault();
+    setMsg("");
+    setError("");
+    try {
+      const r = await api.put("/settings/profile", { weight_kg: weight === "" ? null : Number(weight) });
+      onChange?.({ ...user, weight_kg: r.weight_kg });
+      setMsg("Gespeichert.");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <h2>Profil</h2>
+      <p className="muted">Dein Gewicht nutzt der Ratgeber für den Reifendruck. Es bleibt auf deinem Server.</p>
+      <form className="inline-form" onSubmit={save}>
+        <label>Körpergewicht (kg)<input type="number" min="30" max="250" step="0.5" value={weight} onChange={(e) => setWeight(e.target.value)} /></label>
+        <button className="btn primary">Speichern</button>
+      </form>
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function MapSettings() {
   const [st, setSt] = useState(null);
   const [key, setKey] = useState("");
@@ -98,7 +130,7 @@ function MapSettings() {
   );
 }
 
-export default function Settings({ user }) {
+export default function Settings({ user, onChange }) {
   return (
     <>
       <header className="page-head"><h1>Einstellungen</h1></header>
@@ -109,6 +141,8 @@ export default function Settings({ user }) {
           Angemeldet als <strong>{user.email}</strong>
         </p>
       </section>
+
+      <ProfileSettings user={user} onChange={onChange} />
 
       <MapSettings />
 

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BIKE_TYPES, api } from "../api.js";
+import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
-  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true });
+  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, chain_lube: "oil", tubeless: true, hookless: false });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -12,12 +13,7 @@ function BikeForm({ onCreated, onCancel }) {
     e.preventDefault();
     setError("");
     try {
-      await api.post("/bikes", {
-        ...form,
-        brand: form.brand || null,
-        model: form.model || null,
-        start_km: Number(form.start_km) || 0,
-      });
+      await api.post("/bikes", bikePayload(form));
       onCreated();
     } catch (err) {
       setError(err.message);
@@ -52,6 +48,7 @@ function BikeForm({ onCreated, onCancel }) {
         <input type="number" min="0" step="1" value={form.start_km} onChange={set("start_km")} />
         <span className="hint">Bisher gefahrene Kilometer, die nicht in Strava stehen.</span>
       </label>
+      <BikeFields form={form} setForm={setForm} />
       <label className="check span-all">
         <input
           type="checkbox"

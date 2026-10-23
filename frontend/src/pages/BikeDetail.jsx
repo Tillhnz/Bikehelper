@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BIKE_TYPES, CATEGORIES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
+import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
+import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 
 function ruleIntervalText(r) {
@@ -355,6 +356,51 @@ function ComponentCard({ comp, onChanged }) {
   );
 }
 
+function BikeEdit({ bike, onSaved, onCancel }) {
+  const [form, setForm] = useState({ ...bike });
+  const [error, setError] = useState("");
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      const { id, total_km, component_count, due_count, unknown_count, ...rest } = bikePayload(form);
+      await api.put(`/bikes/${bike.id}`, rest);
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <form className="panel form-grid" onSubmit={submit}>
+      <h2 className="span-all">Rad bearbeiten</h2>
+      <label>Name<input value={form.name} onChange={set("name")} required /></label>
+      <label>
+        Art
+        <select value={form.type} onChange={set("type")}>
+          {Object.entries(BIKE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </label>
+      <label>Marke<input value={form.brand ?? ""} onChange={set("brand")} /></label>
+      <label>Modell<input value={form.model ?? ""} onChange={set("model")} /></label>
+      <BikeFields form={form} setForm={setForm} />
+      {form.chain_lube !== (bike.chain_lube || "oil") && (
+        <p className="hint span-all">
+          Beim Speichern werden die Regeln der Kette (Schmieren und Wechseln) auf die neue Schmierung umgestellt.
+          Bereits eingetragene Wartungen bleiben erhalten.
+        </p>
+      )}
+      {error && <p className="error span-all" role="alert">{error}</p>}
+      <div className="actions span-all">
+        <button className="btn primary">Speichern</button>
+        <button type="button" className="btn" onClick={onCancel}>Abbrechen</button>
+      </div>
+    </form>
+  );
+}
+
 export default function BikeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -362,6 +408,7 @@ export default function BikeDetail() {
   const [components, setComponents] = useState([]);
   const [adding, setAdding] = useState(false);
   const [catalog, setCatalog] = useState(null);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -416,7 +463,13 @@ export default function BikeDetail() {
             {bike.brand ? ` · ${bike.brand}` : ""}{bike.model ? ` ${bike.model}` : ""}
             {bike.retired ? " · ausgemustert" : ""}
           </p>
+          <p className="muted small">
+            Kette: {CHAIN_LUBES[bike.chain_lube || "oil"].name}
+            {bike.tire_width_mm ? ` · Reifen ${bike.tire_width_mm} mm` : ""}
+            {bike.tubeless === false ? " mit Schlauch" : bike.tire_width_mm ? ", tubeless" : ""}
+          </p>
           <div className="actions">
+            <button className="btn small" onClick={() => setEditing(true)}>Bearbeiten</button>
             <button className="btn small" onClick={toggleRetired}>
               {bike.retired ? "Wieder aktivieren" : "Ausmustern"}
             </button>
@@ -425,6 +478,10 @@ export default function BikeDetail() {
         </div>
         <Odometer km={bike.total_km} />
       </header>
+
+      {editing && (
+        <BikeEdit bike={bike} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />
+      )}
 
       <header className="page-head">
         <h2>Komponenten</h2>

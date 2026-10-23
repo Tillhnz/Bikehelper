@@ -410,3 +410,19 @@ input:focus, select:focus { border-color: var(--celeste); }
 .upload-banner.is-error { border-left-color: var(--signal); }
 .upload-banner-main { display: flex; gap: 0.75rem; align-items: baseline; flex-wrap: wrap; }
 .banner-progress { height: 6px; }
+
+.checks { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; padding-top: 1.4rem; }
+
+/* ---------- Ratgeber ---------- */
+
+.advice-headline { font-family: var(--font-display); font-size: 2.6rem; font-weight: 600; line-height: 1.1; margin: 0 0 0.25rem; color: var(--celeste); }
+.advice-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem 1.5rem; margin-top: 1rem; }
+.advice-group { background: var(--ink-2); border-radius: 10px; padding: 0.9rem 1.1rem; }
+.advice-group h3 { font-size: 1.1rem; color: var(--mute); font-weight: 500; margin-bottom: 0.4rem; }
+.advice-group ul { margin: 0; padding-left: 1.1rem; }
+.advice-group li { margin-bottom: 0.25rem; }
+.pressure { display: flex; gap: 1.25rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+.pressure-box { display: flex; flex-direction: column; gap: 0.1rem; background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 1rem 1.6rem; min-width: 150px; }
+.pressure-label { color: var(--mute); font-size: 0.9rem; }
+.pressure-bar { font-family: var(--font-display); font-size: 3.4rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.pressure-bar small { font-size: 1.3rem; color: var(--celeste); margin-left: 0.3rem; font-weight: 500; }

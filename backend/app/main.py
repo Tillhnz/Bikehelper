@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
 from .database import Base, ensure_columns, engine
-from .routers import activities, auth, garage, mapconfig, stats as stats_router, weather as weather_router
+from .routers import activities, advisor, auth, garage, mapconfig, stats as stats_router, weather as weather_router
 from .weather import service as weather_service
 
 
@@ -25,6 +25,7 @@ app.include_router(activities.router)
 app.include_router(weather_router.router)
 app.include_router(stats_router.router)
 app.include_router(mapconfig.router)
+app.include_router(advisor.router)
 
 
 @app.get("/api/health")

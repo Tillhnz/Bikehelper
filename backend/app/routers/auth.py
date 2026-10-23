@@ -17,6 +17,7 @@ def _user_out(u: User) -> UserOut:
         email=u.email,
         strava_configured=bool(u.strava_client_id and u.strava_client_secret),
         strava_connected=bool(u.strava_refresh_token),
+        weight_kg=u.weight_kg,
     )
 
 

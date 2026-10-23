@@ -135,3 +135,48 @@ def test_active_import_route_is_not_taken_for_a_job_id():
         h = {"Authorization": f"Bearer {t}"}
         assert c.get("/api/imports/active", headers=h).json() == {"job": None}
         assert c.get("/api/imports/unbekannt", headers=h).status_code == 404
+
+
+def test_advisor_with_manual_weather_and_chain_lube():
+    with TestClient(app) as c:
+        c.post("/api/auth/register", json={"email": "adv@example.com", "password": "geheim1234"})
+        t = c.post("/api/auth/login", json={"email": "adv@example.com", "password": "geheim1234"}).json()["access_token"]
+        h = {"Authorization": f"Bearer {t}"}
+
+        # ohne Gewicht und Reifenbreite keine Reifenempfehlung, Kleidung trotzdem
+        body = {"start": "2026-10-25T09:00:00", "duration_min": 120, "manual": {"temp_c": 8, "wind_kmh": 10, "rain": "none"}}
+        r = c.post("/api/advisor/plan", headers=h, json=body).json()
+        assert r["tires"] is None and set(r["tires_missing"]) == {"Körpergewicht", "Reifenbreite"}
+        assert r["clothing"]["headline"].startswith("Lang") and r["weather"]["source"] == "manual"
+
+        assert c.put("/api/settings/profile", headers=h, json={"weight_kg": 75}).json()["weight_kg"] == 75
+        assert c.get("/api/me", headers=h).json()["weight_kg"] == 75
+
+        bike = c.post("/api/bikes", headers=h, json={
+            "name": "Gravel", "type": "gravel", "tire_width_mm": 40, "rim_inner_mm": 25, "bike_weight_kg": 10,
+        }).json()
+        assert bike["chain_lube"] == "oil" and bike["tire_width_mm"] == 40
+        defaults = c.get("/api/advisor/defaults", headers=h).json()
+        assert defaults["weight_kg"] == 75 and defaults["bikes"][0]["tire_width_mm"] == 40
+
+        dry = c.post("/api/advisor/plan", headers=h, json={**body, "bike_id": bike["id"]}).json()
+        wet = c.post("/api/advisor/plan", headers=h, json={
+            **body, "bike_id": bike["id"], "manual": {"temp_c": 8, "wind_kmh": 10, "rain": "heavy"}}).json()
+        assert dry["tires"]["rear_bar"] > wet["tires"]["rear_bar"] and wet["tires"]["wetness"] == "wet"
+        assert wet["clothing"]["groups"]["Regen & Wind"]
+
+        # ohne Ort und ohne manuelles Wetter: klare Fehlermeldung
+        assert c.post("/api/advisor/plan", headers=h, json={"start": "2026-10-25T09:00:00"}).status_code == 422
+
+        # Kettenschmierung wechseln passt die Regeln an
+        comps = c.get(f"/api/components?bike_id={bike['id']}", headers=h).json()
+        chain = next(x for x in comps if x["category"] == "chain")
+        before = {r["label"]: r for r in c.get(f"/api/components/{chain['id']}/rules", headers=h).json()}
+        assert before["Kette wechseln"]["interval_km"] == 3000
+        upd = {k: v for k, v in bike.items() if k not in ("id", "total_km", "component_count", "due_count", "unknown_count")}
+        upd["chain_lube"] = "hot_wax"
+        assert c.put(f"/api/bikes/{bike['id']}", headers=h, json=upd).json()["chain_lube"] == "hot_wax"
+        after = {r["label"]: r for r in c.get(f"/api/components/{chain['id']}/rules", headers=h).json()}
+        assert "Kette neu wachsen (Heißwachs)" in after and "Kette reinigen und schmieren" not in after
+        assert after["Kette wechseln"]["interval_km"] == 6000
+        assert after["Kette wechseln"]["id"] == before["Kette wechseln"]["id"]  # gleiche Regel, Wartungen bleiben erhalten

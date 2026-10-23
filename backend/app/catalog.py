@@ -27,6 +27,62 @@ class ComponentTemplate:
     rules: tuple[RuleTemplate, ...]
 
 
+WEAR_HINT = (
+    "Mit einer Kettenlehre messen: bei 0,5 % Längung (11- und 12-fach) bzw. 0,75 % (10-fach und weniger) wechseln. "
+    "Ein rechtzeitiger Wechsel schont Kassette und Kettenblätter."
+)
+
+# Kettenschmierung. Die Werte stammen aus Herstellerangaben und Tests (Quellen siehe README) und streuen stark:
+# Heißwachs 300 bis 600 km, Tropfwachs 200 bis 400 km. Nach Regen immer früher. Zur Lebensdauer gibt es nur
+# Herstellerangaben (bis zu dreimal so lang wie geölt, unabhängige Messungen fehlen), deshalb rechnen wir vorsichtig.
+CHAIN_LUBES: dict[str, dict] = {
+    "oil": {
+        "name": "Öl",
+        "lube": RuleTemplate(
+            "Kette reinigen und schmieren", interval_km=200, wet_factor=2.0,
+            hint="Etwa alle 200 km, nach Regenfahrten früher. Abwischen und neu schmieren, bevor sie trocken oder schmutzig läuft. "
+                 "Bei viel Nässe und Streusalz ist Öl besser als Wachs.",
+        ),
+        "wear": RuleTemplate("Kette wechseln", interval_km=3000, wet_factor=2.0, hint=WEAR_HINT),
+    },
+    "hot_wax": {
+        "name": "Heißwachs (Tauchwachs)",
+        "lube": RuleTemplate(
+            "Kette neu wachsen (Heißwachs)", interval_km=500, wet_factor=2.5,
+            hint="Je nach Wachs 300 bis 600 km, Hersteller nennen teils mehr. Nach jeder Nassfahrt früher neu wachsen und die Kette "
+                 "trocknen, damit sie nicht rostet. Zeit zum Nachwachsen: Die Kette wird dunkel (statt weiß oder hellgrau), "
+                 "oder sie klingt trocken und knackt. Bei dauerhaft nassem Wetter oder Salz ist Öl besser.",
+        ),
+        "wear": RuleTemplate(
+            "Kette wechseln", interval_km=6000, wet_factor=2.0,
+            hint=WEAR_HINT + " Gewachste Ketten halten laut Herstellern deutlich länger (bis dreimal so lang wie geölte). "
+                 "Unabhängige Messungen fehlen, deshalb ist hier nur das Doppelte angesetzt. Bei Nässe läuft die Kette "
+                 "schneller trocken, daher zählt Nässe weiter doppelt.",
+        ),
+    },
+    "drip_wax": {
+        "name": "Tropfwachs",
+        "lube": RuleTemplate(
+            "Kette nachwachsen (Tropfwachs)", interval_km=250, wet_factor=2.5,
+            hint="Etwa alle 200 bis 400 km nachtropfen, sobald die Kette lauter wird. Tropfwachs ist empfindlicher gegen Regen "
+                 "als Heißwachs; nach Nassfahrten früher nachtragen und die Kette trocknen.",
+        ),
+        "wear": RuleTemplate(
+            "Kette wechseln", interval_km=5000, wet_factor=2.0,
+            hint=WEAR_HINT + " Auch Tropfwachs verlängert die Lebensdauer deutlich, aber weniger als ein Heißwachsbad. "
+                 "Der Wert ist eine vorsichtige Schätzung.",
+        ),
+    },
+}
+CHAIN_LUBE_KEYS = tuple(CHAIN_LUBES)
+LUBE_LABELS = {v["lube"].label for v in CHAIN_LUBES.values()}
+
+
+def chain_rules(lube: str | None) -> tuple[RuleTemplate, RuleTemplate]:
+    spec = CHAIN_LUBES.get(lube or "oil", CHAIN_LUBES["oil"])
+    return (spec["lube"], spec["wear"])
+
+
 CATALOG: dict[str, ComponentTemplate] = {
     "chain": ComponentTemplate("chain", "Kette", (
         RuleTemplate(
@@ -148,5 +204,6 @@ def catalog_payload() -> dict:
     """Für die Oberfläche: Katalog je Kategorie und die Vorlagen je Radtyp."""
     return {
         "components": {k: asdict(v) for k, v in CATALOG.items()},
+        "chain_lubes": {k: {"name": v["name"], "lube": asdict(v["lube"]), "wear": asdict(v["wear"])} for k, v in CHAIN_LUBES.items()},
         "bike_templates": {k: list(v) for k, v in BIKE_TEMPLATES.items()},
     }

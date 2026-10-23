@@ -28,6 +28,23 @@ Aus dem Export werden nur Radfahrten übernommen. Kilometer, Zeit, Höhenmeter u
 
 Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413“ scheitern. Trage dann beim Proxy Host unter „Advanced“ die Zeile `client_max_body_size 8g;` ein.
 
+## Ratgeber
+
+Die Seite „Ratgeber“ beantwortet für die nächste Tour zwei Fragen. Du wählst Rad, Start, Dauer, Tempo und Ort. Das Wetter kommt aus der 15-Tage-Vorhersage von Open-Meteo (nur gerundeter Ort und Zeit werden gesendet) oder von Hand.
+
+**Reifendruck** aus Gewicht, Reifenbreite und Untergrund:
+- Grundformel nach Frank Bertos 15-%-Regel, als Formel gefasst von BikeLab: `P = 600 · L / W² + 0,75 · W − 25` (psi, L Last pro Rad in lb, W echte Reifenbreite in mm), laut Quelle auf etwa ±2 psi genau. Hinten wird direkt gerechnet, vorn sind es 93 %. Das Hinterrad trägt bei Rennrädern 60 %, bei Gravel und MTB 55 % des Systemgewichts.
+- Zu- und Abschläge: Untergrund (fester Schotter −9 %, lockerer −17,5 %, grober −33 %, rauer Asphalt −5 %, nach SILCA und BikeLab), Schlauch +5 %, weiche Karkasse −5 %, steife +5 %, feuchte Straße −5 %, nasse −10 % (Continental nennt rund 10 % weniger bei Regen).
+- Hookless-Felgen werden auf 5,0 bar begrenzt (bei Innenweite ab 30 mm auf 4,1 bar). Es gilt immer der Maximaldruck, der auf Reifen und Felge steht.
+- Das ist ein Startwert. Verglichen mit dem SILCA-Rechner liegt die Formel bei 80 kg und 30 mm etwa 8 % darunter; sie liefert für 10 kg mehr Fahrergewicht rund 9 psi mehr. Für MTB-Reifen ist es nur eine grobe Näherung.
+
+**Kleidung** („kurz-kurz“ bis „lang-lang“):
+- Aus Temperatur zu Beginn und im Mittel entsteht eine gefühlte Kleidungstemperatur. Zusätzlich zählen echter Wind (Windchill-Formel von Environment Canada, nur über den normalen Fahrtwind hinaus), Regen (eine Stufe wärmer), Tempo (hart: etwa 3 °C weniger, locker: 2 °C mehr), Kälteempfinden (±2 °C), Dauer (unter 1 Std. etwas wärmer, ab 4 Std. mehr Reserve).
+- Stufen: ab 24 °C kurz/kurz mit Sonnenschutz, 20 bis 24 kurz/kurz, 16 bis 20 kurz mit Armlingen, 12 bis 16 lang mit Beinlingen und dünnen Handschuhen, 8 bis 12 lang/lang mit Überschuhen, 4 bis 8 Thermo und winddichte Jacke, 0 bis 4 Winterausrüstung, darunter zusätzlich Zehenwärmer und Sturmhaube. Die Grenzen sind das Mittel aus den Tabellen von Roadman, Löffler und Down The Road.
+- Dazu kommen Regen- und Windkleidung, Sonnenschutz, Mitnehmen (Weste für die Abfahrt, Notfall-Schicht ab 3 Std., Armlinge zum Ausziehen bei starkem Temperaturanstieg), Licht bei Dunkelheit sowie Warnungen bei Frost oder Glatteis. Zu- und Abschläge sind eigene Annahmen und Geschmackssache.
+
+Quellen: BikeLab PSI Calculator, SILCA-Rechner, Lebel Bicycles, Lennard Zinn (Active.com) und Velo (Reifendruck bei Nässe); Roadman Cycling, Löffler, Down The Road (Kleidung); Cyclowax, bike-components, Componentry, CyclingCeramic (Kettenwachs).
+
 ## Uploads im Hintergrund
 
 Uploads und Importe laufen weiter, wenn du die Seite oder den Tab wechselst. Der Fortschritt steht auf jeder Seite oben in einer Meldung, im Tab-Titel, und am Ende kommt eine Meldung („Import abgeschlossen“). Beim ersten Upload fragt der Browser, ob BikeHelper Benachrichtigungen senden darf; ist der Tab dann im Hintergrund, erscheint eine Systembenachrichtigung. Die Verarbeitung der ZIP läuft auf dem Server und übersteht auch ein Neuladen. Nur das Hochladen selbst bricht ab, wenn du den Tab schließt oder neu lädst (der Browser warnt davor), und auf dem Handy kann ein gesperrter Bildschirm den Upload anhalten.
@@ -72,6 +89,16 @@ Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entste
 Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum fehlt“, bis du ein Datum einträgst oder eine Regel als erledigt abhakst. Erst dann kann gezählt werden. Mit „Teil gewechselt“ wird das alte Teil ausgemustert und das neue übernimmt alle Regeln.
 
 Quellen: Park Tool (Kettenverschleiß), BikeGremlin, Slowtwitch, Zero Friction Cycling, Geekay, BikeRadar, Lennard Zinn, CX Magazine, Michelin sowie Herstellerangaben von SRAM, Shimano und TRP.
+
+**Kettenschmierung:** Am Rad wählst du Öl, Heißwachs oder Tropfwachs. Die Regeln der Kette passen sich an:
+
+| Schmierung | Schmieren bzw. neu wachsen | Nässefaktor | Kette wechseln |
+|---|---|---|---|
+| Öl | 200 km | 2,0 | 3.000 km |
+| Heißwachs | 500 km | 2,5 | 6.000 km |
+| Tropfwachs | 250 km | 2,5 | 5.000 km |
+
+Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCeramic), für Tropfwachs 200 bis 400 km und raten, nach jeder Nassfahrt früher neu zu wachsen, weil Regen das Wachs abwäscht. Bei Dauerregen und Streusalz sei Öl besser. Zur Lebensdauer gibt es nur Herstellerangaben („bis zu dreimal so lang“, Cyclowax); unabhängige Messungen habe ich nicht gefunden. Deshalb rechnet BikeHelper vorsichtig mit dem Doppelten (Heißwachs) bzw. 1,7-fachen (Tropfwachs). Ein Wechsel der Schmierung stellt die Regeln um, Wartungseinträge bleiben erhalten.
 
 ## Wetter
 

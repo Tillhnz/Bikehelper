@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -23,6 +24,7 @@ class UserOut(BaseModel):
     email: str
     strava_configured: bool
     strava_connected: bool
+    weight_kg: float | None = None
 
 
 class StravaSettingsIn(BaseModel):
@@ -40,6 +42,12 @@ class BikeIn(BaseModel):
     strava_gear_id: str | None = None
     notes: str | None = None
     retired: bool = False
+    chain_lube: Literal["oil", "hot_wax", "drip_wax"] | None = "oil"
+    tire_width_mm: float | None = Field(default=None, ge=18, le=80)
+    rim_inner_mm: float | None = Field(default=None, ge=12, le=40)
+    bike_weight_kg: float | None = Field(default=None, ge=3, le=40)
+    tubeless: bool | None = True
+    hookless: bool | None = False
 
 
 class BikeCreate(BikeIn):

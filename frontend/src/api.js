@@ -100,6 +100,12 @@ export const CATEGORIES = {
   other: "Sonstiges",
 };
 
+export const CHAIN_LUBES = {
+  oil: { name: "Öl", hint: "Klassisch: alle ca. 200 km schmieren. Gut bei Dauerregen und Streusalz." },
+  hot_wax: { name: "Heißwachs (Tauchwachs)", hint: "Kette im Wachsbad: sauber und lange haltbar, alle 300 bis 600 km neu wachsen, nach Regen früher. Verschleiß deutlich geringer." },
+  drip_wax: { name: "Tropfwachs", hint: "Wachs zum Auftropfen: weniger Aufwand als Heißwachs, alle 200 bis 400 km nachtragen, empfindlicher gegen Regen." },
+};
+
 export const BIKE_TYPES = { road: "Rennrad", gravel: "Gravel", mtb: "Mountainbike", other: "Sonstiges" };
 
 export const STATUS_LABEL = { ok: "In Ordnung", soon: "Bald fällig", due: "Fällig", unknown: "Einbaudatum fehlt" };

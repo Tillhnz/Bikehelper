@@ -24,6 +24,7 @@ class User(Base):
     strava_expires_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     strava_athlete_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)  # Körpergewicht für den Ratgeber
     # Kartenhintergrund: eigener CARTO-Schlüssel (hat Vorrang vor dem Schlüssel des Servers)
     carto_api_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
@@ -44,6 +45,13 @@ class Bike(Base):
     strava_gear_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     retired: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Kette und Ratgeber
+    chain_lube: Mapped[str | None] = mapped_column(String(12), nullable=True)  # oil | hot_wax | drip_wax, leer = oil
+    tire_width_mm: Mapped[float | None] = mapped_column(Float, nullable=True)   # aufgezogene Reifenbreite laut Aufdruck
+    rim_inner_mm: Mapped[float | None] = mapped_column(Float, nullable=True)    # Maulweite der Felge
+    bike_weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tubeless: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    hookless: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="bikes")
     components: Mapped[list["Component"]] = relationship(back_populates="bike")

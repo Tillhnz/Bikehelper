@@ -11,7 +11,8 @@ from ..schemas import (
 )
 from ..security import current_user
 from ..services import (
-    bike_total_km, component_km, component_status, create_default_components, rule_state, worst_status,
+    apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, rule_state,
+    worst_status,
 )
 
 router = APIRouter(prefix="/api", tags=["garage"])
@@ -47,6 +48,9 @@ def _bike_out(db: Session, bike: Bike) -> BikeOut:
         id=bike.id, name=bike.name, type=bike.type, brand=bike.brand, model=bike.model,
         year=bike.year, start_km=bike.start_km, strava_gear_id=bike.strava_gear_id,
         notes=bike.notes, retired=bike.retired,
+        chain_lube=bike.chain_lube or "oil", tire_width_mm=bike.tire_width_mm, rim_inner_mm=bike.rim_inner_mm,
+        bike_weight_kg=bike.bike_weight_kg, tubeless=True if bike.tubeless is None else bike.tubeless,
+        hookless=bool(bike.hookless),
         total_km=round(bike_total_km(db, bike), 1),
         component_count=len(active),
         due_count=sum(1 for s in statuses if s == "due"),
@@ -115,8 +119,11 @@ def get_bike(bike_id: int, user: User = Depends(current_user), db: Session = Dep
 @router.put("/bikes/{bike_id}", response_model=BikeOut)
 def update_bike(bike_id: int, data: BikeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     bike = _own_bike(db, user, bike_id)
+    old_lube = bike.chain_lube or "oil"
     for k, v in data.model_dump().items():
         setattr(bike, k, v)
+    if (bike.chain_lube or "oil") != old_lube:
+        apply_chain_lube(db, bike)
     db.commit()
     return _bike_out(db, bike)
 

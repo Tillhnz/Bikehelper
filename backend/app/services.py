@@ -3,7 +3,7 @@ from datetime import date, datetime, time
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .catalog import CATALOG, categories_for
+from .catalog import CATALOG, LUBE_LABELS, categories_for, chain_rules
 from .models import Activity, Bike, Component, MaintenanceRule
 
 SOON_THRESHOLD = 0.8
@@ -148,14 +148,37 @@ def create_default_components(
         if tpl is None or cat in existing:
             continue
         comp = Component(user_id=user_id, bike_id=bike.id, category=cat, name=tpl.name)
+        rules = chain_rules(bike.chain_lube) if cat == "chain" else tpl.rules
         comp.rules = [
             MaintenanceRule(
                 label=r.label, interval_km=r.interval_km, interval_months=r.interval_months,
                 wet_factor=r.wet_factor, hint=r.hint or None,
             )
-            for r in tpl.rules
+            for r in rules
         ]
         db.add(comp)
         created.append(comp)
     db.flush()
     return created
+
+
+def apply_chain_lube(db: Session, bike: Bike) -> int:
+    """Passt die Regeln der Kette an die gewählte Schmierung an (Öl, Heißwachs, Tropfwachs).
+
+    Schmier- und Wechselregel werden an Ort und Stelle geändert, damit bereits eingetragene Wartungen erhalten
+    bleiben. Eigene Regeln mit anderen Namen bleiben unberührt. Gibt die Zahl geänderter Regeln zurück.
+    """
+    lube_rule, wear_rule = chain_rules(bike.chain_lube)
+    changed = 0
+    for comp in bike.components:
+        if comp.category != "chain" or comp.retired_at:
+            continue
+        for r in comp.rules:
+            tpl = lube_rule if r.label in LUBE_LABELS else wear_rule if r.label == wear_rule.label else None
+            if tpl is None:
+                continue
+            r.label, r.interval_km, r.interval_months = tpl.label, tpl.interval_km, tpl.interval_months
+            r.wet_factor, r.hint = tpl.wet_factor, tpl.hint or None
+            changed += 1
+    db.flush()
+    return changed

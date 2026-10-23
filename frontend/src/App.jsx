@@ -8,6 +8,7 @@ import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Rides from "./pages/Rides.jsx";
+import Advisor from "./pages/Advisor.jsx";
 import RideDetail from "./pages/RideDetail.jsx";
 import Heatmap from "./pages/Heatmap.jsx";
 import Stats from "./pages/Stats.jsx";
@@ -23,6 +24,7 @@ function Shell({ user, onLogout, children }) {
         </div>
         <nav>
           <NavLink to="/" end>Garage</NavLink>
+          <NavLink to="/advisor">Ratgeber</NavLink>
           <NavLink to="/rides">Fahrten</NavLink>
           <NavLink to="/heatmap">Heatmap</NavLink>
           <NavLink to="/stats">Statistik</NavLink>
@@ -89,6 +91,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Garage />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
+        <Route path="/advisor" element={<Advisor />} />
         <Route path="/rides" element={<Rides />} />
         <Route path="/rides/:id" element={<RideDetail />} />
         <Route path="/heatmap" element={<Heatmap />} />
