@@ -220,3 +220,50 @@ def test_is_cycling_localized_types():
         assert is_cycling(t), t
     for t in ("Lauf", "Run", "Wanderung", "Schwimmen", "Treadmill"):
         assert not is_cycling(t), t
+
+
+GPX_WITH_SENSORS = """<?xml version="1.0"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<trk><name>Mit Sensoren</name><trkseg>
+%s
+</trkseg></trk></gpx>"""
+
+
+def _sensor_gpx(n=120):
+    pts = []
+    for i in range(n):
+        pts.append(
+            f'<trkpt lat="{53.5 + i * 0.0002:.5f}" lon="10.0"><ele>{10 + i * 0.5:.1f}</ele>'
+            f'<time>2026-10-23T08:{i // 60:02d}:{i % 60:02d}Z</time>'
+            f'<extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>{120 + i // 4}</gpxtpx:hr>'
+            f'<gpxtpx:cad>{0 if i % 10 == 0 else 85}</gpxtpx:cad></gpxtpx:TrackPointExtension>'
+            f'<power>{200 + i}</power></extensions></trkpt>'
+        )
+    return (GPX_WITH_SENSORS % "\n".join(pts)).encode()
+
+
+def test_details_with_heart_rate_cadence_and_power():
+    from app.importers.parsers import parse_activity_file
+    a = parse_activity_file("fahrt.gpx", _sensor_gpx())
+    d = a.details
+    assert d is not None
+    assert d["elapsed_s"] == 119
+    assert d["max_hr"] == 149 and 130 <= d["avg_hr"] <= 140
+    assert d["avg_cadence"] == 85  # Nullwerte (Ausrollen) zählen nicht
+    assert d["max_power"] == 319 and d["avg_power"] == 260
+    assert d["ele_min"] == 10.0 and d["ele_max"] == 69.5
+    assert 78 < d["max_speed"] < 82  # 0,0002 Grad Breite pro Sekunde = 22,2 m/s = 80 km/h
+    p = d["profile"]
+    assert len(p["d"]) == len(p["e"]) == len(p["s"]) == len(p["h"]) <= 300
+    assert p["d"] == sorted(p["d"]) and p["ll"]
+    assert len(polyline.decode(p["ll"])) == len(p["d"])
+
+
+def test_details_without_sensors_have_no_empty_series():
+    from app.importers.parsers import parse_activity_file
+    gpx = """<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>""" + "".join(
+        f'<trkpt lat="{53.5 + i * 0.0001:.5f}" lon="10.0"><time>2026-10-23T08:00:{i:02d}Z</time></trkpt>' for i in range(50)
+    ) + "</trkseg></trk></gpx>"
+    d = parse_activity_file("x.gpx", gpx.encode()).details
+    assert d["profile"]["h"] is None and d["profile"]["p"] is None and d["profile"]["e"] is None
+    assert d["avg_hr"] is None and d["max_power"] is None

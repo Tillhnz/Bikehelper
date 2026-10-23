@@ -5,6 +5,7 @@ import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Rides from "./pages/Rides.jsx";
+import RideDetail from "./pages/RideDetail.jsx";
 import Heatmap from "./pages/Heatmap.jsx";
 import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/" element={<Garage />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/rides" element={<Rides />} />
+        <Route path="/rides/:id" element={<RideDetail />} />
         <Route path="/heatmap" element={<Heatmap />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />

@@ -387,3 +387,14 @@ input:focus, select:focus { border-color: var(--celeste); }
   .grid-2 { grid-template-columns: 1fr; }
   .hbars li { grid-template-columns: 80px 1fr 90px; }
 }
+
+/* ---------- Einzelauswertung ---------- */
+
+.detail-map { height: 420px; border: 1px solid var(--line); border-radius: var(--r-panel); overflow: hidden; background: #0b1117; }
+.chart-title { font-size: 1.05rem; color: var(--mute); margin: 1.1rem 0 0.2rem; font-weight: 500; }
+.profile { cursor: crosshair; }
+.rides a.ride-link { color: var(--chalk); text-decoration: none; font-weight: 500; }
+.rides a.ride-link:hover { color: var(--celeste); text-decoration: underline; }
+.danger-zone { border-color: rgba(255, 107, 107, 0.35); }
+.danger-zone h2 { color: var(--signal); }
+@media (max-width: 800px) { .detail-map { height: 300px; } }

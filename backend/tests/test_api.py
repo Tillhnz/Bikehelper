@@ -69,3 +69,39 @@ def test_full_flow():
         h2 = {"Authorization": f"Bearer {t2}"}
         assert c.get("/api/bikes", headers=h2).json() == []
         assert c.get(f"/api/bikes/{bike['id']}", headers=h2).status_code == 404
+
+
+def test_activity_detail_and_delete_all():
+    import json
+
+    with TestClient(app) as c:
+        def login(mail):
+            c.post("/api/auth/register", json={"email": mail, "password": "geheim1234"})
+            t = c.post("/api/auth/login", json={"email": mail, "password": "geheim1234"}).json()["access_token"]
+            return {"Authorization": f"Bearer {t}"}
+
+        h1, h2 = login("detail1@example.com"), login("detail2@example.com")
+        uid1 = c.get("/api/me", headers=h1).json()["id"]
+        uid2 = c.get("/api/me", headers=h2).json()["id"]
+        with SessionLocal() as db:
+            a = Activity(user_id=uid1, name="Mit Details", start_date=datetime(2026, 5, 1, 8), distance_km=40.0,
+                         moving_time_s=5400, elevation_m=300,
+                         details=json.dumps({"max_speed": 55.5, "profile": {"d": [1.0, 2.0], "e": [10, 20]}}))
+            b = Activity(user_id=uid1, name="Ohne Details", start_date=datetime(2026, 5, 2, 8), distance_km=10.0,
+                         moving_time_s=1800, elevation_m=10)
+            other = Activity(user_id=uid2, name="Fremd", start_date=datetime(2026, 5, 3, 8), distance_km=5.0,
+                             moving_time_s=900, elevation_m=5)
+            db.add_all([a, b, other])
+            db.commit()
+            ida, idb, ido = a.id, b.id, other.id
+
+        d = c.get(f"/api/activities/{ida}", headers=h1).json()
+        assert d["details"]["max_speed"] == 55.5 and d["avg_speed"] == 26.7
+        assert c.get(f"/api/activities/{idb}", headers=h1).json()["details"] is None
+        assert c.get(f"/api/activities/{ido}", headers=h1).status_code == 404
+        assert c.get("/api/activities/gear", headers=h1).status_code == 200  # darf nicht als ID gelesen werden
+
+        assert c.delete("/api/activities", headers=h1).status_code == 422
+        r = c.delete("/api/activities?confirm=true", headers=h1)
+        assert r.status_code == 200 and r.json() == {"deleted": 2}
+        assert c.get(f"/api/activities/{ido}", headers=h2).status_code == 200  # fremde Fahrten bleiben

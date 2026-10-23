@@ -1,14 +1,15 @@
+import json
 import shutil
 import tempfile
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, defer
 
 from ..database import get_db
 from ..importers import service
-from ..models import Activity, User
-from ..schemas import ActivityOut, ActivityPage, ActivityUpdate, AssignIn, GearOut
+from ..models import Activity, Bike, User
+from ..schemas import ActivityDetail, ActivityOut, ActivityPage, ActivityUpdate, AssignIn, GearOut
 from ..security import current_user
 from ..weather import service as weather_service
 from .garage import _own_bike
@@ -182,3 +183,37 @@ def update_activity(
 def delete_activity(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     db.delete(_own_activity(db, user, activity_id))
     db.commit()
+
+
+@router.delete("/activities")
+def delete_all_activities(
+    confirm: bool = Query(default=False),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Löscht alle Fahrten des Nutzers (Räder, Komponenten und Wartungen bleiben erhalten)."""
+    if not confirm:
+        raise HTTPException(422, "Zum Löschen aller Fahrten muss confirm=true angegeben werden.")
+    result = db.execute(delete(Activity).where(Activity.user_id == user.id))
+    db.commit()
+    return {"deleted": result.rowcount}
+
+
+@router.get("/activities/{activity_id}", response_model=ActivityDetail)
+def activity_detail(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Einzelauswertung einer Fahrt mit Strecke und Verlaufsdaten."""
+    a = _own_activity(db, user, activity_id)
+    base = _out(a, bool(a.polyline)).model_dump()
+    try:
+        details = json.loads(a.details) if a.details else None
+    except ValueError:
+        details = None
+    return ActivityDetail(
+        **base,
+        bike_name=(db.get(Bike, a.bike_id).name if a.bike_id and db.get(Bike, a.bike_id) else None),
+        polyline=a.polyline,
+        avg_speed=round(a.distance_km / a.moving_time_s * 3600, 1) if a.moving_time_s else None,
+        details=details,
+        start_lat=a.start_lat,
+        start_lng=a.start_lng,
+    )

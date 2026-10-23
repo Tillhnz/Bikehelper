@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 import zipfile
+import json
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -75,7 +76,10 @@ def is_duplicate(db: Session, user_id: int, parsed: ParsedActivity, strava_id: i
     return find_duplicate(db, user_id, parsed, strava_id) is not None
 
 
-def backfill_existing(existing: Activity, strava_id: int | None, gear_name: str | None, bike: Bike | None) -> bool:
+def backfill_existing(
+    existing: Activity, strava_id: int | None, gear_name: str | None, bike: Bike | None,
+    details: dict | None = None,
+) -> bool:
     """Ergänzt bei einer schon vorhandenen Fahrt fehlende Angaben (Strava-ID, Radname, Rad).
 
     Bereits gesetzte Werte bleiben unberührt, damit manuelle Zuordnungen nicht überschrieben werden.
@@ -89,6 +93,9 @@ def backfill_existing(existing: Activity, strava_id: int | None, gear_name: str 
         changed = True
     if bike is not None and existing.bike_id is None:
         existing.bike_id = bike.id
+        changed = True
+    if details and not existing.details:
+        existing.details = json.dumps(details, separators=(",", ":"))
         changed = True
     return changed
 
@@ -121,6 +128,7 @@ def store_activity(
         moving_time_s=parsed.moving_time_s,
         elevation_m=parsed.elevation_m,
         polyline=parsed.polyline,
+        details=json.dumps(parsed.details, separators=(",", ":")) if parsed.details else None,
         start_lat=parsed.start_lat,
         start_lng=parsed.start_lng,
         gear_name=gear_name[:160] if gear_name else None,
@@ -296,7 +304,7 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
                     bike = None
                     if existing.bike_id is None:
                         bike = _resolve_bike(db, job.user_id, entry, bikes, index.bikes, create_bikes, summary)
-                    if backfill_existing(existing, entry.strava_id, entry.gear, bike):
+                    if backfill_existing(existing, entry.strava_id, entry.gear, bike, parsed.details):
                         summary.updated += 1
                         if bike is not None:
                             summary.assigned += 1

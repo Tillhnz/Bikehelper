@@ -35,6 +35,9 @@ class Point:
     ele: float | None = None
     time: datetime | None = None
     dist: float | None = None  # kumulierte Strecke in m laut Datei
+    hr: float | None = None    # Herzfrequenz (bpm)
+    cad: float | None = None   # Trittfrequenz (U/min)
+    pwr: float | None = None   # Leistung (Watt)
 
 
 @dataclass
@@ -48,6 +51,7 @@ class ParsedActivity:
     start_lng: float | None
     sport: str | None
     name: str | None
+    details: dict | None = None  # Kennzahlen und Verlaufsdaten für die Einzelauswertung
 
 
 # ---------- Hilfsfunktionen ----------
@@ -107,6 +111,105 @@ def _segment_m(a: Point, b: Point) -> float:
     return 0.0
 
 
+PROFILE_BINS = 300
+
+
+def _avg(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
+
+
+def _round(v: float | None, n: int = 1) -> float | None:
+    return None if v is None else round(v, n)
+
+
+def build_details(points: list[Point], cum: list[float], segs: list[tuple[float, float]], total_m: float) -> dict | None:
+    """Kennzahlen und ein auf ca. 300 Stützpunkte verdichteter Verlauf (Höhe, Tempo, Puls, Frequenz, Leistung).
+
+    cum[i] ist die Strecke in m bis zum Punkt i, segs enthält (Meter, Sekunden) gültiger Teilstücke.
+    """
+    if total_m <= 0 or len(points) < 2:
+        return None
+    timed = [p.time for p in points if p.time]
+    elapsed = (timed[-1] - timed[0]).total_seconds() if len(timed) >= 2 else None
+
+    def vals(attr: str) -> list[float]:
+        return [getattr(p, attr) for p in points if getattr(p, attr) is not None]
+
+    eles, hrs, pwrs = vals("ele"), [v for v in vals("hr") if v > 0], vals("pwr")
+    cads = [v for v in vals("cad") if v > 0]  # Ausrollen (0) zählt nicht in den Schnitt
+
+    # höchstes Tempo: gleitender Schnitt über 5 gültige Teilstücke, damit einzelne Ausreißer nicht zählen
+    max_speed = None
+    win = 5
+    for i in range(0, max(0, len(segs) - win + 1)):
+        m = sum(x for x, _ in segs[i:i + win])
+        t = sum(y for _, y in segs[i:i + win])
+        if t >= 3:
+            v = m / t * 3.6
+            if max_speed is None or v > max_speed:
+                max_speed = v
+
+    n = PROFILE_BINS
+    bins: dict[int, dict] = {}
+    for i, p in enumerate(points):
+        b = min(n - 1, int(cum[i] / total_m * n))
+        d = bins.setdefault(b, {"ele": [], "hr": [], "cad": [], "pwr": [], "m": 0.0, "t": 0.0, "end": 0.0, "ll": None})
+        if p.ele is not None:
+            d["ele"].append(p.ele)
+        if p.hr is not None and p.hr > 0:
+            d["hr"].append(p.hr)
+        if p.cad is not None:
+            d["cad"].append(p.cad)
+        if p.pwr is not None:
+            d["pwr"].append(p.pwr)
+        d["end"] = cum[i]
+        if _valid_coord(p.lat, p.lng):
+            d["ll"] = (p.lat, p.lng)
+    # Zeit und Strecke je Abschnitt aus den Teilstücken
+    prev_i = None
+    for i, p in enumerate(points):
+        if prev_i is not None and p.time and points[prev_i].time:
+            dt = (p.time - points[prev_i].time).total_seconds()
+            seg = cum[i] - cum[prev_i]
+            if 0 < dt <= PAUSE_GAP_S:
+                b = min(n - 1, int(cum[i] / total_m * n))
+                bins[b]["m"] += seg
+                bins[b]["t"] += dt
+        prev_i = i
+
+    keys = sorted(bins)
+    profile = {"d": [], "e": [], "s": [], "h": [], "c": [], "p": []}
+    ll = []
+    for k in keys:
+        d = bins[k]
+        profile["d"].append(round(d["end"] / 1000, 2))
+        profile["e"].append(_round(_avg(d["ele"])))
+        profile["s"].append(_round(d["m"] / d["t"] * 3.6) if d["t"] > 0 else None)
+        profile["h"].append(_round(_avg(d["hr"]), 0))
+        profile["c"].append(_round(_avg(d["cad"]), 0))
+        profile["p"].append(_round(_avg(d["pwr"]), 0))
+        if d["ll"]:
+            ll.append(d["ll"])
+    for key in ("e", "s", "h", "c", "p"):
+        if all(v is None for v in profile[key]):
+            profile[key] = None
+    # Position je Stützpunkt für die Verknüpfung von Diagramm und Karte (nur wenn jeder Punkt eine hat)
+    profile["ll"] = polyline.encode(ll) if len(ll) == len(keys) else None
+
+    return {
+        "elapsed_s": int(elapsed) if elapsed is not None else None,
+        "max_speed": _round(max_speed),
+        "ele_max": _round(max(eles)) if eles else None,
+        "ele_min": _round(min(eles)) if eles else None,
+        "avg_hr": _round(_avg(hrs), 0),
+        "max_hr": _round(max(hrs), 0) if hrs else None,
+        "avg_cadence": _round(_avg(cads), 0),
+        "avg_power": _round(_avg(pwrs), 0),
+        "max_power": _round(max(pwrs), 0) if pwrs else None,
+        "profile": profile,
+    }
+
+
 def summarize(
     points: list[Point],
     *,
@@ -127,6 +230,8 @@ def summarize(
     gain = 0.0
     ref_ele: float | None = None
     prev: Point | None = None
+    cum: list[float] = []
+    segs: list[tuple[float, float]] = []
     for p in points:
         if p.ele is not None:
             if ref_ele is None:
@@ -144,6 +249,9 @@ def summarize(
             dist_m += seg
             if dt is not None and 0 < dt <= PAUSE_GAP_S and seg / dt >= MIN_MOVING_SPEED:
                 moving += dt
+            if dt is not None and 0 < dt <= PAUSE_GAP_S:
+                segs.append((seg, dt))
+        cum.append(dist_m)
         prev = p
 
     if session:
@@ -169,6 +277,11 @@ def summarize(
     if dist_m <= 0:
         raise ParseError("Die Datei enthält keine Strecke (0 km).")
 
+    try:
+        details = build_details(points, cum, segs, dist_m)
+    except Exception:  # die Zusatzauswertung darf den Import nie verhindern
+        details = None
+
     return ParsedActivity(
         start=start,
         distance_km=round(dist_m / 1000, 3),
@@ -179,6 +292,7 @@ def summarize(
         start_lng=start_lng,
         sport=sport,
         name=name,
+        details=details,
     )
 
 
@@ -219,6 +333,15 @@ def parse_gpx(root: ET.Element) -> ParsedActivity:
                     p.ele = _float(c.text)
                 elif ct == "time":
                     p.time = parse_time(c.text or "")
+                elif ct == "extensions":
+                    for x in c.iter():
+                        xt = _local(x.tag).lower()
+                        if xt == "hr":
+                            p.hr = _float(x.text)
+                        elif xt in ("cad", "cadence"):
+                            p.cad = _float(x.text)
+                        elif xt in ("power", "watts"):
+                            p.pwr = _float(x.text)
             points.append(p)
         elif tag == "name" and name is None and el.text:
             name = el.text.strip()
@@ -250,6 +373,12 @@ def parse_tcx(root: ET.Element) -> ParsedActivity:
                     p.ele = _float(c.text)
                 elif ct == "DistanceMeters":
                     p.dist = _float(c.text)
+                elif ct == "Value":  # nur HeartRateBpm hat im Trackpoint ein Unterelement "Value"
+                    p.hr = _float(c.text)
+                elif ct == "Cadence":
+                    p.cad = _float(c.text)
+                elif ct == "Watts":
+                    p.pwr = _float(c.text)
             points.append(p)
     if not points:
         raise ParseError("Die TCX-Datei enthält keine aufgezeichneten Streckenpunkte.")
@@ -259,6 +388,13 @@ def parse_tcx(root: ET.Element) -> ParsedActivity:
 # ---------- FIT ----------
 
 _SEMICIRCLE = 180.0 / 2**31
+
+
+def _num(v) -> float | None:
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _naive_utc(dt: datetime | None) -> datetime | None:
@@ -296,6 +432,9 @@ def parse_fit(data: bytes) -> ParsedActivity:
                         ele=float(ele) if ele is not None else None,
                         time=_naive_utc(frame.get_value("timestamp", fallback=None)),
                         dist=float(dist) if dist is not None else None,
+                        hr=_num(frame.get_value("heart_rate", fallback=None)),
+                        cad=_num(frame.get_value("cadence", fallback=None)),
+                        pwr=_num(frame.get_value("power", fallback=None)),
                     ))
                 elif frame.name == "session":
                     for key in ("total_distance", "total_timer_time", "total_ascent"):

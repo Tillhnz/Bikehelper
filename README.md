@@ -28,6 +28,12 @@ Aus dem Export werden nur Radfahrten übernommen. Kilometer, Zeit, Höhenmeter u
 
 Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413“ scheitern. Trage dann beim Proxy Host unter „Advanced“ die Zeile `client_max_body_size 8g;` ein.
 
+## Einzelauswertung und Neuimport
+
+- Ein Klick auf eine Fahrt öffnet die Einzelauswertung: Karte mit Start und Ziel, Kennzahlen (Strecke, Zeiten, Tempo, Höhenmeter, Puls, Trittfrequenz, Leistung, soweit aufgezeichnet), Verlaufsdiagramme und das Wetter. Fährst du mit der Maus über ein Diagramm, wandert ein Punkt über die Karte.
+- Verlaufsdaten werden beim Import gespeichert. Fahrten, die früher importiert wurden, haben sie nicht. Es genügt, denselben Export noch einmal hochzuladen: Vorhandene Fahrten werden ergänzt (Verlauf, Rad), nicht doppelt angelegt.
+- Unter „Fahrten“ gibt es ganz unten „Alle Fahrten löschen“ (mit Bestätigung durch Eintippen). Räder, Komponenten und Wartungseinträge bleiben dabei erhalten.
+
 ## Wartungsintervalle und Nässe
 
 Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entstehen Komponenten mit Regeln, passend zum Radtyp. Alle Werte lassen sich je Regel ändern.

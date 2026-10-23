@@ -134,3 +134,74 @@ export function HBars({ rows, color = "var(--celeste)" }) {
     </ul>
   );
 }
+
+/**
+ * Verlaufsdiagramm über die Strecke (z. B. Höhe, Tempo, Puls). x in km, y mit möglichen Lücken (null).
+ * hover/onHover verbinden mehrere Diagramme und die Karte über den Index des Stützpunkts.
+ */
+export function ProfileChart({ x, y, unit, color = "var(--celeste)", fill = false, hover, onHover, height = 130, decimals = 0, zeroBased = false }) {
+  const W = 640, padL = 44, padR = 8, padT = 8, padB = 20;
+  const vals = y.filter((v) => v != null);
+  if (vals.length < 2) return null;
+  let lo = zeroBased ? 0 : Math.min(...vals);
+  let hi = Math.max(...vals);
+  if (hi - lo < 1) { hi = lo + 1; }
+  const pad = zeroBased ? 0 : (hi - lo) * 0.08;
+  lo -= pad; hi += pad;
+  const xmax = x[x.length - 1] || 1;
+  const sx = (v) => padL + (v / xmax) * (W - padL - padR);
+  const sy = (v) => padT + (1 - (v - lo) / (hi - lo)) * (height - padT - padB);
+
+  let d = "";
+  let area = "";
+  let open = false;
+  y.forEach((v, i) => {
+    if (v == null) { open = false; return; }
+    d += `${open ? "L" : "M"}${sx(x[i]).toFixed(1)},${sy(v).toFixed(1)}`;
+    open = true;
+  });
+  if (fill) {
+    area = `${d}L${sx(x[y.length - 1]).toFixed(1)},${height - padB}L${sx(x[0]).toFixed(1)},${height - padB}Z`;
+  }
+
+  function move(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * W;
+    const km = ((px - padL) / (W - padL - padR)) * xmax;
+    let best = 0;
+    for (let i = 1; i < x.length; i++) if (Math.abs(x[i] - km) < Math.abs(x[best] - km)) best = i;
+    onHover?.(best);
+  }
+
+  const hv = hover != null && y[hover] != null ? hover : null;
+  const ticks = [0, 0.5, 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} className="chart profile" role="img" aria-label={`Verlauf in ${unit}`}
+      onMouseMove={move} onMouseLeave={() => onHover?.(null)}>
+      {ticks.map((f) => (
+        <g key={f}>
+          <line x1={padL} x2={W - padR} y1={sy(lo + (hi - lo) * f)} y2={sy(lo + (hi - lo) * f)} className="chart-grid" />
+          <text x={padL - 6} y={sy(lo + (hi - lo) * f) + 4} textAnchor="end" className="chart-label">
+            {fmtNum(lo + (hi - lo) * f, decimals)}
+          </text>
+        </g>
+      ))}
+      {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+        <text key={f} x={sx(xmax * f)} y={height - 5} textAnchor={f === 0 ? "start" : f === 1 ? "end" : "middle"} className="chart-label">
+          {fmtNum(xmax * f, 0)}{f === 1 ? " km" : ""}
+        </text>
+      ))}
+      {fill && <path d={area} fill={color} opacity="0.18" />}
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      {hv !== null && (
+        <g>
+          <line x1={sx(x[hv])} x2={sx(x[hv])} y1={padT} y2={height - padB} stroke="var(--chalk)" strokeWidth="1" opacity="0.5" />
+          <circle cx={sx(x[hv])} cy={sy(y[hv])} r="4" fill={color} stroke="var(--ink)" strokeWidth="2" />
+          <text x={Math.min(Math.max(sx(x[hv]), padL + 40), W - 50)} y={padT + 10} textAnchor="middle" className="chart-tip">
+            {fmtNum(y[hv], decimals)} {unit} · km {fmtNum(x[hv], 1)}
+          </text>
+        </g>
+      )}
+    </svg>
+  );
+}

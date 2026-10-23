@@ -134,6 +134,15 @@ class ActivityOut(BaseModel):
     weather_status: str | None = None
 
 
+class ActivityDetail(ActivityOut):
+    bike_name: str | None = None
+    polyline: str | None = None
+    avg_speed: float | None = None
+    details: dict | None = None  # fehlt bei Fahrten, die vor dieser Funktion importiert wurden
+    start_lat: float | None = None
+    start_lng: float | None = None
+
+
 class ActivityPage(BaseModel):
     total: int
     items: list[ActivityOut]

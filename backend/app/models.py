@@ -112,6 +112,7 @@ class Activity(Base):
     start_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     gear_name: Mapped[str | None] = mapped_column(String(160), nullable=True)  # Radname laut Strava-Export
     source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "upload" oder "strava_export"
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: Kennzahlen und Verlauf (Höhe, Tempo, Puls …)
     tiles: Mapped[str | None] = mapped_column(Text, nullable=True)  # erkundete z14-Kacheln, '' = keine, NULL = offen
     # Wetter (wird später angereichert)
     temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)

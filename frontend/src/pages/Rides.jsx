@@ -466,7 +466,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
               {items.map((a) => (
                 <tr key={a.id}>
                   <td className="nowrap">{fmtDateTime(a.start_date)}</td>
-                  <td>{a.name}</td>
+                  <td><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link></td>
                   <td className="num nowrap">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap">{fmtDuration(a.moving_time_s)}</td>
                   <td className="num nowrap">{Math.round(a.elevation_m)} m</td>
@@ -491,6 +491,60 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
             {loading ? "Lädt …" : "Weitere Fahrten laden"}
           </button>
         </div>
+      )}
+    </section>
+  );
+}
+
+// ---------- Alle Fahrten löschen ----------
+
+function DeleteAll({ onDone }) {
+  const [open, setOpen] = useState(false);
+  const [word, setWord] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  async function run(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api.del("/activities?confirm=true");
+      setMsg(`${r.deleted} Fahrten gelöscht. Du kannst den Export jetzt neu hochladen.`);
+      setOpen(false);
+      setWord("");
+      onDone();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="panel danger-zone">
+      <h2>Alle Fahrten löschen</h2>
+      <p className="muted">
+        Entfernt alle importierten Fahrten samt Wetter, Karte und Statistik, zum Beispiel für einen sauberen Neuimport.
+        Deine Räder, Komponenten und Wartungseinträge bleiben erhalten. Dort gezählte Kilometer richten sich nach den
+        Fahrten und sind bis zum Neuimport entsprechend niedriger.
+      </p>
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {!open ? (
+        <button className="btn" onClick={() => { setOpen(true); setMsg(""); }}>Alle Fahrten löschen …</button>
+      ) : (
+        <form className="inline-form" onSubmit={run}>
+          <label className="grow">
+            Tippe LÖSCHEN, um zu bestätigen
+            <input value={word} onChange={(e) => setWord(e.target.value)} autoFocus autoComplete="off" />
+          </label>
+          <button className="btn primary" disabled={word.trim().toUpperCase() !== "LÖSCHEN" || busy}>
+            {busy ? "Lösche …" : "Endgültig löschen"}
+          </button>
+          <button type="button" className="btn" onClick={() => { setOpen(false); setWord(""); }}>Abbrechen</button>
+        </form>
       )}
     </section>
   );
@@ -528,6 +582,7 @@ export default function Rides() {
       <GearAssign gear={gear} bikes={bikes} onDone={refresh} />
       <WeatherPanel refreshKey={refreshKey} />
       <ActivityList bikes={bikes} refreshKey={refreshKey} onChanged={refresh} />
+      <DeleteAll onDone={refresh} />
     </>
   );
 }
