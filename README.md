@@ -10,9 +10,29 @@ Geplant: Strava-Import, Heatmap, Statistiken, Wetter pro Tour.
 - Wartungsregeln (nach km und/oder Monaten), Wartungsprotokoll, Anzeige „Das steht an“
 - Strava-Zugangsdaten pro Nutzer in den Einstellungen (Verbindung und Import folgen)
 
-## Starten (Docker)
+## Schnellinstallation
 
-Auf dem Server (VM oder LXC auf Proxmox) muss Docker mit Compose installiert sein.
+Auf einer frischen Debian-/Ubuntu-Maschine (VM oder LXC auf Proxmox), per SSH als normaler Benutzer mit sudo oder als root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/install.sh | bash
+```
+
+Das Skript installiert bei Bedarf Git und Docker, erzeugt die Passwörter, schreibt die `.env` und startet BikeHelper.
+Wer vorher nachlesen möchte, was es tut, klont das Repository und startet `./install.sh` selbst.
+
+Weitere Befehle im Projektordner:
+
+| Befehl | Wirkung |
+| --- | --- |
+| `./install.sh update` | Neueste Version holen und neu starten |
+| `./install.sh lock` / `unlock` | Neue Registrierungen sperren / erlauben |
+| `./install.sh url https://bike.example.de` | Öffentliche Adresse ändern |
+| `./install.sh logs` | Protokolle anzeigen |
+
+## Manuell starten (Docker)
+
+Auf dem Server muss Docker mit Compose installiert sein.
 
 ```bash
 cp .env.example .env
