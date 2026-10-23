@@ -266,3 +266,32 @@ def test_tire_sets_mount_history_and_km():
         other = _user(c, "other-tires@example.com")
         assert c.get(f"/api/bikes/{bid}/tire-sets", headers=other).status_code == 404
         assert c.post(f"/api/tire-sets/{a['id']}/mount", headers=other, json={"day": d(0)}).status_code == 404
+
+
+def test_maintenance_time_of_day_decides_which_rides_count():
+    with TestClient(app) as c:
+        h = _user(c, "clock@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "chain", "name": "Kette",
+            "installed_at": (date.today() - timedelta(days=5)).isoformat(),
+        }).json()
+        rule = c.post(f"/api/components/{comp['id']}/rules", headers=h, json={"label": "Wachsen", "interval_km": 500}).json()
+        with SessionLocal() as db:
+            uid = db.execute(__import__("sqlalchemy").text("select id from users where email='clock@example.com'")).scalar()
+            noon = datetime.combine(date.today(), datetime.min.time()) + timedelta(hours=10)  # 10:00 UTC, also 11:00 oder 12:00 Ortszeit
+            db.add(Activity(user_id=uid, bike_id=bike["id"], name="Tour", start_date=noon, distance_km=80))
+            db.commit()
+
+        def km_since():
+            return next(r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json())["km_since"]
+
+        assert km_since() == 80
+        today = date.today().isoformat()
+        # Abends gewachst: die Tour vom Vormittag zählt nicht mehr
+        evening = c.post(f"/api/rules/{rule['id']}/done", headers=h, json={"performed_at": today, "performed_time": "23:30:00"}).json()
+        assert evening["performed_time"] == "23:30:00" and km_since() == 0
+        c.delete(f"/api/logs/{evening['id']}", headers=h)
+        # Früh am Morgen gewachst: die Tour kam danach und zählt
+        c.post(f"/api/rules/{rule['id']}/done", headers=h, json={"performed_at": today, "performed_time": "06:00:00"})
+        assert km_since() == 80

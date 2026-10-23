@@ -116,6 +116,13 @@ export const fmtDate = (iso) =>
   iso ? new Date(iso + "T00:00:00").toLocaleDateString("de-DE") : "–";
 
 export const today = () => new Date().toISOString().slice(0, 10);
+// Aktuelle Ortszeit als HH:MM für Zeitfelder
+export const nowTime = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+const toTime = (t) => (t ? (t.length === 5 ? `${t}:00` : t) : null);
+export { toTime };
 
 // Der Server liefert Zeiten in UTC ohne Zeitzonenangabe
 export const fmtDateTime = (iso) => {

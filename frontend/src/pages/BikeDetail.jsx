@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
+import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, nowTime, toTime, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import TireSets from "../components/TireSets.jsx";
@@ -92,7 +92,7 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
 
 function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState({ performed_at: today(), note: "", variant: rule.variant || "hot_wax" });
+  const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax" });
   const [hintOpen, setHintOpen] = useState(false);
   const unknown = rule.status === "unknown";
   const wet = rule.wet_factor > 1;
@@ -108,7 +108,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
     e.preventDefault();
     await onDone(done);
     setOpen(false);
-    setDone({ performed_at: today(), note: "", variant: done.variant });
+    setDone({ performed_at: today(), time: nowTime(), note: "", variant: done.variant });
   }
 
   return (
@@ -142,6 +142,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
       {open && (
         <form className="inline-form" onSubmit={submit}>
           <label>Datum<input type="date" value={done.performed_at} onChange={(e) => setDone({ ...done, performed_at: e.target.value })} required /></label>
+          <label>Uhrzeit<input type="time" value={done.time} onChange={(e) => setDone({ ...done, time: e.target.value })} /></label>
           {rule.variants && (
             <label>
               Wachsart
@@ -153,6 +154,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
           <label className="grow">Notiz<input value={done.note} onChange={(e) => setDone({ ...done, note: e.target.value })} /></label>
           <button className="btn primary">Als erledigt eintragen</button>
           <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
+          <p className="hint" style={{ flexBasis: "100%" }}>Mit Uhrzeit zählen nur Fahrten, die danach begonnen haben. Ohne Uhrzeit zählt der ganze Tag.</p>
         </form>
       )}
     </li>
@@ -163,7 +165,7 @@ function ComponentCard({ comp, onChanged }) {
   const [rules, setRules] = useState([]);
   const [logs, setLogs] = useState([]);
   const [panel, setPanel] = useState(null); // "log" | "rule" | "replace" | "date" | null
-  const [log, setLog] = useState({ performed_at: today(), note: "" });
+  const [log, setLog] = useState({ performed_at: today(), time: nowTime(), note: "" });
   const [rule, setRule] = useState({ label: "", interval_km: "", interval_months: "", wet_factor: 1 });
   const [repl, setRepl] = useState({ performed_at: today(), name: comp.name, brand: comp.brand ?? "" });
   const [installed, setInstalled] = useState(comp.installed_at || today());
@@ -197,9 +199,9 @@ function ComponentCard({ comp, onChanged }) {
   const addLog = (e) => {
     e.preventDefault();
     return guarded(async () => {
-      await api.post(`/components/${comp.id}/logs`, { performed_at: log.performed_at, note: log.note || null });
+      await api.post(`/components/${comp.id}/logs`, { performed_at: log.performed_at, performed_time: toTime(log.time), note: log.note || null });
       setPanel(null);
-      setLog({ performed_at: today(), note: "" });
+      setLog({ performed_at: today(), time: nowTime(), note: "" });
       await refresh();
     });
   };
@@ -222,7 +224,8 @@ function ComponentCard({ comp, onChanged }) {
   const ruleDone = (r, data) =>
     guarded(async () => {
       await api.post(`/rules/${r.id}/done`, {
-        performed_at: data.performed_at, note: data.note || null, variant: r.variants ? data.variant : null,
+        performed_at: data.performed_at, performed_time: toTime(data.time), note: data.note || null,
+        variant: r.variants ? data.variant : null,
       });
       await refresh();
     });
@@ -339,7 +342,7 @@ function ComponentCard({ comp, onChanged }) {
               return (
                 <li key={l.id}>
                   <span>
-                    <strong>{fmtDate(l.performed_at)}</strong>{" "}
+                    <strong>{fmtDate(l.performed_at)}{l.performed_time ? `, ${l.performed_time.slice(0, 5)} Uhr` : ""}</strong>{" "}
                     <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : "ganze Komponente"}</span>
                     {variant ? `, ${variant}` : ""}{l.note ? ` – ${l.note}` : ""}
                   </span>
@@ -364,6 +367,7 @@ function ComponentCard({ comp, onChanged }) {
       {panel === "log" && (
         <form className="inline-form" onSubmit={addLog}>
           <label>Datum<input type="date" value={log.performed_at} onChange={(e) => setLog({ ...log, performed_at: e.target.value })} required /></label>
+          <label>Uhrzeit<input type="time" value={log.time} onChange={(e) => setLog({ ...log, time: e.target.value })} /></label>
           <label className="grow">Notiz<input value={log.note} onChange={(e) => setLog({ ...log, note: e.target.value })} placeholder="z. B. gereinigt und geölt" /></label>
           <button className="btn primary">Wartung speichern</button>
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>

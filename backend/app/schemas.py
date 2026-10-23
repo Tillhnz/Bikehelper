@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -121,6 +121,7 @@ class RuleOut(RuleIn):
 
 class RuleDoneIn(BaseModel):
     performed_at: date
+    performed_time: time | None = None  # Ortszeit
     note: str | None = None
     variant: Literal["hot_wax", "drip_wax"] | None = None  # nur für die Wachsregel
 
@@ -137,6 +138,7 @@ class StandardComponentsIn(BaseModel):
 
 class LogIn(BaseModel):
     performed_at: date
+    performed_time: time | None = None  # Ortszeit
     note: str | None = None
 
 

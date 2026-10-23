@@ -14,11 +14,9 @@ export default function BikeFields({ form, setForm }) {
         </select>
         <span className="hint">{lube.hint}</span>
       </label>
-      <label>
-        Reifenbreite (Aufdruck, mm)
-        <input type="number" min="18" max="80" step="1" value={form.tire_width_mm ?? ""} onChange={set("tire_width_mm")} placeholder="z. B. 28" />
-        <span className="hint">Für den Reifendruck-Ratgeber. Montierst du unten einen Reifensatz, übernimmt das Rad dessen Breite.</span>
-      </label>
+      <p className="hint span-all">
+        Reifenbreite und Tubeless übernimmt das Rad vom montierten Reifensatz. Du legst die Sätze auf der Seite des Rades unter „Reifen“ an.
+      </p>
       <label>
         Innenweite der Felge (mm)
         <input type="number" min="12" max="40" step="0.5" value={form.rim_inner_mm ?? ""} onChange={set("rim_inner_mm")} placeholder="z. B. 21" />
@@ -29,9 +27,6 @@ export default function BikeFields({ form, setForm }) {
         <input type="number" min="3" max="40" step="0.1" value={form.bike_weight_kg ?? ""} onChange={set("bike_weight_kg")} placeholder="z. B. 8,5" />
       </label>
       <div className="checks">
-        <label className="check">
-          <input type="checkbox" checked={form.tubeless ?? true} onChange={check("tubeless")} /> Tubeless
-        </label>
         <label className="check">
           <input type="checkbox" checked={!!form.hookless} onChange={check("hookless")} /> Hookless-Felgen
         </label>

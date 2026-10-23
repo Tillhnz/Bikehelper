@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
-import UploadBanner from "./components/UploadBanner.jsx";
+import Shell from "./components/Shell.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
 import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
@@ -13,36 +13,6 @@ import RideDetail from "./pages/RideDetail.jsx";
 import Heatmap from "./pages/Heatmap.jsx";
 import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
-
-function Shell({ user, onLogout, children }) {
-  const { pathname } = useLocation();
-  return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          BikeHelper
-        </div>
-        <nav>
-          <NavLink to="/" end>Garage</NavLink>
-          <NavLink to="/advisor">Ratgeber</NavLink>
-          <NavLink to="/rides">Fahrten</NavLink>
-          <NavLink to="/heatmap">Heatmap</NavLink>
-          <NavLink to="/stats">Statistik</NavLink>
-          <NavLink to="/settings">Einstellungen</NavLink>
-        </nav>
-        <div className="sidebar-foot">
-          <span className="muted small">{user.email}</span>
-          <button className="link" onClick={onLogout}>Abmelden</button>
-        </div>
-      </aside>
-      <main className="main">
-        <UploadBanner />
-        <div className="page" key={pathname}>{children}</div>
-      </main>
-    </div>
-  );
-}
 
 export default function App() {
   const navigate = useNavigate();

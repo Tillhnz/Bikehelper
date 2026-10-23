@@ -1,7 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func,
+    BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -133,6 +133,8 @@ class MaintenanceLog(Base):
         ForeignKey("maintenance_rules.id", ondelete="CASCADE"), nullable=True, index=True
     )
     performed_at: Mapped[date] = mapped_column(Date)
+    # Uhrzeit (Ortszeit): Fahrten davor am selben Tag zählen nicht mehr mit. Leer bei älteren Einträgen: ganzer Tag.
+    performed_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     variant: Mapped[str | None] = mapped_column(String(12), nullable=True)  # Wachsart: hot_wax | drip_wax
 

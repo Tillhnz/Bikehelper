@@ -4,12 +4,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .catalog import CATALOG, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from .timeutil import local_to_utc
 from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
 SOON_THRESHOLD = 0.8
 
 
-def _since(d: date | None) -> datetime | None:
+def _since(d: date | datetime | None) -> datetime | None:
+    if isinstance(d, datetime):  # genauer Zeitpunkt (UTC): spätere Fahrten zählen
+        return d
     return datetime.combine(d, time.min) if d else None
 
 
@@ -79,7 +82,7 @@ def last_done(comp: Component, rule: MaintenanceRule) -> date | None:
 def last_log(comp: Component, rule: MaintenanceRule) -> MaintenanceLog | None:
     """Jüngster Wartungseintrag, der für diese Regel gilt (bei gleichem Datum der zuletzt angelegte)."""
     logs = [l for l in comp.logs if l.rule_id in (None, rule.id)]
-    return max(logs, key=lambda l: (l.performed_at, l.id or 0), default=None)
+    return max(logs, key=lambda l: (l.performed_at, l.performed_time or time.min, l.id or 0), default=None)
 
 
 def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date | None = None) -> dict:
@@ -90,6 +93,8 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     variant = entry.variant if entry and rule.label == WAX_LUBE_LABEL else None
     interval_km = wax_interval_km(rule.label, variant, rule.interval_km)
     base = last or comp.installed_at
+    # Mit Uhrzeit zählen nur Fahrten, die nach der Wartung begannen; ohne Uhrzeit der ganze Tag
+    since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
     if base is None:
         # Ohne Einbaudatum und ohne Wartungseintrag lässt sich nichts zählen.
         return {
@@ -98,7 +103,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             "variant": variant,
         }
 
-    km, wet_km, effective = wear_between(db, comp.bike_id, base, comp.retired_at, rule.wet_factor)
+    km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
     if last is None:  # noch nie gewartet: Kilometer, die ein gebrauchtes Teil schon hatte, zählen mit
         km += comp.start_km
         effective += comp.start_km

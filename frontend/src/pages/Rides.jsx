@@ -396,7 +396,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
           text={unassigned || debouncedQ ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
         />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap rides-wrap">
           <table className="rides">
             <thead>
               <tr>
@@ -413,19 +413,19 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
             <tbody>
               {items.map((a) => (
                 <tr key={a.id}>
-                  <td className="nowrap">{fmtDateTime(a.start_date)}</td>
-                  <td><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link></td>
-                  <td className="num nowrap">{fmtKm1(a.distance_km)} km</td>
-                  <td className="num nowrap">{fmtDuration(a.moving_time_s)}</td>
-                  <td className="num nowrap">{Math.round(a.elevation_m)} m</td>
-                  <td className="nowrap"><WeatherCell a={a} /></td>
-                  <td>
+                  <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
+                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link></td>
+                  <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
+                  <td className="num nowrap" data-label="Zeit">{fmtDuration(a.moving_time_s)}</td>
+                  <td className="num nowrap" data-label="Höhenmeter">{Math.round(a.elevation_m)} m</td>
+                  <td className="nowrap cell-wide" data-label="Wetter"><WeatherCell a={a} /></td>
+                  <td className="cell-wide">
                     <select aria-label={`Rad für ${a.name}`} value={a.bike_id ?? ""} onChange={(e) => changeBike(a, e.target.value)}>
                       <option value="">Kein Rad</option>
                       {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </td>
-                  <td><button className="link small danger" onClick={() => remove(a)}>Löschen</button></td>
+                  <td className="cell-wide"><button className="link small danger" onClick={() => remove(a)}>Löschen</button></td>
                 </tr>
               ))}
             </tbody>

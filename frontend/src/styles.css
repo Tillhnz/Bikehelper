@@ -599,7 +599,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
 .wx-wind, .wx-time { color: var(--mute); }
 
 @media (max-width: 1100px) {
-  .advisor { grid-template-columns: 1fr; }
+  .advisor { grid-template-columns: minmax(0, 1fr); }
   .advisor-results { position: static; max-height: none; overflow: visible; }
 }
 @media (max-width: 800px) {
@@ -618,3 +618,123 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
 .log-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.45rem 0; font-size: 0.9rem; }
 .log-list li + li { border-top: 1px solid var(--line); }
 .bike-card-tire { margin: -0.6rem 0 0; }
+
+/* ---------- Navigation: Symbole ---------- */
+
+.sidebar nav a { display: flex; align-items: center; gap: 0.7rem; }
+.nav-icon { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.nav-short { display: none; }
+
+/* ---------- Handy ---------- */
+
+@media (max-width: 800px) {
+  body { font-size: 15.5px; }
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1.4rem; }
+
+  /* schmale Kopfzeile oben, Tabs unten */
+  .sidebar { padding: 0.6rem 1rem; gap: 1rem; flex-wrap: nowrap; justify-content: space-between; border-bottom: 1px solid var(--line); }
+  .brand { font-size: 1.35rem; }
+  .sidebar-foot { margin: 0; }
+  .sidebar nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 0;
+    background: rgba(18, 28, 40, 0.97); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+    padding: 0.3rem 0.2rem calc(0.3rem + env(safe-area-inset-bottom));
+  }
+  .sidebar nav a {
+    flex-direction: column; justify-content: center; gap: 0.15rem; padding: 0.4rem 0.1rem; border-radius: 10px;
+    font-size: 0.66rem; line-height: 1.1; text-align: center; min-height: 52px;
+  }
+  .sidebar nav a:hover, .sidebar nav a.active:hover { padding-left: 0.1rem; }
+  .sidebar nav a.active { background: transparent; color: var(--celeste); }
+  .sidebar nav a.active .nav-icon { stroke-width: 2.2; }
+  .nav-icon { width: 24px; height: 24px; }
+  .nav-short { display: inline; }
+  .nav-short + .nav-label, .nav-label:has(+ .nav-short) { display: none; }
+
+  .main { padding: 1rem 1rem calc(5.8rem + env(safe-area-inset-bottom)); }
+  .page-head { margin-bottom: 1rem; }
+  .page-head .btn { flex: 1 1 auto; }
+  .panel { padding: 1.1rem; margin-bottom: 1.1rem; border-radius: 12px; }
+
+  /* Bedienelemente groß genug zum Tippen */
+  .btn { padding: 0.65rem 1rem; }
+  .btn.small { padding: 0.5rem 0.8rem; }
+  input, select { padding: 0.65rem 0.75rem; }
+  input[type="range"] { height: 40px; }
+  input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -10px; }
+  .actions { gap: 0.6rem; }
+  .actions .link.small { padding: 0.5rem 0.25rem; }
+  .rule-actions { gap: 0.4rem 1rem; }
+  .rule-actions .link, .log-list .link { padding: 0.35rem 0; }
+
+  .inline-form { padding: 0.8rem; }
+  .inline-form label { min-width: 0; flex: 1 1 100%; }
+  .inline-form .btn { flex: 1 1 auto; }
+  .form-grid { gap: 0.9rem; }
+
+  /* Garage und Rad */
+  .bike-card { padding: 1rem; gap: 1rem; }
+  .bike-hero { padding: 1.1rem; gap: 1rem; flex-direction: column-reverse; align-items: stretch; margin-bottom: 1.75rem; }
+  .bike-hero-art { order: -1; }
+  .bike-hero-art .odo { justify-self: start; }
+  .component { padding: 1rem; }
+  .component-head { flex-direction: column; gap: 0.4rem; }
+  .component-km { font-size: 1.05rem; }
+  .odo-lg .odo-unit { font-size: 1.2rem; }
+
+  /* Ratgeber */
+  .pick { flex-basis: 132px; }
+  .pick-row.types .pick { min-width: 100px; }
+  .stage-view { padding: 0.6rem 0.4rem 0.1rem; }
+  .slider-value { font-size: 1.15rem; }
+  .segmented { width: 100%; }
+  .segmented button { flex: 1 1 auto; padding: 0.5rem 0.6rem; }
+  .advice-headline { font-size: 2.1rem; }
+  .advice-groups { grid-template-columns: 1fr; }
+  .search-row .btn { flex: 1 1 auto; }
+
+  /* Statistik */
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .kpi { padding: 0.8rem 0.9rem; }
+  .kpi-value { font-size: 1.9rem; }
+  .tile-hero { gap: 1.25rem; }
+  .tile-hero .kpi-value { font-size: 2.4rem; }
+  .filter-bar select { flex: 1 1 130px; }
+
+  /* Fahrten als Karten statt Tabelle */
+  .rides-wrap { background: none; border: 0; overflow: visible; }
+  .rides, .rides tbody { display: block; }
+  .rides thead { display: none; }
+  .rides tr {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem 0.75rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 0.75rem;
+  }
+  .rides td, .rides tbody tr:last-child td { display: block; padding: 0; border: 0; }
+  .rides td[data-label]::before { content: attr(data-label); display: block; color: var(--mute); font-size: 0.7rem; }
+  .rides td.num { text-align: left; }
+  .rides .cell-name { grid-column: 1 / -1; order: -2; font-size: 1.05rem; }
+  .rides .cell-date { grid-column: 1 / -1; order: -1; color: var(--mute); font-size: 0.85rem; }
+  .rides .cell-wide { grid-column: 1 / -1; }
+  .rides select { width: 100%; }
+
+  /* Karten und Verlaufsdiagramme */
+  .map-wrap { height: calc(100vh - 15rem); min-height: 340px; }
+  .map-badge { left: 8px; bottom: 24px; font-size: 0.8rem; }
+  .chart-label { font-size: 12px; }
+  .upload-banner { padding: 0.7rem 0.8rem; }
+  .gear-actions { flex-wrap: wrap; width: 100%; }
+  .gear-actions select { flex: 1 1 160px; min-width: 0; }
+  .record-list strong { font-size: 1.15rem; }
+}
+
+@media (max-width: 420px) {
+  .kpis { grid-template-columns: 1fr 1fr; }
+  .login-art { padding: 1.5rem 1rem; }
+  .login-form { padding: 1.5rem 1rem; }
+  .odo-lg .odo-digit { width: 32px; --h: 50px; font-size: 2.1rem; }
+  .bike-card .odo-digit { width: 32px; --h: 50px; font-size: 2.1rem; }
+}
+.advisor-controls, .advisor-results { min-width: 0; }
