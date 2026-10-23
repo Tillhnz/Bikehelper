@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     token_expire_days: int = 30
     weather_enabled: bool = True
     timezone: str = "Europe/Berlin"
+    # Kartenhintergrund: kostenloser CARTO-Schlüssel (dunkle Karte) oder eigene Kachel-URL; ohne beides OpenStreetMap
+    carto_api_key: str = ""
+    map_tile_url: str = ""
+    map_tile_dark: bool = True
 
     class Config:
         env_file = ".env"

@@ -18,3 +18,20 @@ export function decodePolyline(str) {
   }
   return out;
 }
+
+let mapConfigPromise = null;
+
+/** Kartenhintergrund laut Server (einmal laden, danach aus dem Speicher). */
+export function loadMapConfig(api) {
+  if (!mapConfigPromise) {
+    mapConfigPromise = api.get("/map-config").catch((e) => {
+      mapConfigPromise = null;
+      throw e;
+    });
+  }
+  return mapConfigPromise;
+}
+
+export function tileOptions(cfg) {
+  return { maxZoom: cfg.max_zoom, subdomains: cfg.subdomains, attribution: cfg.attribution };
+}

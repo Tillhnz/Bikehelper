@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { api, fmtKm } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
+import { loadMapConfig, tileOptions } from "../geo.js";
 
 /** Google-Polyline (Präzision 5) -> Float64Array mit normalisierten Mercator-Koordinaten (x, y in 0..1). */
 function decodeToMercator(str) {
@@ -46,6 +47,7 @@ export default function Heatmap() {
   const [data, setData] = useState(null);
   const [showTiles, setShowTiles] = useState(true);
   const [error, setError] = useState("");
+  const [cfg, setCfg] = useState(null);
   const boxRef = useRef(null);
   const state = useRef({}); // Karte, Canvas, Daten für den Zeichner
 
@@ -64,14 +66,15 @@ export default function Heatmap() {
     api.get(`/stats/heatmap?${qs}`).then(setData).catch((e) => setError(e.message));
   }, [filters]);
 
-  // Karte einmal aufbauen
   useEffect(() => {
+    loadMapConfig(api).then(setCfg).catch((e) => setError(e.message));
+  }, []);
+
+  // Karte aufbauen, sobald der Kartenhintergrund bekannt ist
+  useEffect(() => {
+    if (!cfg) return undefined;
     const map = L.map(boxRef.current, { zoomAnimation: false, zoomControl: true, preferCanvas: true }).setView([51.2, 10.4], 6);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 18,
-      subdomains: "abcd",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(map);
+    L.tileLayer(cfg.url, tileOptions(cfg)).addTo(map);
     const canvas = document.createElement("canvas");
     canvas.className = "heat";
     map.getContainer().appendChild(canvas);
@@ -83,6 +86,7 @@ export default function Heatmap() {
     st.zoomTile = 14;
     st.square = null;
     st.showTiles = true;
+    st.dark = cfg.dark;
 
     let raf = 0;
     const draw = () => {
@@ -106,8 +110,8 @@ export default function Heatmap() {
       if (st.showTiles && st.tiles.length) {
         const n = 2 ** st.zoomTile;
         const w = (1 / n) * world;
-        ctx.fillStyle = "rgba(111, 211, 195, 0.13)";
-        ctx.strokeStyle = "rgba(111, 211, 195, 0.28)";
+        ctx.fillStyle = st.dark ? "rgba(111, 211, 195, 0.13)" : "rgba(20, 150, 130, 0.14)";
+        ctx.strokeStyle = st.dark ? "rgba(111, 211, 195, 0.28)" : "rgba(20, 150, 130, 0.45)";
         ctx.lineWidth = 1;
         for (const [tx, ty] of st.tiles) {
           const x = (tx / n) * world - ox, y = (ty / n) * world - oy;
@@ -118,8 +122,9 @@ export default function Heatmap() {
       }
 
       // Strecken: additiv gemischt, damit oft gefahrene Wege heller leuchten
-      ctx.globalCompositeOperation = "lighter";
-      ctx.strokeStyle = "rgba(255, 112, 40, 0.22)";
+      // Dunkle Karte: additiv gemischt (leuchtet). Helle Karte: normales Überlagern, dichter wird dunkler.
+      ctx.globalCompositeOperation = st.dark ? "lighter" : "source-over";
+      ctx.strokeStyle = st.dark ? "rgba(255, 112, 40, 0.22)" : "rgba(214, 48, 20, 0.30)";
       ctx.lineWidth = Math.max(1.2, Math.min(3, (z - 5) * 0.35));
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -156,7 +161,7 @@ export default function Heatmap() {
       map.remove();
       state.current = {};
     };
-  }, []);
+  }, [cfg]);
 
   // Daten in den Zeichner übernehmen
   useEffect(() => {
@@ -179,7 +184,7 @@ export default function Heatmap() {
       st.map.fitBounds([toLL(x0, y1), toLL(x1, y0)], { padding: [30, 30], maxZoom: 13 });
     }
     st.schedule();
-  }, [data]);
+  }, [data, cfg]);
 
   useEffect(() => {
     state.current.showTiles = showTiles;

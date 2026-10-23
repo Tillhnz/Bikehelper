@@ -4,9 +4,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm, fmtKm1, fmtNum } from "../api.js";
 import { ProfileChart } from "../components/charts.jsx";
-import { decodePolyline } from "../geo.js";
+import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
 
-function RouteMap({ polyline, hoverPoint }) {
+function RouteMap({ polyline, hoverPoint, cfg }) {
   const boxRef = useRef(null);
   const marker = useRef(null);
   const mapRef = useRef(null);
@@ -15,18 +15,14 @@ function RouteMap({ polyline, hoverPoint }) {
     const pts = decodePolyline(polyline);
     const map = L.map(boxRef.current, { zoomControl: true, scrollWheelZoom: false });
     mapRef.current = map;
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 18,
-      subdomains: "abcd",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(map);
-    const line = L.polyline(pts, { color: "#6fd3c3", weight: 4, opacity: 0.95 }).addTo(map);
+    L.tileLayer(cfg.url, tileOptions(cfg)).addTo(map);
+    const line = L.polyline(pts, { color: cfg.dark ? "#6fd3c3" : "#d63014", weight: 4, opacity: 0.95 }).addTo(map);
     L.circleMarker(pts[0], { radius: 7, color: "#0e1620", weight: 2, fillColor: "#6fd3c3", fillOpacity: 1 }).addTo(map).bindTooltip("Start");
     L.circleMarker(pts[pts.length - 1], { radius: 7, color: "#0e1620", weight: 2, fillColor: "#f2b84b", fillOpacity: 1 }).addTo(map).bindTooltip("Ziel");
     marker.current = L.circleMarker(pts[0], { radius: 7, color: "#fff", weight: 2, fillColor: "#ff6b6b", fillOpacity: 1 });
     map.fitBounds(line.getBounds(), { padding: [24, 24] });
     return () => { map.remove(); mapRef.current = null; };
-  }, [polyline]);
+  }, [polyline, cfg]);
 
   useEffect(() => {
     const m = marker.current, map = mapRef.current;
@@ -60,6 +56,11 @@ export default function RideDetail() {
   const [hover, setHover] = useState(null);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
+  const [cfg, setCfg] = useState(null);
+
+  useEffect(() => {
+    loadMapConfig(api).then(setCfg).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setA(null);
@@ -131,7 +132,7 @@ export default function RideDetail() {
       </div>
 
       {a.polyline ? (
-        <RouteMap polyline={a.polyline} hoverPoint={hoverPoint} />
+        cfg ? <RouteMap polyline={a.polyline} hoverPoint={hoverPoint} cfg={cfg} /> : <div className="detail-map" />
       ) : (
         <p className="muted">Zu dieser Fahrt gibt es keine GPS-Strecke.</p>
       )}

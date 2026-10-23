@@ -27,6 +27,9 @@ services:
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       WEATHER_ENABLED: ${WEATHER_ENABLED:-true}
       TIMEZONE: ${TIMEZONE:-Europe/Berlin}
+      CARTO_API_KEY: ${CARTO_API_KEY:-}
+      MAP_TILE_URL: ${MAP_TILE_URL:-}
+      MAP_TILE_DARK: ${MAP_TILE_DARK:-true}
 
   frontend:
     build: ./frontend
