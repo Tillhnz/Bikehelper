@@ -26,14 +26,23 @@ def test_payload_is_serializable():
 
 
 def test_chain_rules_by_lube():
-    from app.catalog import CHAIN_LUBES, LUBE_LABELS, chain_rules
+    from app.catalog import CHAIN_LUBES, LUBE_LABELS, WAX_LUBE_LABEL, WAX_VARIANTS, chain_rules, wax_interval_km
 
     oil_lube, oil_wear = chain_rules("oil")
-    wax_lube, wax_wear = chain_rules("hot_wax")
-    drip_lube, drip_wear = chain_rules("drip_wax")
+    wax_lube, wax_wear = chain_rules("wax")
     assert chain_rules(None) == chain_rules("oil") == chain_rules("unbekannt")
-    assert oil_lube.interval_km == 200 and wax_lube.interval_km > drip_lube.interval_km > oil_lube.interval_km
-    assert oil_wear.interval_km < drip_wear.interval_km < wax_wear.interval_km
+    assert chain_rules("hot_wax") == chain_rules("drip_wax") == chain_rules("wax")  # frühere Werte
+    assert oil_lube.interval_km == 200 and wax_lube.interval_km > oil_lube.interval_km
+    assert oil_wear.interval_km < wax_wear.interval_km
     assert wax_lube.wet_factor > oil_lube.wet_factor  # Wachs verliert bei Nässe schneller seinen Schutz
-    assert all(w.label == "Kette wechseln" for w in (oil_wear, wax_wear, drip_wear))
-    assert LUBE_LABELS == {v["lube"].label for v in CHAIN_LUBES.values()} and len(LUBE_LABELS) == 3
+    assert wax_lube.label == WAX_LUBE_LABEL and oil_wear.label == wax_wear.label == "Kette wechseln"
+    assert set(CHAIN_LUBES) == {"oil", "wax"}
+    assert {v["lube"].label for v in CHAIN_LUBES.values()} <= LUBE_LABELS
+    assert "Kette neu wachsen (Heißwachs)" in LUBE_LABELS  # alte Bezeichnungen werden weiter erkannt
+
+    # Das Intervall der Wachsregel hängt von der Wachsart der letzten Wartung ab
+    assert set(WAX_VARIANTS) == {"hot_wax", "drip_wax"}
+    assert wax_interval_km(WAX_LUBE_LABEL, "hot_wax", 500) == 500
+    assert wax_interval_km(WAX_LUBE_LABEL, "drip_wax", 500) == 250
+    assert wax_interval_km(WAX_LUBE_LABEL, None, 500) == 500
+    assert wax_interval_km("Kette wechseln", "drip_wax", 5000) == 5000

@@ -46,7 +46,7 @@ class Bike(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     retired: Mapped[bool] = mapped_column(Boolean, default=False)
     # Kette und Ratgeber
-    chain_lube: Mapped[str | None] = mapped_column(String(12), nullable=True)  # oil | hot_wax | drip_wax, leer = oil
+    chain_lube: Mapped[str | None] = mapped_column(String(12), nullable=True)  # oil | wax, leer = oil
     tire_width_mm: Mapped[float | None] = mapped_column(Float, nullable=True)   # aufgezogene Reifenbreite laut Aufdruck
     rim_inner_mm: Mapped[float | None] = mapped_column(Float, nullable=True)    # Maulweite der Felge
     bike_weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -55,6 +55,39 @@ class Bike(Base):
 
     user: Mapped[User] = relationship(back_populates="bikes")
     components: Mapped[list["Component"]] = relationship(back_populates="bike")
+    tire_sets: Mapped[list["TireSet"]] = relationship(back_populates="bike", cascade="all, delete-orphan")
+
+
+class TireSet(Base):
+    """Ein Satz Reifen (Mäntel) für ein Rad. Die Kilometer ergeben sich aus den Zeiträumen, in denen er montiert war."""
+    __tablename__ = "tire_sets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bike_id: Mapped[int] = mapped_column(ForeignKey("bikes.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    width_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tubeless: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    start_km: Mapped[float] = mapped_column(Float, default=0)  # Kilometer, die der Satz schon vor der App hatte
+    max_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # erwartete Lebensdauer, optional
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retired: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    bike: Mapped[Bike] = relationship(back_populates="tire_sets")
+    mounts: Mapped[list["TireMount"]] = relationship(back_populates="tire_set", cascade="all, delete-orphan")
+
+
+class TireMount(Base):
+    """Zeitraum, in dem ein Reifensatz auf dem Rad war. to_date leer = noch montiert (beide Tage zählen mit)."""
+    __tablename__ = "tire_mounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tire_set_id: Mapped[int] = mapped_column(ForeignKey("tire_sets.id", ondelete="CASCADE"), index=True)
+    from_date: Mapped[date] = mapped_column(Date)
+    to_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    tire_set: Mapped[TireSet] = relationship(back_populates="mounts")
 
 
 class Component(Base):
@@ -101,6 +134,7 @@ class MaintenanceLog(Base):
     )
     performed_at: Mapped[date] = mapped_column(Date)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variant: Mapped[str | None] = mapped_column(String(12), nullable=True)  # Wachsart: hot_wax | drip_wax
 
     component: Mapped[Component] = relationship(back_populates="logs")
 

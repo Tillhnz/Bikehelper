@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
+import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 
 function ruleIntervalText(r) {
@@ -91,12 +92,14 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
 
 function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState({ performed_at: today(), note: "" });
+  const [done, setDone] = useState({ performed_at: today(), note: "", variant: rule.variant || "hot_wax" });
   const [hintOpen, setHintOpen] = useState(false);
   const unknown = rule.status === "unknown";
   const wet = rule.wet_factor > 1;
 
+  const variantName = rule.variants?.find((v) => v.key === rule.variant)?.name;
   const limits = [
+    variantName && `zuletzt ${variantName}`,
     rule.interval_km && `${fmtKm(rule.km_since)} von ${fmtKm(rule.interval_km)} km`,
     rule.interval_months && `${fmtNum(rule.months_since)} von ${rule.interval_months} Monaten`,
   ].filter(Boolean).join(" · ");
@@ -105,7 +108,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
     e.preventDefault();
     await onDone(done);
     setOpen(false);
-    setDone({ performed_at: today(), note: "" });
+    setDone({ performed_at: today(), note: "", variant: done.variant });
   }
 
   return (
@@ -139,6 +142,14 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
       {open && (
         <form className="inline-form" onSubmit={submit}>
           <label>Datum<input type="date" value={done.performed_at} onChange={(e) => setDone({ ...done, performed_at: e.target.value })} required /></label>
+          {rule.variants && (
+            <label>
+              Wachsart
+              <select value={done.variant} onChange={(e) => setDone({ ...done, variant: e.target.value })}>
+                {rule.variants.map((v) => <option key={v.key} value={v.key}>{v.name}, alle {fmtKm(v.interval_km)} km</option>)}
+              </select>
+            </label>
+          )}
           <label className="grow">Notiz<input value={done.note} onChange={(e) => setDone({ ...done, note: e.target.value })} /></label>
           <button className="btn primary">Als erledigt eintragen</button>
           <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
@@ -155,7 +166,7 @@ function ComponentCard({ comp, onChanged }) {
   const [log, setLog] = useState({ performed_at: today(), note: "" });
   const [rule, setRule] = useState({ label: "", interval_km: "", interval_months: "", wet_factor: 1 });
   const [repl, setRepl] = useState({ performed_at: today(), name: comp.name, brand: comp.brand ?? "" });
-  const [installed, setInstalled] = useState(today());
+  const [installed, setInstalled] = useState(comp.installed_at || today());
   const [error, setError] = useState("");
 
   const loadDetails = useCallback(async () => {
@@ -210,7 +221,9 @@ function ComponentCard({ comp, onChanged }) {
 
   const ruleDone = (r, data) =>
     guarded(async () => {
-      await api.post(`/rules/${r.id}/done`, { performed_at: data.performed_at, note: data.note || null });
+      await api.post(`/rules/${r.id}/done`, {
+        performed_at: data.performed_at, note: data.note || null, variant: r.variants ? data.variant : null,
+      });
       await refresh();
     });
 
@@ -235,11 +248,34 @@ function ComponentCard({ comp, onChanged }) {
     e.preventDefault();
     return guarded(async () => {
       const { id, km, status, ...rest } = comp;
-      await api.put(`/components/${id}`, { ...rest, installed_at: installed });
+      await api.put(`/components/${id}`, { ...rest, installed_at: installed || null });
       setPanel(null);
       onChanged();
     });
   };
+
+  const clearInstallDate = () =>
+    guarded(async () => {
+      const { id, km, status, ...rest } = comp;
+      await api.put(`/components/${id}`, { ...rest, installed_at: null });
+      setInstalled(today());
+      setPanel(null);
+      onChanged();
+    });
+
+  const unretire = () =>
+    guarded(async () => {
+      const { id, km, status, ...rest } = comp;
+      await api.put(`/components/${id}`, { ...rest, retired_at: null });
+      onChanged();
+    });
+
+  const removeLog = (l) =>
+    guarded(async () => {
+      if (!window.confirm(`Wartung vom ${fmtDate(l.performed_at)} wirklich löschen?`)) return;
+      await api.del(`/logs/${l.id}`);
+      await refresh();
+    });
 
   const retire = () =>
     guarded(async () => {
@@ -292,16 +328,36 @@ function ComponentCard({ comp, onChanged }) {
       )}
 
       {logs.length > 0 && (
-        <p className="muted small">
-          Letzte Wartung: {fmtDate(logs[0].performed_at)}{logs[0].note ? ` – ${logs[0].note}` : ""}
-        </p>
+        <details className="howto log-history">
+          <summary>
+            Wartungsverlauf ({logs.length}), zuletzt {fmtDate(logs[0].performed_at)}
+          </summary>
+          <ul className="log-list">
+            {logs.map((l) => {
+              const r = rules.find((x) => x.id === l.rule_id);
+              const variant = r?.variants?.find((v) => v.key === l.variant)?.name;
+              return (
+                <li key={l.id}>
+                  <span>
+                    <strong>{fmtDate(l.performed_at)}</strong>{" "}
+                    <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : "ganze Komponente"}</span>
+                    {variant ? `, ${variant}` : ""}{l.note ? ` – ${l.note}` : ""}
+                  </span>
+                  <button className="link small danger" onClick={() => removeLog(l)}>Löschen</button>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
 
       {panel === "date" && (
         <form className="inline-form" onSubmit={saveInstallDate}>
-          <label>Eingebaut am<input type="date" value={installed} onChange={(e) => setInstalled(e.target.value)} required /></label>
+          <label>Eingebaut am<input type="date" value={installed} onChange={(e) => setInstalled(e.target.value)} /></label>
           <button className="btn primary">Datum speichern</button>
+          {comp.installed_at && <button type="button" className="btn" onClick={clearInstallDate}>Datum entfernen</button>}
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+          <p className="hint span-all">Ohne Einbaudatum zählt BikeHelper erst ab der nächsten eingetragenen Wartung.</p>
         </form>
       )}
 
@@ -340,7 +396,9 @@ function ComponentCard({ comp, onChanged }) {
 
       {!retired && (
         <div className="actions">
-          {noDate && <button className="btn small primary" onClick={() => setPanel("date")}>Einbaudatum eintragen</button>}
+          <button className={`btn small ${noDate ? "primary" : ""}`} onClick={() => setPanel("date")}>
+            {noDate ? "Einbaudatum eintragen" : "Einbaudatum ändern"}
+          </button>
           <button className="btn small" onClick={() => setPanel("replace")}>Teil gewechselt</button>
           <button className="btn small" onClick={() => setPanel("log")}>Wartung eintragen</button>
           <button className="btn small" onClick={() => setPanel("rule")}>Regel hinzufügen</button>
@@ -350,6 +408,7 @@ function ComponentCard({ comp, onChanged }) {
       )}
       {retired && (
         <div className="actions">
+          <button className="btn small" onClick={unretire}>Wieder einbauen</button>
           <button className="link small danger" onClick={remove}>Löschen</button>
         </div>
       )}
@@ -366,7 +425,7 @@ function BikeEdit({ bike, onSaved, onCancel }) {
     e.preventDefault();
     setError("");
     try {
-      const { id, total_km, component_count, due_count, unknown_count, ...rest } = bikePayload(form);
+      const { id, total_km, component_count, due_count, unknown_count, tire_set, ...rest } = bikePayload(form);
       await api.put(`/bikes/${bike.id}`, rest);
       onSaved();
     } catch (err) {
@@ -436,7 +495,7 @@ export default function BikeDetail() {
   }
 
   async function toggleRetired() {
-    const { id: _id, total_km, component_count, due_count, unknown_count, ...rest } = bike;
+    const { id: _id, total_km, component_count, due_count, unknown_count, tire_set, ...rest } = bike;
     await api.put(`/bikes/${bike.id}`, { ...rest, retired: !bike.retired });
     load();
   }
@@ -466,7 +525,7 @@ export default function BikeDetail() {
           </p>
           <p className="muted small">
             Kette: {CHAIN_LUBES[bike.chain_lube || "oil"].name}
-            {bike.tire_width_mm ? ` · Reifen ${bike.tire_width_mm} mm` : ""}
+            {bike.tire_set ? ` · Reifen ${bike.tire_set.name}` : bike.tire_width_mm ? ` · Reifen ${bike.tire_width_mm} mm` : ""}
             {bike.tubeless === false ? " mit Schlauch" : bike.tire_width_mm ? ", tubeless" : ""}
           </p>
           <div className="actions">
@@ -486,6 +545,8 @@ export default function BikeDetail() {
       {editing && (
         <BikeEdit bike={bike} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />
       )}
+
+      <TireSets bike={bike} onChanged={load} />
 
       <header className="page-head">
         <h2>Komponenten</h2>

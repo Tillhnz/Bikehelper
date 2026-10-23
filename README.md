@@ -92,15 +92,19 @@ Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum
 
 Quellen: Park Tool (Kettenverschleiß), BikeGremlin, Slowtwitch, Zero Friction Cycling, Geekay, BikeRadar, Lennard Zinn, CX Magazine, Michelin sowie Herstellerangaben von SRAM, Shimano und TRP.
 
-**Kettenschmierung:** Am Rad wählst du Öl, Heißwachs oder Tropfwachs. Die Regeln der Kette passen sich an:
+**Kettenschmierung:** Am Rad wählst du nur Öl oder Wachs. Welche Art Wachs du benutzt hast, trägst du bei jeder Wartung der Kette ein (Heißwachs im Tauchbad oder flüssiges Tropfwachs). Davon hängt das Intervall ab:
 
 | Schmierung | Schmieren bzw. neu wachsen | Nässefaktor | Kette wechseln |
 |---|---|---|---|
 | Öl | 200 km | 2,0 | 3.000 km |
-| Heißwachs | 500 km | 2,5 | 6.000 km |
-| Tropfwachs | 250 km | 2,5 | 5.000 km |
+| Wachs, heiß | 500 km | 2,5 | 5.000 km |
+| Wachs, flüssig | 250 km | 2,5 | 5.000 km |
 
-Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCeramic), für Tropfwachs 200 bis 400 km und raten, nach jeder Nassfahrt früher neu zu wachsen, weil Regen das Wachs abwäscht. Bei Dauerregen und Streusalz sei Öl besser. Zur Lebensdauer gibt es nur Herstellerangaben („bis zu dreimal so lang“, Cyclowax); unabhängige Messungen habe ich nicht gefunden. Deshalb rechnet BikeHelper vorsichtig mit dem Doppelten (Heißwachs) bzw. 1,7-fachen (Tropfwachs). Ein Wechsel der Schmierung stellt die Regeln um, Wartungseinträge bleiben erhalten.
+Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCeramic), für Tropfwachs 200 bis 400 km und raten, nach jeder Nassfahrt früher neu zu wachsen, weil Regen das Wachs abwäscht. Bei Dauerregen und Streusalz sei Öl besser. Zur Lebensdauer gibt es nur Herstellerangaben („bis zu dreimal so lang“, Cyclowax); unabhängige Messungen habe ich nicht gefunden. Deshalb rechnet BikeHelper vorsichtig mit gut dem Anderthalbfachen. Ein Wechsel der Schmierung stellt die Regeln um, Wartungseinträge bleiben erhalten.
+
+**Reifen:** Auf der Seite eines Rades legst du jeden Reifensatz (Mäntel) an und wählst, welcher montiert ist. Die Fahrten des Rades zählen ab dem Montagetag automatisch auf den montierten Satz, bis du einen anderen montierst. So siehst du die Kilometer je Satz, auch wenn du Sätze wechselst und später wieder aufziehst. Zeiträume lassen sich nachtragen, ändern und löschen. Breite und Tubeless-Angabe des montierten Satzes übernimmt das Rad für den Ratgeber. Optional trägst du eine erwartete Lebensdauer ein, dann zeigt eine Anzeige den Verbrauch.
+
+**Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
 
 ## Wetter
 

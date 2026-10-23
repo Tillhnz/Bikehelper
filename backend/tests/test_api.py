@@ -174,9 +174,95 @@ def test_advisor_with_manual_weather_and_chain_lube():
         before = {r["label"]: r for r in c.get(f"/api/components/{chain['id']}/rules", headers=h).json()}
         assert before["Kette wechseln"]["interval_km"] == 3000
         upd = {k: v for k, v in bike.items() if k not in ("id", "total_km", "component_count", "due_count", "unknown_count")}
-        upd["chain_lube"] = "hot_wax"
-        assert c.put(f"/api/bikes/{bike['id']}", headers=h, json=upd).json()["chain_lube"] == "hot_wax"
+        upd["chain_lube"] = "wax"
+        assert c.put(f"/api/bikes/{bike['id']}", headers=h, json=upd).json()["chain_lube"] == "wax"
         after = {r["label"]: r for r in c.get(f"/api/components/{chain['id']}/rules", headers=h).json()}
-        assert "Kette neu wachsen (Heißwachs)" in after and "Kette reinigen und schmieren" not in after
-        assert after["Kette wechseln"]["interval_km"] == 6000
+        assert "Kette wachsen" in after and "Kette reinigen und schmieren" not in after
+        assert after["Kette wechseln"]["interval_km"] == 5000
         assert after["Kette wechseln"]["id"] == before["Kette wechseln"]["id"]  # gleiche Regel, Wartungen bleiben erhalten
+
+        # Die Wachsart wählt man beim Eintragen; sie bestimmt das Intervall
+        wax = after["Kette wachsen"]
+        assert {v["key"] for v in wax["variants"]} == {"hot_wax", "drip_wax"} and wax["interval_km"] == 500
+        c.post(f"/api/rules/{wax['id']}/done", headers=h, json={"performed_at": date.today().isoformat(), "variant": "drip_wax"})
+        wax = next(r for r in c.get(f"/api/components/{chain['id']}/rules", headers=h).json() if r["label"] == "Kette wachsen")
+        assert wax["variant"] == "drip_wax" and wax["interval_km"] == 250
+
+
+def _user(c, email):
+    c.post("/api/auth/register", json={"email": email, "password": "geheim1234"})
+    t = c.post("/api/auth/login", json={"email": email, "password": "geheim1234"}).json()["access_token"]
+    return {"Authorization": f"Bearer {t}"}
+
+
+def test_maintenance_log_and_install_date_can_be_removed():
+    with TestClient(app) as c:
+        h = _user(c, "undo@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "chain", "name": "Kette", "installed_at": date.today().isoformat(),
+        }).json()
+        rule = c.post(f"/api/components/{comp['id']}/rules", headers=h, json={"label": "Wechseln", "interval_km": 1000}).json()
+        done = c.post(f"/api/rules/{rule['id']}/done", headers=h, json={"performed_at": date.today().isoformat()}).json()
+        logs = c.get(f"/api/components/{comp['id']}/logs", headers=h).json()
+        assert logs[0]["id"] == done["id"] and logs[0]["rule_id"] == rule["id"]
+        assert c.delete(f"/api/logs/{done['id']}", headers=h).status_code == 204
+        assert c.get(f"/api/components/{comp['id']}/logs", headers=h).json() == []
+        assert c.delete(f"/api/logs/{done['id']}", headers=h).status_code == 404
+
+        # Einbaudatum entfernen: Status wird wieder "unknown"
+        body = {k: v for k, v in comp.items() if k not in ("id", "km", "status")}
+        body["installed_at"] = None
+        upd = c.put(f"/api/components/{comp['id']}", headers=h, json=body).json()
+        assert upd["installed_at"] is None and upd["status"] == "unknown"
+
+        # fremde Nutzer kommen nicht an den Eintrag
+        other = _user(c, "other-undo@example.com")
+        done2 = c.post(f"/api/rules/{rule['id']}/done", headers=h, json={"performed_at": date.today().isoformat()}).json()
+        assert c.delete(f"/api/logs/{done2['id']}", headers=other).status_code == 404
+
+
+def test_tire_sets_mount_history_and_km():
+    with TestClient(app) as c:
+        h = _user(c, "tires@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Renner", "type": "road", "with_defaults": False}).json()
+        bid = bike["id"]
+        today = date.today()
+        d = lambda n: (today - timedelta(days=n)).isoformat()  # noqa: E731
+
+        with SessionLocal() as db:
+            uid = db.execute(__import__("sqlalchemy").text("select id from users where email='tires@example.com'")).scalar()
+            for days_ago, km in ((50, 100.0), (30, 60.0), (5, 40.0)):
+                db.add(Activity(user_id=uid, bike_id=bid, name="Fahrt", start_date=datetime.combine(today - timedelta(days=days_ago), datetime.min.time()) + timedelta(hours=9), distance_km=km))
+            db.commit()
+
+        a = c.post(f"/api/bikes/{bid}/tire-sets", headers=h, json={
+            "name": "GP5000 28", "width_mm": 28, "tubeless": True, "start_km": 500, "mount_from": d(60),
+        }).json()
+        b = c.post(f"/api/bikes/{bid}/tire-sets", headers=h, json={"name": "Winterreifen 32", "width_mm": 32, "tubeless": False}).json()
+        assert a["mounted"] and not b["mounted"] and a["km"] == 500 + 100 + 60 + 40
+
+        # Montieren schließt den bisherigen Satz am Vortag; Fahrten davor bleiben beim alten Satz
+        b = c.post(f"/api/tire-sets/{b['id']}/mount", headers=h, json={"day": d(10)}).json()
+        assert b["mounted"] and b["km"] == 40.0
+        sets = {s["name"]: s for s in c.get(f"/api/bikes/{bid}/tire-sets", headers=h).json()}
+        assert not sets["GP5000 28"]["mounted"] and sets["GP5000 28"]["km"] == 500 + 100 + 60
+        mounted = c.get(f"/api/bikes/{bid}", headers=h).json()
+        assert mounted["tire_set"]["name"] == "Winterreifen 32" and mounted["tire_width_mm"] == 32 and mounted["tubeless"] is False
+
+        # Überschneidung wird abgelehnt, Korrektur des Zeitraums rechnet neu
+        old_mount = sets["GP5000 28"]["mounts"][0]
+        r = c.put(f"/api/tire-mounts/{old_mount['id']}", headers=h, json={"from_date": d(60), "to_date": d(3)})
+        assert r.status_code == 409
+        r = c.put(f"/api/tire-mounts/{old_mount['id']}", headers=h, json={"from_date": d(60), "to_date": d(20)})
+        assert r.status_code == 200 and r.json()["km"] == 500 + 100 + 60
+
+        # ausmustern nimmt den Satz vom Rad
+        upd = {k: v for k, v in b.items() if k in ("name", "brand", "width_mm", "tubeless", "start_km", "max_km", "notes")}
+        r = c.put(f"/api/tire-sets/{b['id']}", headers=h, json={**upd, "retired": True}).json()
+        assert not r["mounted"] and c.get(f"/api/bikes/{bid}", headers=h).json()["tire_set"] is None
+
+        # fremde Nutzer sehen nichts
+        other = _user(c, "other-tires@example.com")
+        assert c.get(f"/api/bikes/{bid}/tire-sets", headers=other).status_code == 404
+        assert c.post(f"/api/tire-sets/{a['id']}/mount", headers=other, json={"day": d(0)}).status_code == 404

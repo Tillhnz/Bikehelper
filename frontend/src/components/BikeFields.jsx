@@ -4,12 +4,12 @@ import { CHAIN_LUBES } from "../api.js";
 export default function BikeFields({ form, setForm }) {
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const check = (k) => (e) => setForm({ ...form, [k]: e.target.checked });
-  const lube = CHAIN_LUBES[form.chain_lube || "oil"];
+  const lube = CHAIN_LUBES[form.chain_lube === "wax" ? "wax" : "oil"];
   return (
     <>
       <label className="span-all">
         Kettenschmierung
-        <select value={form.chain_lube || "oil"} onChange={set("chain_lube")}>
+        <select value={form.chain_lube === "wax" ? "wax" : "oil"} onChange={set("chain_lube")}>
           {Object.entries(CHAIN_LUBES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
         </select>
         <span className="hint">{lube.hint}</span>
@@ -17,7 +17,7 @@ export default function BikeFields({ form, setForm }) {
       <label>
         Reifenbreite (Aufdruck, mm)
         <input type="number" min="18" max="80" step="1" value={form.tire_width_mm ?? ""} onChange={set("tire_width_mm")} placeholder="z. B. 28" />
-        <span className="hint">Für den Reifendruck-Ratgeber.</span>
+        <span className="hint">Für den Reifendruck-Ratgeber. Montierst du unten einen Reifensatz, übernimmt das Rad dessen Breite.</span>
       </label>
       <label>
         Innenweite der Felge (mm)
@@ -48,7 +48,7 @@ export function bikePayload(form) {
     brand: form.brand || null,
     model: form.model || null,
     start_km: Number(form.start_km) || 0,
-    chain_lube: form.chain_lube || "oil",
+    chain_lube: form.chain_lube === "wax" || form.chain_lube === "hot_wax" || form.chain_lube === "drip_wax" ? "wax" : "oil",
     tire_width_mm: num(form.tire_width_mm),
     rim_inner_mm: num(form.rim_inner_mm),
     bike_weight_kg: num(form.bike_weight_kg),

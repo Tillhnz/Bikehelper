@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BIKE_TYPES, api } from "../api.js";
+import { BIKE_TYPES, api, fmtKm } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
@@ -166,6 +166,11 @@ function BikeCard({ bike, index = 0 }) {
         </span>
       </div>
       <Odometer km={bike.total_km} />
+      {bike.tire_set && (
+        <p className="muted small bike-card-tire">
+          Reifen: {bike.tire_set.name}{bike.tire_set.width_mm ? `, ${bike.tire_set.width_mm} mm` : ""}, {fmtKm(bike.tire_set.km)} km
+        </p>
+      )}
       <div className="bike-card-foot">
         <span className="muted small">{bike.component_count} Komponenten</span>
         {bike.unknown_count > 0 && <span className="pill pill-unknown">{bike.unknown_count} ohne Einbaudatum</span>}

@@ -2,17 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..catalog import catalog_payload
+from ..catalog import WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload
 from ..database import get_db
 from ..models import Bike, Component, MaintenanceLog, MaintenanceRule, User
 from ..schemas import (
     BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
-    RuleOut, StandardComponentsIn,
+    MountedTireSet, RuleOut, StandardComponentsIn, WaxVariantOut,
 )
 from ..security import current_user
 from ..services import (
-    apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, rule_state,
-    worst_status,
+    apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
+    rule_state, tire_set_km, worst_status,
 )
 
 router = APIRouter(prefix="/api", tags=["garage"])
@@ -44,6 +44,7 @@ def _own_rule(db: Session, user: User, rule_id: int) -> MaintenanceRule:
 def _bike_out(db: Session, bike: Bike) -> BikeOut:
     active = [c for c in bike.components if not c.retired_at]
     statuses = [component_status(db, c) for c in active]
+    ts = current_tire_set(db, bike.id)
     return BikeOut(
         id=bike.id, name=bike.name, type=bike.type, brand=bike.brand, model=bike.model,
         year=bike.year, start_km=bike.start_km, strava_gear_id=bike.strava_gear_id,
@@ -55,6 +56,7 @@ def _bike_out(db: Session, bike: Bike) -> BikeOut:
         component_count=len(active),
         due_count=sum(1 for s in statuses if s == "due"),
         unknown_count=sum(1 for s in statuses if s == "unknown"),
+        tire_set=MountedTireSet(id=ts.id, name=ts.name, width_mm=ts.width_mm, km=round(tire_set_km(db, ts), 1)) if ts else None,
     )
 
 
@@ -67,9 +69,15 @@ def _component_out(db: Session, c: Component) -> ComponentOut:
 
 
 def _rule_out(db: Session, c: Component, r: MaintenanceRule) -> RuleOut:
+    st = rule_state(db, c, r)
+    interval_km = st.pop("interval_km_eff")
+    variants = (
+        [WaxVariantOut(key=k, name=v["name"], interval_km=v["interval_km"]) for k, v in WAX_VARIANTS.items()]
+        if r.label == WAX_LUBE_LABEL else None
+    )
     return RuleOut(
-        id=r.id, label=r.label, interval_km=r.interval_km, interval_months=r.interval_months,
-        wet_factor=r.wet_factor or 1.0, hint=r.hint, **rule_state(db, c, r),
+        id=r.id, label=r.label, interval_km=interval_km, interval_months=r.interval_months,
+        wet_factor=r.wet_factor or 1.0, hint=r.hint, variants=variants, **st,
     )
 
 
@@ -234,7 +242,10 @@ def delete_rule(rule_id: int, user: User = Depends(current_user), db: Session = 
 def rule_done(rule_id: int, data: RuleDoneIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Trägt ein, dass diese eine Aufgabe erledigt wurde; der Zähler dieser Regel startet neu."""
     rule = _own_rule(db, user, rule_id)
-    log = MaintenanceLog(component_id=rule.component_id, rule_id=rule.id, **data.model_dump())
+    values = data.model_dump()
+    if rule.label != WAX_LUBE_LABEL:
+        values["variant"] = None  # die Wachsart gibt es nur bei der Wachsregel
+    log = MaintenanceLog(component_id=rule.component_id, rule_id=rule.id, **values)
     db.add(log)
     db.commit()
     return log
@@ -256,6 +267,16 @@ def create_log(comp_id: int, data: LogIn, user: User = Depends(current_user), db
     return log
 
 
+@router.delete("/logs/{log_id}", status_code=204)
+def delete_log(log_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Entfernt einen Wartungseintrag, zum Beispiel bei einem falschen Datum. Die Zähler rechnen danach neu."""
+    log = db.get(MaintenanceLog, log_id)
+    if not log or log.component.user_id != user.id:
+        raise HTTPException(404, "Wartungseintrag nicht gefunden")
+    db.delete(log)
+    db.commit()
+
+
 # ---------- Übersicht: fällige Wartungen ----------
 
 @router.get("/maintenance/overview")
@@ -271,7 +292,7 @@ def maintenance_overview(user: User = Depends(current_user), db: Session = Depen
                 items.append({
                     "component_id": c.id, "component": c.name, "category": c.category,
                     "bike_id": c.bike_id, "bike": c.bike.name if c.bike else None,
-                    "rule": r.label, "wet_factor": r.wet_factor or 1.0, **st,
+                    "rule": r.label, "wet_factor": r.wet_factor or 1.0, **{k: v for k, v in st.items() if k != "interval_km_eff"},
                 })
     items.sort(key=lambda i: i["progress"], reverse=True)
     return {"items": items, "status": worst_status([i["status"] for i in items])}

@@ -32,9 +32,22 @@ WEAR_HINT = (
     "Ein rechtzeitiger Wechsel schont Kassette und Kettenblätter."
 )
 
-# Kettenschmierung. Die Werte stammen aus Herstellerangaben und Tests (Quellen siehe README) und streuen stark:
-# Heißwachs 300 bis 600 km, Tropfwachs 200 bis 400 km. Nach Regen immer früher. Zur Lebensdauer gibt es nur
-# Herstellerangaben (bis zu dreimal so lang wie geölt, unabhängige Messungen fehlen), deshalb rechnen wir vorsichtig.
+# Kettenschmierung: Öl oder Wachs. Welche Art Wachs (Heißwachs im Tauchbad oder flüssiges Tropfwachs), legt man erst bei
+# der Wartung fest; davon hängt das Intervall ab. Die Werte stammen aus Herstellerangaben und Tests (Quellen siehe README)
+# und streuen stark: Heißwachs 300 bis 600 km, Tropfwachs 200 bis 400 km. Nach Regen immer früher. Zur Lebensdauer gibt es
+# nur Herstellerangaben (bis zu dreimal so lang wie geölt, unabhängige Messungen fehlen), deshalb rechnen wir vorsichtig.
+WAX_LUBE_LABEL = "Kette wachsen"
+WAX_VARIANTS: dict[str, dict] = {
+    "hot_wax": {
+        "name": "Heißwachs (Tauchbad)", "interval_km": 500,
+        "hint": "Je nach Wachs 300 bis 600 km. Zeit zum Nachwachsen: Die Kette wird dunkel statt weiß oder hellgrau, "
+                "oder sie klingt trocken und knackt.",
+    },
+    "drip_wax": {
+        "name": "Flüssigwachs (Tropfwachs)", "interval_km": 250,
+        "hint": "Etwa 200 bis 400 km, sobald die Kette lauter wird. Empfindlicher gegen Regen als Heißwachs.",
+    },
+}
 CHAIN_LUBES: dict[str, dict] = {
     "oil": {
         "name": "Öl",
@@ -45,42 +58,41 @@ CHAIN_LUBES: dict[str, dict] = {
         ),
         "wear": RuleTemplate("Kette wechseln", interval_km=3000, wet_factor=2.0, hint=WEAR_HINT),
     },
-    "hot_wax": {
-        "name": "Heißwachs (Tauchwachs)",
+    "wax": {
+        "name": "Wachs",
         "lube": RuleTemplate(
-            "Kette neu wachsen (Heißwachs)", interval_km=500, wet_factor=2.5,
-            hint="Je nach Wachs 300 bis 600 km, Hersteller nennen teils mehr. Nach jeder Nassfahrt früher neu wachsen und die Kette "
-                 "trocknen, damit sie nicht rostet. Zeit zum Nachwachsen: Die Kette wird dunkel (statt weiß oder hellgrau), "
-                 "oder sie klingt trocken und knackt. Bei dauerhaft nassem Wetter oder Salz ist Öl besser.",
-        ),
-        "wear": RuleTemplate(
-            "Kette wechseln", interval_km=6000, wet_factor=2.0,
-            hint=WEAR_HINT + " Gewachste Ketten halten laut Herstellern deutlich länger (bis dreimal so lang wie geölte). "
-                 "Unabhängige Messungen fehlen, deshalb ist hier nur das Doppelte angesetzt. Bei Nässe läuft die Kette "
-                 "schneller trocken, daher zählt Nässe weiter doppelt.",
-        ),
-    },
-    "drip_wax": {
-        "name": "Tropfwachs",
-        "lube": RuleTemplate(
-            "Kette nachwachsen (Tropfwachs)", interval_km=250, wet_factor=2.5,
-            hint="Etwa alle 200 bis 400 km nachtropfen, sobald die Kette lauter wird. Tropfwachs ist empfindlicher gegen Regen "
-                 "als Heißwachs; nach Nassfahrten früher nachtragen und die Kette trocknen.",
+            WAX_LUBE_LABEL, interval_km=500, wet_factor=2.5,
+            hint="Beim Eintragen wählst du, ob heiß oder flüssig gewachst wurde: Heißwachs 300 bis 600 km, Flüssigwachs 200 bis 400 km. "
+                 "Nach jeder Nassfahrt früher nachwachsen und die Kette trocknen, damit sie nicht rostet. "
+                 "Bei dauerhaft nassem Wetter oder Salz ist Öl besser.",
         ),
         "wear": RuleTemplate(
             "Kette wechseln", interval_km=5000, wet_factor=2.0,
-            hint=WEAR_HINT + " Auch Tropfwachs verlängert die Lebensdauer deutlich, aber weniger als ein Heißwachsbad. "
-                 "Der Wert ist eine vorsichtige Schätzung.",
+            hint=WEAR_HINT + " Gewachste Ketten halten laut Herstellern deutlich länger (bis dreimal so lang wie geölte). "
+                 "Unabhängige Messungen fehlen, deshalb ist hier nur gut das Anderthalbfache angesetzt. Heißwachs hält tendenziell "
+                 "länger als Flüssigwachs. Bei Nässe läuft die Kette schneller trocken, daher zählt Nässe weiter doppelt.",
         ),
     },
 }
 CHAIN_LUBE_KEYS = tuple(CHAIN_LUBES)
-LUBE_LABELS = {v["lube"].label for v in CHAIN_LUBES.values()}
+# Auch frühere Bezeichnungen erkennen, damit bestehende Regeln beim Umstellen gefunden werden
+LUBE_LABELS = {v["lube"].label for v in CHAIN_LUBES.values()} | {
+    "Kette neu wachsen (Heißwachs)", "Kette nachwachsen (Tropfwachs)",
+}
+LEGACY_LUBES = {"hot_wax": "hot_wax", "drip_wax": "drip_wax"}
 
 
 def chain_rules(lube: str | None) -> tuple[RuleTemplate, RuleTemplate]:
-    spec = CHAIN_LUBES.get(lube or "oil", CHAIN_LUBES["oil"])
+    key = "wax" if lube in ("wax", "hot_wax", "drip_wax") else "oil"
+    spec = CHAIN_LUBES[key]
     return (spec["lube"], spec["wear"])
+
+
+def wax_interval_km(label: str, variant: str | None, default: float | None) -> float | None:
+    """Intervall der Wachsregel je nach zuletzt eingetragener Wachsart."""
+    if label == WAX_LUBE_LABEL and variant in WAX_VARIANTS:
+        return WAX_VARIANTS[variant]["interval_km"]
+    return default
 
 
 CATALOG: dict[str, ComponentTemplate] = {
@@ -205,5 +217,6 @@ def catalog_payload() -> dict:
     return {
         "components": {k: asdict(v) for k, v in CATALOG.items()},
         "chain_lubes": {k: {"name": v["name"], "lube": asdict(v["lube"]), "wear": asdict(v["wear"])} for k, v in CHAIN_LUBES.items()},
+        "wax_variants": WAX_VARIANTS,
         "bike_templates": {k: list(v) for k, v in BIKE_TEMPLATES.items()},
     }

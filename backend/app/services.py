@@ -1,10 +1,10 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .catalog import CATALOG, LUBE_LABELS, categories_for, chain_rules
-from .models import Activity, Bike, Component, MaintenanceRule
+from .catalog import CATALOG, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
 SOON_THRESHOLD = 0.8
 
@@ -76,16 +76,26 @@ def last_done(comp: Component, rule: MaintenanceRule) -> date | None:
     return max((l.performed_at for l in comp.logs if l.rule_id in (None, rule.id)), default=None)
 
 
+def last_log(comp: Component, rule: MaintenanceRule) -> MaintenanceLog | None:
+    """Jüngster Wartungseintrag, der für diese Regel gilt (bei gleichem Datum der zuletzt angelegte)."""
+    logs = [l for l in comp.logs if l.rule_id in (None, rule.id)]
+    return max(logs, key=lambda l: (l.performed_at, l.id or 0), default=None)
+
+
 def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date | None = None) -> dict:
     """Verbrauch eines Wartungsintervalls seit der letzten Wartung (oder dem Einbau)."""
     today = today or date.today()
-    last = last_done(comp, rule)
+    entry = last_log(comp, rule)
+    last = entry.performed_at if entry else None
+    variant = entry.variant if entry and rule.label == WAX_LUBE_LABEL else None
+    interval_km = wax_interval_km(rule.label, variant, rule.interval_km)
     base = last or comp.installed_at
     if base is None:
         # Ohne Einbaudatum und ohne Wartungseintrag lässt sich nichts zählen.
         return {
             "km_since": 0.0, "wet_km": 0.0, "effective_km": 0.0, "months_since": 0.0,
-            "progress": 0.0, "status": "unknown", "last_done": None,
+            "progress": 0.0, "status": "unknown", "last_done": None, "interval_km_eff": interval_km,
+            "variant": variant,
         }
 
     km, wet_km, effective = wear_between(db, comp.bike_id, base, comp.retired_at, rule.wet_factor)
@@ -95,8 +105,8 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     months_since = months_between(base, today)
 
     ratios = []
-    if rule.interval_km:
-        ratios.append(effective / rule.interval_km)
+    if interval_km:
+        ratios.append(effective / interval_km)
     if rule.interval_months:
         ratios.append(months_since / rule.interval_months)
     progress = max(ratios) if ratios else 0.0
@@ -117,6 +127,8 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         "progress": round(progress, 3),
         "status": state,
         "last_done": last,
+        "interval_km_eff": interval_km,
+        "variant": variant,
     }
 
 
@@ -182,3 +194,93 @@ def apply_chain_lube(db: Session, bike: Bike) -> int:
             changed += 1
     db.flush()
     return changed
+
+
+def migrate_legacy_lube(db: Session) -> int:
+    """Früher gab es hot_wax und drip_wax als Schmierung. Jetzt heißt sie wax; die Wachsart steht an der Wartung.
+
+    Bereits eingetragene Schmierwartungen bekommen die bisherige Wachsart, damit ihre Intervalle gleich bleiben.
+    """
+    bikes = db.scalars(select(Bike).where(Bike.chain_lube.in_(("hot_wax", "drip_wax")))).all()
+    for bike in bikes:
+        old = bike.chain_lube
+        bike.chain_lube = "wax"
+        for comp in bike.components:
+            if comp.category != "chain":
+                continue
+            lube_ids = {r.id for r in comp.rules if r.label in LUBE_LABELS}
+            for log in comp.logs:
+                if log.variant is None and log.rule_id in lube_ids:
+                    log.variant = old
+        apply_chain_lube(db, bike)
+    db.commit()
+    return len(bikes)
+
+
+# ---------- Reifensätze ----------
+
+def _tire_sets_of(db: Session, bike_id: int) -> list[TireSet]:
+    return list(db.scalars(select(TireSet).where(TireSet.bike_id == bike_id)))
+
+
+def mount_km(db: Session, bike_id: int, m: TireMount) -> float:
+    return km_between(db, bike_id, m.from_date, m.to_date)
+
+
+def tire_set_km(db: Session, ts: TireSet) -> float:
+    return ts.start_km + sum(mount_km(db, ts.bike_id, m) for m in ts.mounts)
+
+
+def open_mount(ts: TireSet) -> TireMount | None:
+    return next((m for m in ts.mounts if m.to_date is None), None)
+
+
+def current_tire_set(db: Session, bike_id: int) -> TireSet | None:
+    return next((ts for ts in _tire_sets_of(db, bike_id) if not ts.retired and open_mount(ts)), None)
+
+
+def sync_bike_tires(bike: Bike, ts: TireSet) -> None:
+    """Der montierte Satz bestimmt Breite und Tubeless-Angabe des Rades (für den Ratgeber)."""
+    if ts.width_mm is not None:
+        bike.tire_width_mm = ts.width_mm
+    if ts.tubeless is not None:
+        bike.tubeless = ts.tubeless
+
+
+def mount_tire_set(db: Session, ts: TireSet, day: date) -> None:
+    """Montiert den Satz ab `day`. Ein bisher montierter Satz des Rades endet am Vortag."""
+    for other in _tire_sets_of(db, ts.bike_id):
+        m = open_mount(other)
+        if m is None:
+            continue
+        if other.id == ts.id:
+            return  # ist schon montiert
+        if m.from_date >= day:
+            db.delete(m)  # war keinen vollen Tag montiert
+        else:
+            m.to_date = day - timedelta(days=1)
+    db.add(TireMount(tire_set_id=ts.id, from_date=day, to_date=None))
+    sync_bike_tires(ts.bike, ts)
+    db.flush()
+
+
+def unmount_tire_set(db: Session, ts: TireSet, day: date) -> None:
+    m = open_mount(ts)
+    if m is None:
+        return
+    if m.from_date >= day:
+        db.delete(m)
+    else:
+        m.to_date = day - timedelta(days=1)
+    db.flush()
+
+
+def find_overlap(db: Session, bike_id: int, from_date: date, to_date: date | None, ignore_id: int | None = None):
+    """Gibt einen anderen Zeitraum desselben Rades zurück, der sich mit dem angegebenen überschneidet."""
+    for ts in _tire_sets_of(db, bike_id):
+        for m in ts.mounts:
+            if m.id == ignore_id:
+                continue
+            if from_date <= (m.to_date or date.max) and m.from_date <= (to_date or date.max):
+                return ts, m
+    return None

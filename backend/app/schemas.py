@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class RegisterIn(BaseModel):
@@ -32,6 +32,13 @@ class StravaSettingsIn(BaseModel):
     client_secret: str = Field(min_length=1, max_length=128)
 
 
+class MountedTireSet(BaseModel):
+    id: int
+    name: str
+    width_mm: float | None = None
+    km: float
+
+
 class BikeIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     type: str = "road"
@@ -42,12 +49,17 @@ class BikeIn(BaseModel):
     strava_gear_id: str | None = None
     notes: str | None = None
     retired: bool = False
-    chain_lube: Literal["oil", "hot_wax", "drip_wax"] | None = "oil"
+    chain_lube: Literal["oil", "wax"] | None = "oil"
     tire_width_mm: float | None = Field(default=None, ge=18, le=80)
     rim_inner_mm: float | None = Field(default=None, ge=12, le=40)
     bike_weight_kg: float | None = Field(default=None, ge=3, le=40)
     tubeless: bool | None = True
     hookless: bool | None = False
+
+    @field_validator("chain_lube", mode="before")
+    @classmethod
+    def _legacy_lube(cls, v):
+        return "wax" if v in ("hot_wax", "drip_wax") else v
 
 
 class BikeCreate(BikeIn):
@@ -60,6 +72,7 @@ class BikeOut(BikeIn):
     component_count: int
     due_count: int
     unknown_count: int = 0  # Komponenten ohne Einbaudatum, bei denen noch nichts gezählt werden kann
+    tire_set: MountedTireSet | None = None  # aktuell montierter Reifensatz
 
 
 class ComponentIn(BaseModel):
@@ -87,8 +100,16 @@ class RuleIn(BaseModel):
     hint: str | None = None
 
 
+class WaxVariantOut(BaseModel):
+    key: str
+    name: str
+    interval_km: float
+
+
 class RuleOut(RuleIn):
     id: int
+    variant: str | None = None  # Wachsart der letzten Wartung (nur Wachsregel)
+    variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
     km_since: float
     wet_km: float
     effective_km: float  # gefahrene km inklusive Nässe-Zuschlag
@@ -101,6 +122,7 @@ class RuleOut(RuleIn):
 class RuleDoneIn(BaseModel):
     performed_at: date
     note: str | None = None
+    variant: Literal["hot_wax", "drip_wax"] | None = None  # nur für die Wachsregel
 
 
 class ReplaceIn(BaseModel):
@@ -120,6 +142,8 @@ class LogIn(BaseModel):
 
 class LogOut(LogIn):
     id: int
+    rule_id: int | None = None
+    variant: str | None = None
 
 
 class ActivityOut(BaseModel):
@@ -173,3 +197,44 @@ class GearOut(BaseModel):
     count: int
     unassigned: int
     km: float
+
+
+class TireSetIn(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    brand: str | None = None
+    width_mm: float | None = Field(default=None, ge=18, le=85)
+    tubeless: bool | None = None
+    start_km: float = Field(default=0, ge=0)
+    max_km: float | None = Field(default=None, gt=0)
+    notes: str | None = None
+    retired: bool = False
+
+
+class TireSetCreate(TireSetIn):
+    mount_from: date | None = None  # gleich ab diesem Tag montieren
+
+
+class MountOut(BaseModel):
+    id: int
+    from_date: date
+    to_date: date | None
+    km: float
+
+
+class TireSetOut(TireSetIn):
+    id: int
+    bike_id: int
+    km: float  # gesamt: Kilometer vor der App plus alle Zeiträume auf dem Rad
+    mounted: bool
+    mounted_since: date | None = None
+    progress: float | None = None  # km / max_km
+    mounts: list[MountOut] = []
+
+
+class MountDateIn(BaseModel):
+    day: date
+
+
+class MountRangeIn(BaseModel):
+    from_date: date
+    to_date: date | None = None
