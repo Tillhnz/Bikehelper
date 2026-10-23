@@ -532,7 +532,7 @@ export default function Advisor() {
               {bike && <GarageFacts bike={bike} />}
               <StopSlider label="Untergrund" value={form.surface} onChange={(v) => patch({ surface: v })} options={SURFACES} />
             </div>
-            {bikes.length === 0 && <p className="hint">Tipp: Lege in der <Link to="/">Garage</Link> ein Rad mit Reifenbreite an, dann füllt sich vieles von selbst.</p>}
+            {bikes.length === 0 && <p className="hint">Tipp: Lege in der <Link to="/garage">Garage</Link> ein Rad mit Reifenbreite an, dann füllt sich vieles von selbst.</p>}
           </section>
 
           <section className="panel">

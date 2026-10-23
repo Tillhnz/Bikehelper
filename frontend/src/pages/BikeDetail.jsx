@@ -512,7 +512,7 @@ export default function BikeDetail() {
   async function removeBike() {
     if (!window.confirm(`„${bike.name}“ wirklich löschen? Die Komponenten bleiben ohne Rad erhalten.`)) return;
     await api.del(`/bikes/${bike.id}`);
-    navigate("/");
+    navigate("/garage");
   }
 
   if (error && !bike) return <p className="error" role="alert">{error}</p>;
@@ -523,7 +523,7 @@ export default function BikeDetail() {
 
   return (
     <>
-      <p><Link to="/" className="link">← Zurück zur Garage</Link></p>
+      <p><Link to="/garage" className="link">← Zurück zur Garage</Link></p>
       <header className="bike-hero">
         <div>
           <h1>{bike.name}</h1>

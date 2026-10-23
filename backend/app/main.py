@@ -5,7 +5,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import notify
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import activities, advisor, auth, garage, mapconfig, notifications, stats as stats_router, tires, weather as weather_router
+from .routers import activities, advisor, auth, garage, home, mapconfig, notifications, stats as stats_router, tires, weather as weather_router
 from .services import migrate_legacy_lube
 from .weather import service as weather_service
 
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="BikeHelper", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.include_router(auth.router)
+app.include_router(home.router)
 app.include_router(garage.router)
 app.include_router(tires.router)
 app.include_router(activities.router)

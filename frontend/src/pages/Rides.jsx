@@ -215,7 +215,7 @@ function GearAssign({ gear, bikes, onDone }) {
         Diese Radnamen stehen im Strava-Export, haben aber noch kein Rad in BikeHelper. Wähle das passende Rad, dann werden alle Fahrten auf einmal zugeordnet.
       </p>
       {bikes.length === 0 ? (
-        <p>Lege zuerst in der <Link to="/">Garage</Link> ein Rad an.</p>
+        <p>Lege zuerst in der <Link to="/garage">Garage</Link> ein Rad an.</p>
       ) : (
         <ul className="gear-list">
           {open.map((g) => (

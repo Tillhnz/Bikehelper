@@ -5,6 +5,7 @@ import { resetMapConfig } from "./geo.js";
 import Shell from "./components/Shell.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
 import Login from "./pages/Login.jsx";
+import Home from "./pages/Home.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Rides from "./pages/Rides.jsx";
@@ -60,7 +61,8 @@ export default function App() {
   return (
     <Shell user={user} onLogout={logout}>
       <Routes>
-        <Route path="/" element={<Garage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/garage" element={<Garage />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/advisor" element={<Advisor />} />
         <Route path="/rides" element={<Rides />} />
