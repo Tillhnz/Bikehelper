@@ -103,6 +103,7 @@ code { background: var(--panel-2); padding: 0.1rem 0.4rem; border-radius: 4px; f
 .btn.primary:hover { background: #8be0d2; }
 .btn:disabled { opacity: 0.6; cursor: wait; }
 .btn.small { padding: 0.3rem 0.7rem; font-size: 0.875rem; }
+a.btn { display: inline-block; text-decoration: none; }
 
 .link { font: inherit; background: none; border: 0; padding: 0; color: var(--celeste); cursor: pointer; text-decoration: none; }
 .link:hover { text-decoration: underline; }
@@ -223,6 +224,59 @@ input:focus, select:focus { border-color: var(--celeste); }
 .steps { padding-left: 1.2rem; margin: 0 0 1.5rem; }
 .steps li { margin-bottom: 0.4rem; }
 
+/* ---------- Fahrten & Import ---------- */
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+
+.import-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; align-items: start; }
+.import-grid .panel { margin-bottom: 0; }
+.import-grid + .panel, .import-grid + section { margin-top: 1.5rem; }
+.import-grid form { display: grid; gap: 1rem; }
+
+.howto { margin: 0 0 1.25rem; }
+.howto summary { cursor: pointer; color: var(--celeste); }
+.howto .steps { margin: 0.75rem 0 0; }
+
+.dropzone {
+  position: relative; display: grid; place-items: center; text-align: center;
+  min-height: 110px; padding: 1rem;
+  border: 2px dashed var(--line); border-radius: var(--r-panel);
+  color: var(--mute); cursor: pointer; font-weight: 400;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone.over { border-color: var(--celeste); background: var(--panel-2); }
+.dropzone.filled { border-style: solid; color: var(--chalk); }
+.dropzone:focus-within { outline: 2px solid var(--celeste); outline-offset: 2px; }
+.dropzone input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+.progress-wrap { margin-top: 1rem; display: grid; gap: 0.4rem; }
+.progress { height: 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--celeste); transition: width 0.3s; }
+
+.result { margin-top: 1rem; padding: 1rem; background: var(--ink-2); border-radius: 10px; }
+.result p { margin: 0 0 0.4rem; }
+.result details { margin-top: 0.5rem; }
+.result summary { cursor: pointer; color: var(--amber); }
+.result ul { margin: 0.5rem 0 0; padding-left: 1.2rem; overflow-wrap: anywhere; }
+
+.gear-list { list-style: none; margin: 0; padding: 0; }
+.gear-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 0.7rem 0; }
+.gear-list li + li { border-top: 1px solid var(--line); }
+.gear-actions { display: flex; gap: 0.5rem; align-items: center; }
+.gear-actions select { width: auto; min-width: 170px; }
+
+.filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.filters input[type="search"] { width: 220px; }
+
+.table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel); }
+.rides { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.rides th { text-align: left; font-weight: 500; color: var(--mute); padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); }
+.rides td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.rides tbody tr:last-child td { border-bottom: 0; }
+.rides .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rides select { min-width: 160px; padding: 0.35rem 0.5rem; }
+
 /* ---------- Login ---------- */
 
 .login { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100%; }
@@ -258,6 +312,8 @@ input:focus, select:focus { border-color: var(--celeste); }
   .login-km span { width: 44px; height: 68px; font-size: 3rem; }
   .odo-lg .odo-digit { width: 36px; height: 56px; font-size: 2.4rem; }
   .bike-grid { grid-template-columns: 1fr; }
+  .import-grid { grid-template-columns: 1fr; }
+  .filters input[type="search"] { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -121,9 +121,12 @@ export default function Garage() {
       {active.length === 0 && !adding ? (
         <EmptyState
           title="Deine Garage ist noch leer"
-          text="Lege dein erstes Rad an. Danach kannst du Komponenten und Wartungsintervalle hinzufügen."
+          text="Lege dein erstes Rad an oder importiere deinen Strava-Export, dabei werden die Räder automatisch angelegt."
         >
-          <button className="btn primary" onClick={() => setAdding(true)}>Erstes Rad anlegen</button>
+          <div className="actions" style={{ justifyContent: "center" }}>
+            <button className="btn primary" onClick={() => setAdding(true)}>Erstes Rad anlegen</button>
+            <Link className="btn" to="/rides">Fahrten importieren</Link>
+          </div>
         </EmptyState>
       ) : (
         <div className="bike-grid">

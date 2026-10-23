@@ -37,6 +37,41 @@ async function request(method, path, body) {
   return res.status === 204 ? null : res.json();
 }
 
+/** Upload mit Fortschrittsanzeige (fetch kann das nicht). */
+export function upload(path, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api${path}`);
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new Error("Verbindung fehlgeschlagen. Prüfe dein Netzwerk und versuche es erneut."));
+    xhr.onload = () => {
+      let data = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* keine JSON-Antwort */
+      }
+      if (xhr.status === 401) {
+        clearToken();
+        onUnauthorized();
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data);
+      let msg =
+        xhr.status === 413
+          ? "Die Datei ist für den Server zu groß. Prüfe das Upload-Limit des Reverse Proxys."
+          : `Fehler ${xhr.status}`;
+      if (data && typeof data.detail === "string") msg = data.detail;
+      else if (data && Array.isArray(data.detail)) msg = data.detail.map((d) => d.msg).join(", ");
+      reject(new Error(msg));
+    };
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   get: (p) => request("GET", p),
   post: (p, b) => request("POST", p, b ?? {}),
@@ -83,3 +118,19 @@ export const fmtDate = (iso) =>
   iso ? new Date(iso + "T00:00:00").toLocaleDateString("de-DE") : "–";
 
 export const today = () => new Date().toISOString().slice(0, 10);
+
+// Der Server liefert Zeiten in UTC ohne Zeitzonenangabe
+export const fmtDateTime = (iso) => {
+  if (!iso) return "–";
+  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + "Z");
+  return d.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+};
+
+export const fmtKm1 = (km) =>
+  new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(km ?? 0);
+
+export const fmtDuration = (s) => {
+  const h = Math.floor((s ?? 0) / 3600);
+  const m = Math.floor(((s ?? 0) % 3600) / 60);
+  return `${h}:${String(m).padStart(2, "0")} h`;
+};

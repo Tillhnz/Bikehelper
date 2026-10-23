@@ -104,6 +104,8 @@ class Activity(Base):
     polyline: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     start_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    gear_name: Mapped[str | None] = mapped_column(String(160), nullable=True)  # Radname laut Strava-Export
+    source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "upload" oder "strava_export"
     # Wetter (wird später angereichert)
     temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[float | None] = mapped_column(Float, nullable=True)

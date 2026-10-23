@@ -4,6 +4,7 @@ import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
+import Rides from "./pages/Rides.jsx";
 import Settings from "./pages/Settings.jsx";
 
 function Shell({ user, onLogout, children }) {
@@ -16,6 +17,7 @@ function Shell({ user, onLogout, children }) {
         </div>
         <nav>
           <NavLink to="/" end>Garage</NavLink>
+          <NavLink to="/rides">Fahrten</NavLink>
           <NavLink to="/settings">Einstellungen</NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -73,6 +75,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Garage />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
+        <Route path="/rides" element={<Rides />} />
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

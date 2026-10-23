@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -87,3 +87,41 @@ class LogIn(BaseModel):
 
 class LogOut(LogIn):
     id: int
+
+
+class ActivityOut(BaseModel):
+    id: int
+    name: str
+    sport_type: str
+    start_date: datetime  # UTC, ohne Zeitzonenangabe
+    distance_km: float
+    moving_time_s: int
+    elevation_m: float
+    bike_id: int | None
+    gear_name: str | None
+    source: str | None
+    has_track: bool
+
+
+class ActivityPage(BaseModel):
+    total: int
+    items: list[ActivityOut]
+
+
+class ActivityUpdate(BaseModel):
+    bike_id: int | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class AssignIn(BaseModel):
+    bike_id: int | None
+    gear_name: str | None = None
+    activity_ids: list[int] | None = None
+    only_unassigned: bool = True
+
+
+class GearOut(BaseModel):
+    gear_name: str | None
+    count: int
+    unassigned: int
+    km: float
