@@ -22,6 +22,7 @@ export function Bars({ data, unit = "", height = 180, color = "var(--celeste)", 
           <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
             <rect x={x} y="0" width={bw} height={height} fill="transparent" />
             <rect
+              className="bar-grow" style={{ "--i": i }}
               x={x + bw * 0.14} y={padT + h - bh} width={bw * 0.72} height={Math.max(bh, d.value > 0 ? 1 : 0)}
               rx="2" fill={color} opacity={hover === null || hover === i ? 1 : 0.45}
             />
@@ -69,7 +70,7 @@ export function CumulativeLines({ cumulative, height = 240 }) {
         const last = pts[pts.length - 1];
         return (
           <g key={y}>
-            <path d={d} fill="none" stroke="var(--celeste)" strokeWidth={i === years.length - 1 ? 2.5 : 1.5} opacity={shades[i]} strokeLinejoin="round" />
+            <path d={d} fill="none" stroke="var(--celeste)" strokeWidth={i === years.length - 1 ? 2.5 : 1.5} opacity={shades[i]} strokeLinejoin="round" className="line-draw" pathLength="1" style={{ "--i": i }} />
             <text x={sx(last[0]) + 5} y={sy(last[1]) + 4} className="chart-label" opacity={Math.max(shades[i], 0.6)}>
               {y} · {fmtNum(last[1], 0)}
             </text>
@@ -125,7 +126,7 @@ export function HBars({ rows, color = "var(--celeste)" }) {
   return (
     <ul className="hbars">
       {rows.map((r) => (
-        <li key={r.label}>
+        <li key={r.label} style={{ "--i": rows.indexOf(r) }}>
           <span className="hbar-label">{r.label}</span>
           <span className="hbar-track"><span className="hbar-fill" style={{ width: `${(r.value / max) * 100}%`, background: color }} /></span>
           <span className="hbar-val">{r.text}</span>
@@ -192,7 +193,7 @@ export function ProfileChart({ x, y, unit, color = "var(--celeste)", fill = fals
         </text>
       ))}
       {fill && <path d={area} fill={color} opacity="0.18" />}
-      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" className="line-draw" pathLength="1" />
       {hv !== null && (
         <g>
           <line x1={sx(x[hv])} x2={sx(x[hv])} y1={padT} y2={height - padB} stroke="var(--chalk)" strokeWidth="1" opacity="0.5" />

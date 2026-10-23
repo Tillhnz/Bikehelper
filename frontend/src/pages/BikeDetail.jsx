@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
+import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 
 function ruleIntervalText(r) {
@@ -476,7 +477,10 @@ export default function BikeDetail() {
             <button className="link small danger" onClick={removeBike}>Rad löschen</button>
           </div>
         </div>
-        <Odometer km={bike.total_km} />
+        <div className="bike-hero-art">
+          <BikeIllustration type={bike.type} tireMm={bike.tire_width_mm} ride title={BIKE_TYPES[bike.type] ?? "Rad"} />
+          <Odometer km={bike.total_km} />
+        </div>
       </header>
 
       {editing && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
 import UploadBanner from "./components/UploadBanner.jsx";
@@ -15,6 +15,7 @@ import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
 
 function Shell({ user, onLogout, children }) {
+  const { pathname } = useLocation();
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -37,7 +38,7 @@ function Shell({ user, onLogout, children }) {
       </aside>
       <main className="main">
         <UploadBanner />
-        {children}
+        <div className="page" key={pathname}>{children}</div>
       </main>
     </div>
   );

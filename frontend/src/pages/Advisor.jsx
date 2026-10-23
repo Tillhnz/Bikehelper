@@ -1,19 +1,61 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { WEATHER_TEXT, api, fmtNum } from "../api.js";
+import { BIKE_TYPES, WEATHER_TEXT, api, fmtNum } from "../api.js";
+import BikeIllustration from "../components/BikeIllustration.jsx";
+import { GroupIcon, Segmented, Slider, StopSlider, Switch } from "../components/controls.jsx";
+import { CountUp, useTween } from "../components/motion.jsx";
 
-const STORE = "bikehelper_advisor";
+const STORE = "bikehelper_advisor_v2";
+const TYPICAL_WIDTH = { road: 28, gravel: 40, mtb: 58, other: 38 };
 
-function defaultStart() {
+const SURFACES = [
+  { value: "asphalt", label: "Glatter Asphalt", short: "Asphalt" },
+  { value: "rough", label: "Rauer Asphalt, Pflaster", short: "Rau" },
+  { value: "hardpack", label: "Fester Schotter, Waldweg", short: "Fest" },
+  { value: "gravel", label: "Lockerer Schotter", short: "Locker" },
+  { value: "chunky", label: "Grober Schotter, Trail", short: "Grob" },
+];
+const INTENSITIES = [
+  { value: "easy", label: "Locker", hint: "Grundlage oder Ausflug" },
+  { value: "normal", label: "Normal" },
+  { value: "hard", label: "Zügig", hint: "Intervalle, Rennen oder ein hartes Training" },
+];
+const SENSITIVITIES = [
+  { value: "cold", label: "Ich friere schnell", short: "Friert schnell" },
+  { value: "normal", label: "Normal" },
+  { value: "warm", label: "Ich schwitze schnell", short: "Schwitzt schnell" },
+];
+const RAINS = [
+  { value: "none", label: "Trocken" },
+  { value: "light", label: "Leichter Regen", short: "Schauer" },
+  { value: "heavy", label: "Regen" },
+];
+
+const pad = (n) => String(n).padStart(2, "0");
+const isoDay = (offset) => {
   const d = new Date();
-  if (d.getHours() >= 17) {
-    d.setDate(d.getDate() + 1);
-    d.setHours(9, 0, 0, 0);
-  } else {
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-  }
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const dayLabel = (offset) => {
+  if (offset === 0) return "Heute";
+  if (offset === 1) return "Morgen";
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" });
+};
+const fmtHour = (h) => `${pad(Math.floor(h))}:${h % 1 ? "30" : "00"} Uhr`;
+const fmtDur = (m) => {
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (!h) return `${r} Min.`;
+  return r ? `${h} Std. ${r} Min.` : `${h} Std.`;
+};
+
+function defaultWhen() {
+  const d = new Date();
+  if (d.getHours() >= 17) return { day: 1, hour: 9 };
+  return { day: 0, hour: Math.min(21, d.getHours() + 1) };
 }
 
 function loadSaved() {
@@ -24,79 +66,105 @@ function loadSaved() {
   }
 }
 
-const DURATIONS = [
-  [60, "1 Std."], [90, "1,5 Std."], [120, "2 Std."], [180, "3 Std."], [240, "4 Std."], [300, "5 Std."], [360, "6 Std."], [480, "8 Std."],
-];
+// ---------- Anzeigen ----------
 
-function WeatherCard({ w }) {
-  const text = WEATHER_TEXT(w.weather_code);
+const ARC = { cx: 60, cy: 60, r: 46, start: 135, sweep: 270 };
+const polar = (deg) => [ARC.cx + ARC.r * Math.cos((deg * Math.PI) / 180), ARC.cy + ARC.r * Math.sin((deg * Math.PI) / 180)];
+const ARC_PATH = (() => {
+  const [x0, y0] = polar(ARC.start);
+  const [x1, y1] = polar(ARC.start + ARC.sweep);
+  return `M${x0} ${y0} A${ARC.r} ${ARC.r} 0 1 1 ${x1} ${y1}`;
+})();
+const BAR_MIN = 0.5;
+const BAR_MAX = 8;
+
+function Dial({ label, bar, psi }) {
+  const frac = Math.min(1, Math.max(0, (bar - BAR_MIN) / (BAR_MAX - BAR_MIN)));
+  const shown = useTween(bar);
+  const [kx, ky] = polar(ARC.start);
+  const ticks = Array.from({ length: 16 }, (_, i) => i);
   return (
-    <section className="panel">
-      <h2>Wetter während der Tour</h2>
-      <p className="muted small">
-        {w.source === "forecast" ? "Vorhersage von Open-Meteo, Ortszeit des Startorts." : "Deine Angaben, ohne Vorhersage."}
-      </p>
-      <div className="kpis" style={{ marginBottom: 0 }}>
-        <div className="kpi">
-          <div className="kpi-value">{fmtNum(w.temp_avg, 0)}<small>°C</small></div>
-          <div className="kpi-label">
-            {w.temp_min != null && w.temp_max != null && Math.round(w.temp_min) !== Math.round(w.temp_max)
-              ? `${fmtNum(w.temp_min, 0)} bis ${fmtNum(w.temp_max, 0)} °C` : "Ø Temperatur"}{text ? ` · ${text}` : ""}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-value">{fmtNum(w.precip_mm)}<small>mm</small></div>
-          <div className="kpi-label">Regen{w.precip_prob != null ? ` · bis ${Math.round(w.precip_prob)} % Wahrscheinlichkeit` : ""}</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-value">{fmtNum(w.wind_kmh, 0)}<small>km/h</small></div>
-          <div className="kpi-label">Wind{w.gust_kmh != null ? ` · Böen bis ${fmtNum(w.gust_kmh, 0)}` : ""}</div>
-        </div>
-        {w.dark_minutes > 0 && (
-          <div className="kpi">
-            <div className="kpi-value">{Math.round(w.dark_minutes)}<small>min</small></div>
-            <div className="kpi-label">in der Dunkelheit</div>
-          </div>
-        )}
+    <div className="dial">
+      <svg viewBox="0 0 120 112" role="img" aria-label={`${label}: ${fmtNum(bar)} bar`}>
+        {ticks.map((i) => {
+          const a = ARC.start + (ARC.sweep * i) / 15;
+          const [ax, ay] = [ARC.cx + 54 * Math.cos((a * Math.PI) / 180), ARC.cy + 54 * Math.sin((a * Math.PI) / 180)];
+          const [bx, by] = [ARC.cx + (i % 5 === 0 ? 50 : 52) * Math.cos((a * Math.PI) / 180), ARC.cy + (i % 5 === 0 ? 50 : 52) * Math.sin((a * Math.PI) / 180)];
+          return <line key={i} x1={ax} y1={ay} x2={bx} y2={by} className="dial-tick" />;
+        })}
+        <path d={ARC_PATH} className="dial-track" />
+        <path d={ARC_PATH} className="dial-fill" pathLength="1" style={{ strokeDashoffset: 1 - frac }} />
+        <g className="dial-knob" style={{ transform: `rotate(${ARC.sweep * frac}deg)`, transformOrigin: `${ARC.cx}px ${ARC.cy}px` }}>
+          <circle cx={kx} cy={ky} r="5.5" />
+        </g>
+      </svg>
+      <div className="dial-read">
+        <span className="dial-label">{label}</span>
+        <span className="dial-num">{fmtNum(shown, 1)}<small>bar</small></span>
+        <span className="muted small">{psi} psi</span>
       </div>
-      {w.hours?.length > 0 && (
-        <div className="table-wrap" style={{ marginTop: "1rem" }}>
-          <table className="rides">
-            <thead>
-              <tr><th>Uhr</th><th className="num">°C</th><th className="num">Regen</th><th className="num">Wind</th><th>Wetter</th></tr>
-            </thead>
-            <tbody>
-              {w.hours.map((h) => (
-                <tr key={h.time}>
-                  <td>{h.time}</td>
-                  <td className="num">{fmtNum(h.temp, 0)}</td>
-                  <td className="num">{h.precip ? `${fmtNum(h.precip)} mm` : "–"}{h.pop != null ? ` (${h.pop} %)` : ""}</td>
-                  <td className="num">{fmtNum(h.wind, 0)}{h.gust ? ` / ${fmtNum(h.gust, 0)}` : ""}</td>
-                  <td>{WEATHER_TEXT(h.code) ?? "–"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    </div>
+  );
+}
+
+function TiresResult({ t, missing }) {
+  if (!t) {
+    return (
+      <section className="panel result-card">
+        <h2>Reifendruck</h2>
+        <p className="muted">
+          {missing.length ? `Dafür fehlt noch: ${missing.join(" und ")}. Stelle es links ein.` : "Stelle links Gewicht und Reifenbreite ein."}
+        </p>
+      </section>
+    );
+  }
+  const wet = { dry: "trocken", damp: "feucht", wet: "nass" }[t.wetness];
+  return (
+    <section className="panel result-card">
+      <h2>Reifendruck</h2>
+      <div className="dials">
+        <Dial label="Vorne" bar={t.front_bar} psi={t.front_psi} />
+        <Dial label="Hinten" bar={t.rear_bar} psi={t.rear_psi} />
+      </div>
+      <p className="muted small">
+        Gerechnet mit {fmtNum(t.system_kg)} kg Systemgewicht und {fmtNum(t.real_width_mm)} mm echter Reifenbreite, Straße {wet}. Ein Startwert:
+        Passe ihn um 0,1 bis 0,2 bar an, bis es sich richtig anfühlt.
+      </p>
+      {t.notes.length > 0 && <ul className="steps">{t.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+      {t.warnings.map((w) => <p key={w} className={/Hookless|niedrig|Mountain/.test(w) ? "error" : "muted small"}>{w}</p>)}
     </section>
   );
 }
 
-function ClothingCard({ c }) {
+const SCALE_MIN = -4;
+const SCALE_MAX = 30;
+
+function ThermoScale({ temp }) {
+  const pct = Math.min(100, Math.max(0, ((temp - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100));
   return (
-    <section className="panel advice">
+    <div className="thermo" role="img" aria-label={`Gefühlte Temperatur ${fmtNum(temp, 0)} Grad`}>
+      <div className="thermo-bar" />
+      <div className="thermo-marker" style={{ left: `${pct}%` }}>
+        <span>{fmtNum(temp, 0)} °C</span>
+      </div>
+      <div className="thermo-ends"><span>kalt</span><span>warm</span></div>
+    </div>
+  );
+}
+
+function ClothingResult({ c }) {
+  return (
+    <section className="panel result-card">
       <h2>Das ziehst du an</h2>
-      <p className="advice-headline">{c.headline}</p>
-      <p className="muted">
-        Gefühlt wie {fmtNum(c.effective_temp, 0)} °C für diese Fahrt · {c.top}, {c.legs.toLowerCase()}
-      </p>
+      <p className="advice-headline" key={c.headline}>{c.headline}</p>
+      <ThermoScale temp={c.effective_temp} />
+      <p className="muted small">Es fühlt sich für diese Fahrt an wie {fmtNum(c.effective_temp, 0)} °C. Oben {c.top.toLowerCase()}, unten {c.legs.toLowerCase()}.</p>
       {c.warnings.map((w) => <p key={w} className="error" role="alert">{w}</p>)}
       <div className="advice-groups">
-        {Object.entries(c.groups).map(([name, items]) => (
-          <div key={name} className="advice-group">
-            <h3>{name}</h3>
-            <ul>{items.map((i) => <li key={i}>{i}</li>)}</ul>
+        {Object.entries(c.groups).map(([name, items], i) => (
+          <div key={`${name}:${items.join("|")}`} className="advice-group" style={{ "--i": i }}>
+            <h3><GroupIcon name={name} />{name}</h3>
+            <ul>{items.map((it) => <li key={it}>{it}</li>)}</ul>
           </div>
         ))}
       </div>
@@ -110,47 +178,88 @@ function ClothingCard({ c }) {
   );
 }
 
-function TiresCard({ t, missing }) {
-  if (!t) {
-    return (
-      <section className="panel">
-        <h2>Reifendruck</h2>
-        <p className="muted">Für den Reifendruck fehlen noch: {missing.join(" und ")}. Trage sie oben ein.</p>
-      </section>
-    );
-  }
-  const wet = { dry: "trocken", damp: "feucht", wet: "nass" }[t.wetness];
+function WeatherStrip({ hours }) {
+  const temps = hours.map((h) => h.temp).filter((v) => v != null);
+  const lo = Math.min(...temps) - 3;
+  const hi = Math.max(...temps) + 3;
+  const maxRain = Math.max(0.5, ...hours.map((h) => h.precip || 0));
   return (
-    <section className="panel advice">
-      <h2>Reifendruck</h2>
-      <div className="pressure">
-        <div className="pressure-box">
-          <span className="pressure-label">Vorne</span>
-          <span className="pressure-bar">{fmtNum(t.front_bar)}<small>bar</small></span>
-          <span className="muted">{t.front_psi} psi</span>
+    <div className="scroll-x">
+    <div className="wx-strip" role="img" aria-label="Wetter Stunde für Stunde">
+      {hours.map((h, i) => (
+        <div key={h.time} className="wx-col" style={{ "--i": i }} title={`${h.time}: ${fmtNum(h.temp, 0)} °C, ${fmtNum(h.precip)} mm, Wind ${fmtNum(h.wind, 0)} km/h`}>
+          <span className="wx-temp">{fmtNum(h.temp, 0)}°</span>
+          <span className="wx-track"><span className="wx-bar" style={{ height: `${Math.max(8, ((h.temp - lo) / (hi - lo)) * 100)}%` }} /></span>
+          <span className="wx-rain"><span style={{ height: `${Math.min(100, ((h.precip || 0) / maxRain) * 100)}%` }} /></span>
+          <span className="wx-wind">{fmtNum(h.wind, 0)}</span>
+          <span className="wx-time">{h.time.slice(0, 2)}</span>
         </div>
-        <div className="pressure-box">
-          <span className="pressure-label">Hinten</span>
-          <span className="pressure-bar">{fmtNum(t.rear_bar)}<small>bar</small></span>
-          <span className="muted">{t.rear_psi} psi</span>
-        </div>
-      </div>
+      ))}
+    </div>
+    <p className="hint">Säulen zeigen die Temperatur, blaue Balken den Regen. Darunter stehen Wind in km/h und die Uhrzeit.</p>
+    </div>
+  );
+}
+
+function WeatherResult({ w }) {
+  const text = WEATHER_TEXT(w.weather_code);
+  return (
+    <section className="panel result-card">
+      <h2>Wetter während der Tour</h2>
       <p className="muted small">
-        Berechnet für {fmtNum(t.system_kg)} kg Systemgewicht (Fahrer, Rad, Gepäck), echte Reifenbreite {fmtNum(t.real_width_mm)} mm, Straße {wet}.
-        Als Startwert gedacht: Im Zweifel 0,1 bis 0,2 bar anpassen, bis es sich richtig anfühlt.
+        {w.source === "forecast" ? "Vorhersage von Open-Meteo, Ortszeit des Startorts." : "Deine Angaben, ohne Vorhersage."}
       </p>
-      {t.notes.length > 0 && <ul className="steps">{t.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
-      {t.warnings.map((w) => <p key={w} className={/Hookless|niedrig|Mountain/.test(w) ? "error" : "muted small"}>{w}</p>)}
+      <div className="kpis" style={{ marginBottom: 0 }}>
+        <div className="kpi">
+          <div className="kpi-value"><CountUp value={w.temp_avg} /><small>°C</small></div>
+          <div className="kpi-label">
+            {w.temp_min != null && w.temp_max != null && Math.round(w.temp_min) !== Math.round(w.temp_max)
+              ? `${fmtNum(w.temp_min, 0)} bis ${fmtNum(w.temp_max, 0)} °C` : "Ø Temperatur"}{text ? `, ${text}` : ""}
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-value"><CountUp value={w.precip_mm} digits={1} /><small>mm</small></div>
+          <div className="kpi-label">Regen{w.precip_prob != null ? `, bis ${Math.round(w.precip_prob)} % Wahrscheinlichkeit` : ""}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-value"><CountUp value={w.wind_kmh} /><small>km/h</small></div>
+          <div className="kpi-label">Wind{w.gust_kmh != null ? `, Böen bis ${fmtNum(w.gust_kmh, 0)}` : ""}</div>
+        </div>
+        {w.dark_minutes > 0 && (
+          <div className="kpi">
+            <div className="kpi-value"><CountUp value={Math.round(w.dark_minutes)} /><small>min</small></div>
+            <div className="kpi-label">in der Dunkelheit</div>
+          </div>
+        )}
+      </div>
+      {w.hours?.length > 0 && <WeatherStrip hours={w.hours} />}
     </section>
   );
 }
 
+// ---------- Rad wählen ----------
+
+function PickCard({ type, title, sub, selected, onClick, tireMm }) {
+  return (
+    <button type="button" role="radio" aria-checked={selected} className={`pick ${selected ? "on" : ""}`} onClick={onClick}>
+      <BikeIllustration type={type} tireMm={tireMm} className="pick-ill" />
+      <span className="pick-title">{title}</span>
+      {sub && <span className="pick-sub">{sub}</span>}
+    </button>
+  );
+}
+
+// ---------- Seite ----------
+
 export default function Advisor() {
   const saved = useMemo(loadSaved, []);
+  const when = useMemo(defaultWhen, []);
   const [defs, setDefs] = useState(null);
   const [form, setForm] = useState({
     bike_id: saved.bike_id ?? "",
-    start: defaultStart(),
+    bike_type: saved.bike_type ?? "road",
+    day: when.day,
+    hour: when.hour,
     duration_min: saved.duration_min ?? 120,
     intensity: saved.intensity ?? "normal",
     sensitivity: saved.sensitivity ?? "normal",
@@ -158,14 +267,13 @@ export default function Advisor() {
     surface: saved.surface ?? "asphalt",
     casing: saved.casing ?? "standard",
     wetness: "auto",
-    rider_kg: "",
+    rider_kg: saved.rider_kg ?? "",
     bike_kg: "",
     luggage_kg: saved.luggage_kg ?? 1.5,
-    tire_width_mm: "",
+    tire_width_mm: saved.tire_width_mm ?? TYPICAL_WIDTH[saved.bike_type ?? "road"],
     rim_inner_mm: "",
     tubeless: true,
     hookless: false,
-    bike_type: "road",
   });
   const [place, setPlace] = useState(saved.place ?? null); // {lat, lng, name}
   const [manual, setManual] = useState(!!saved.manual);
@@ -177,43 +285,127 @@ export default function Advisor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const reqId = useRef(0);
+
+  const patch = (p) => setForm((f) => ({ ...f, ...p }));
 
   useEffect(() => {
     api.get("/advisor/defaults").then((d) => {
       setDefs(d);
-      setForm((f) => ({ ...f, rider_kg: f.rider_kg || d.weight_kg || "" }));
-      if (!saved.place && d.last_location) {
-        setPlace({ ...d.last_location, name: "Ort deiner letzten Fahrt" });
-      }
+      setForm((f) => ({ ...f, rider_kg: f.rider_kg === "" ? (d.weight_kg ?? "") : f.rider_kg }));
+      if (!saved.place && d.last_location) setPlace({ ...d.last_location, name: "Ort deiner letzten Fahrt" });
       if (!d.weather_enabled) setManual(true);
     }).catch((e) => setError(e.message));
   }, [saved.place]);
 
-  // Rad gewählt: Reifendaten übernehmen
-  function pickBike(id) {
-    const b = defs?.bikes.find((x) => String(x.id) === String(id));
-    setForm((f) => ({
-      ...f,
-      bike_id: id,
-      ...(b ? {
-        bike_type: b.type,
-        tire_width_mm: b.tire_width_mm ?? "",
-        rim_inner_mm: b.rim_inner_mm ?? "",
-        bike_kg: b.bike_weight_kg ?? "",
-        tubeless: b.tubeless,
-        hookless: b.hookless,
-        surface: b.type === "gravel" && f.surface === "asphalt" ? "hardpack" : f.surface,
-      } : {}),
-    }));
+  function applyBike(b) {
+    patch({
+      bike_id: b.id,
+      bike_type: b.type,
+      tire_width_mm: b.tire_width_mm ?? TYPICAL_WIDTH[b.type] ?? 28,
+      rim_inner_mm: b.rim_inner_mm ?? "",
+      bike_kg: b.bike_weight_kg ?? "",
+      tubeless: b.tubeless,
+      hookless: b.hookless,
+      surface: b.type === "gravel" && form.surface === "asphalt" ? "hardpack" : form.surface,
+    });
   }
 
+  function pickOther() {
+    patch({ bike_id: "", bike_kg: "", rim_inner_mm: "", tubeless: true, hookless: false });
+  }
+
+  function pickType(type) {
+    patch({
+      bike_type: type,
+      tire_width_mm: TYPICAL_WIDTH[type],
+      surface: type === "gravel" && form.surface === "asphalt" ? "hardpack" : form.surface,
+    });
+  }
+
+  // gespeichertes Rad nach dem Laden der Daten übernehmen
+  const applied = useRef(false);
   useEffect(() => {
-    if (defs && form.bike_id && !form.tire_width_mm) pickBike(form.bike_id);
+    if (!defs || applied.current) return;
+    applied.current = true;
+    const b = defs.bikes.find((x) => String(x.id) === String(form.bike_id));
+    if (b) applyBike(b);
+    else if (form.bike_id) patch({ bike_id: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defs]);
 
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const num = (v) => (v === "" || v == null ? null : Number(v));
+
+  // Anfrage aus dem Formular; fehlt noch der Ort, gibt es keine
+  const request = useMemo(() => {
+    const date = isoDay(form.day);
+    const body = {
+      start: `${date}T${pad(Math.floor(form.hour))}:${form.hour % 1 ? "30" : "00"}:00`,
+      duration_min: Number(form.duration_min),
+      intensity: form.intensity,
+      sensitivity: form.sensitivity,
+      elevation_gain_m: num(form.elevation_gain_m),
+      bike_id: form.bike_id ? Number(form.bike_id) : null,
+      bike_type: form.bike_type,
+      rider_kg: num(form.rider_kg),
+      bike_kg: num(form.bike_kg),
+      luggage_kg: Number(form.luggage_kg) || 0,
+      tire_width_mm: num(form.tire_width_mm),
+      rim_inner_mm: num(form.rim_inner_mm),
+      tubeless: form.tubeless,
+      hookless: form.hookless,
+      casing: form.casing,
+      surface: form.surface,
+      wetness: form.wetness,
+    };
+    if (manual) {
+      body.manual = { temp_c: Number(manualWx.temp_c), wind_kmh: Number(manualWx.wind_kmh) || 0, rain: manualWx.rain };
+    } else if (place) {
+      body.lat = place.lat;
+      body.lng = place.lng;
+    } else {
+      return null;
+    }
+    return body;
+  }, [form, manual, manualWx, place]);
+
+  const requestKey = JSON.stringify(request);
+
+  // Ergebnis live nachführen, kurz nachdem sich ein Regler beruhigt hat
+  useEffect(() => {
+    if (!defs || !request) {
+      setResult(null);
+      return undefined;
+    }
+    const id = ++reqId.current;
+    setBusy(true);
+    const timer = setTimeout(async () => {
+      try {
+        const r = await api.post("/advisor/plan", request);
+        if (id !== reqId.current) return;
+        setResult(r);
+        setError("");
+      } catch (err) {
+        if (id !== reqId.current) return;
+        setError(err.message);
+        setResult(null);
+      } finally {
+        if (id === reqId.current) setBusy(false);
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey, defs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        bike_id: form.bike_id, bike_type: form.bike_type, duration_min: form.duration_min, intensity: form.intensity,
+        sensitivity: form.sensitivity, surface: form.surface, casing: form.casing, luggage_kg: form.luggage_kg,
+        rider_kg: form.rider_kg, tire_width_mm: form.tire_width_mm, place, manual, manualWx,
+      }));
+    } catch { /* ohne Speicher weiter */ }
+  }, [form, place, manual, manualWx]);
 
   async function search(e) {
     e.preventDefault();
@@ -247,225 +439,157 @@ export default function Advisor() {
     }
   }
 
-  async function submit(e) {
-    e.preventDefault();
-    setError("");
-    setNote("");
-    setBusy(true);
-    try {
-      const body = {
-        start: form.start.length === 16 ? `${form.start}:00` : form.start,
-        duration_min: Number(form.duration_min),
-        intensity: form.intensity,
-        sensitivity: form.sensitivity,
-        elevation_gain_m: num(form.elevation_gain_m),
-        bike_id: form.bike_id ? Number(form.bike_id) : null,
-        bike_type: form.bike_type,
-        rider_kg: num(form.rider_kg),
-        bike_kg: num(form.bike_kg),
-        luggage_kg: Number(form.luggage_kg) || 0,
-        tire_width_mm: num(form.tire_width_mm),
-        rim_inner_mm: num(form.rim_inner_mm),
-        tubeless: form.tubeless,
-        hookless: form.hookless,
-        casing: form.casing,
-        surface: form.surface,
-        wetness: form.wetness,
-      };
-      if (manual) {
-        body.manual = { temp_c: Number(manualWx.temp_c), wind_kmh: Number(manualWx.wind_kmh) || 0, rain: manualWx.rain };
-      } else {
-        if (!place) throw new Error("Bitte wähle einen Ort oder gib das Wetter von Hand ein.");
-        body.lat = place.lat;
-        body.lng = place.lng;
-      }
-      setResult(await api.post("/advisor/plan", body));
-      try {
-        localStorage.setItem(STORE, JSON.stringify({
-          bike_id: form.bike_id, duration_min: form.duration_min, intensity: form.intensity, sensitivity: form.sensitivity,
-          surface: form.surface, casing: form.casing, luggage_kg: form.luggage_kg, place, manual, manualWx,
-        }));
-      } catch { /* ohne Speicher weiter */ }
-    } catch (err) {
-      setError(err.message);
-      setResult(null);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (!defs && !error) return <p className="muted">Lade …</p>;
+
+  const bikes = defs?.bikes ?? [];
+  const showTypes = !form.bike_id;
 
   return (
     <>
       <header className="page-head"><h1>Ratgeber</h1></header>
-      <p className="muted">Sag BikeHelper, wann und wie lange du fahren willst. Du bekommst den passenden Reifendruck und eine Kleidungsempfehlung für das Wetter der Tour.</p>
+      <p className="muted lead">Stelle deine Tour ein. Reifendruck und Kleidung passen sich sofort an.</p>
 
-      <form className="panel" onSubmit={submit}>
-        <h2>Deine Tour</h2>
-        <div className="form-grid">
-          <label>
-            Rad
-            <select value={form.bike_id} onChange={(e) => pickBike(e.target.value)}>
-              <option value="">Ohne Rad (Angaben von Hand)</option>
-              {defs?.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Start (Ortszeit)
-            <input type="datetime-local" value={form.start} onChange={set("start")} required />
-          </label>
-          <label>
-            Dauer
-            <select value={form.duration_min} onChange={set("duration_min")}>
-              {DURATIONS.map(([m, l]) => <option key={m} value={m}>{l}</option>)}
-              {!DURATIONS.some(([m]) => m === Number(form.duration_min)) && <option value={form.duration_min}>{form.duration_min} Min.</option>}
-            </select>
-          </label>
-          <label>
-            Tempo
-            <select value={form.intensity} onChange={set("intensity")}>
-              <option value="easy">Locker, Grundlage oder Ausflug</option>
-              <option value="normal">Normal</option>
-              <option value="hard">Zügig oder hart (Intervalle, Rennen)</option>
-            </select>
-          </label>
-          <label>
-            Kälteempfinden
-            <select value={form.sensitivity} onChange={set("sensitivity")}>
-              <option value="cold">Ich friere schnell</option>
-              <option value="normal">Normal</option>
-              <option value="warm">Ich schwitze schnell</option>
-            </select>
-          </label>
-          <label>
-            Höhenmeter (optional)
-            <input type="number" min="0" step="50" value={form.elevation_gain_m} onChange={set("elevation_gain_m")} placeholder="z. B. 800" />
-          </label>
-        </div>
-
-        <h3 style={{ margin: "1.5rem 0 0.75rem" }}>Ort und Wetter</h3>
-        {!manual ? (
-          <>
-            <p>
-              {place ? <>Ort: <strong>{place.name}</strong> <span className="muted small">({place.lat}, {place.lng})</span></> : <span className="muted">Noch kein Ort gewählt.</span>}
-            </p>
-            <div className="inline-form" style={{ marginTop: 0 }}>
-              <label className="grow">
-                Ort suchen
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="z. B. Hamburg" />
-              </label>
-              <button type="button" className="btn" onClick={search} disabled={searching}>{searching ? "Suche …" : "Suchen"}</button>
-              <button type="button" className="btn" onClick={useMyLocation}>Mein Standort</button>
+      <div className="advisor">
+        <div className="advisor-controls">
+          <section className="panel stage">
+            <div className="pick-row" role="radiogroup" aria-label="Dein Rad">
+              {bikes.map((b) => (
+                <PickCard
+                  key={b.id} type={b.type} title={b.name} sub={BIKE_TYPES[b.type]} tireMm={b.tire_width_mm}
+                  selected={String(form.bike_id) === String(b.id)} onClick={() => applyBike(b)}
+                />
+              ))}
+              {bikes.length > 0 && (
+                <PickCard type={form.bike_id ? "other" : form.bike_type} title="Anderes Rad" sub="Radtyp wählen" selected={!form.bike_id} onClick={pickOther} />
+              )}
             </div>
-            {hits.length > 0 && (
-              <ul className="gear-list">
-                {hits.map((h) => (
-                  <li key={`${h.lat},${h.lng}`}>
-                    <span>{h.name}</span>
-                    <button type="button" className="btn small" onClick={() => { setPlace({ lat: Math.round(h.lat * 100) / 100, lng: Math.round(h.lng * 100) / 100, name: h.name }); setHits([]); setQuery(""); }}>Wählen</button>
-                  </li>
+            {showTypes && (
+              <div className="pick-row types" role="radiogroup" aria-label="Radtyp">
+                {Object.entries(BIKE_TYPES).map(([k, v]) => (
+                  <PickCard key={k} type={k} title={v} selected={form.bike_type === k} onClick={() => pickType(k)} />
                 ))}
-              </ul>
+              </div>
             )}
-            <p className="hint">Es werden nur der gerundete Ort und die Zeit an Open-Meteo gesendet. Die Vorhersage reicht 15 Tage voraus.</p>
-          </>
-        ) : (
-          <div className="form-grid">
-            <label>Temperatur (°C)<input type="number" step="0.5" value={manualWx.temp_c} onChange={(e) => setManualWx({ ...manualWx, temp_c: e.target.value })} required /></label>
-            <label>Wind (km/h)<input type="number" min="0" value={manualWx.wind_kmh} onChange={(e) => setManualWx({ ...manualWx, wind_kmh: e.target.value })} /></label>
-            <label>
-              Regen
-              <select value={manualWx.rain} onChange={(e) => setManualWx({ ...manualWx, rain: e.target.value })}>
-                <option value="none">Trocken</option>
-                <option value="light">Leichter Regen oder Schauer</option>
-                <option value="heavy">Regen</option>
-              </select>
-            </label>
-          </div>
-        )}
-        {defs?.weather_enabled && (
-          <label className="check" style={{ marginTop: "0.75rem" }}>
-            <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} />
-            Wetter selbst eingeben, statt die Vorhersage zu nutzen
-          </label>
-        )}
 
-        <h3 style={{ margin: "1.5rem 0 0.75rem" }}>Reifen und Gewicht</h3>
-        <div className="form-grid">
-          <label>
-            Dein Gewicht (kg)
-            <input type="number" min="30" max="250" step="0.5" value={form.rider_kg} onChange={set("rider_kg")} placeholder="z. B. 75" />
-            <button type="button" className="link small" onClick={saveWeight} style={{ textAlign: "left" }}>Im Profil speichern</button>
-          </label>
-          <label>
-            Rad (kg)
-            <input type="number" min="3" max="40" step="0.1" value={form.bike_kg} onChange={set("bike_kg")} placeholder="Leer = typisch für den Radtyp" />
-          </label>
-          <label>
-            Gepäck, Flaschen, Kleidung (kg)
-            <input type="number" min="0" step="0.5" value={form.luggage_kg} onChange={set("luggage_kg")} />
-          </label>
-          <label>
-            Reifenbreite (mm)
-            <input type="number" min="18" max="80" value={form.tire_width_mm} onChange={set("tire_width_mm")} placeholder="z. B. 28" />
-          </label>
-          <label>
-            Innenweite der Felge (mm)
-            <input type="number" min="12" max="40" step="0.5" value={form.rim_inner_mm} onChange={set("rim_inner_mm")} placeholder="Leer = typisch" />
-          </label>
-          <label>
-            Untergrund
-            <select value={form.surface} onChange={set("surface")}>
-              <option value="asphalt">Glatter Asphalt</option>
-              <option value="rough">Rauer Asphalt, Pflaster</option>
-              <option value="hardpack">Fester Schotter, Waldweg</option>
-              <option value="gravel">Lockerer Schotter</option>
-              <option value="chunky">Grober Schotter, Trail</option>
-            </select>
-          </label>
-          <label>
-            Reifenkarkasse
-            <select value={form.casing} onChange={set("casing")}>
-              <option value="supple">Dünn, geschmeidig (Rennreifen)</option>
-              <option value="standard">Normal</option>
-              <option value="stiff">Pannenschutz, steif</option>
-            </select>
-          </label>
-          <label>
-            Straße
-            <select value={form.wetness} onChange={set("wetness")}>
-              <option value="auto">Nach dem Wetter</option>
-              <option value="dry">Trocken</option>
-              <option value="damp">Feucht</option>
-              <option value="wet">Nass</option>
-            </select>
-          </label>
-          <div className="checks">
-            <label className="check"><input type="checkbox" checked={form.tubeless} onChange={(e) => setForm({ ...form, tubeless: e.target.checked })} /> Tubeless</label>
-            <label className="check"><input type="checkbox" checked={form.hookless} onChange={(e) => setForm({ ...form, hookless: e.target.checked })} /> Hookless-Felgen</label>
-          </div>
+            <div className="stage-view">
+              <BikeIllustration type={form.bike_type} tireMm={form.tire_width_mm} ground={form.surface} ride className="stage-ill" title={`${BIKE_TYPES[form.bike_type]} auf ${SURFACES.find((s) => s.value === form.surface)?.label}`} />
+            </div>
+
+            <div className="stage-controls">
+              <Slider label="Reifenbreite" value={form.tire_width_mm} onChange={(v) => patch({ tire_width_mm: v })} min={23} max={65} format={(v) => `${v} mm`} marks={["23", "35", "50", "65"]} />
+              <StopSlider label="Untergrund" value={form.surface} onChange={(v) => patch({ surface: v })} options={SURFACES} />
+            </div>
+            {bikes.length === 0 && <p className="hint">Tipp: Lege in der <Link to="/">Garage</Link> ein Rad mit Reifenbreite an, dann füllt sich vieles von selbst.</p>}
+          </section>
+
+          <section className="panel">
+            <h2>Die Tour</h2>
+            <div className="field-label">Tag</div>
+            <div className="chips" role="radiogroup" aria-label="Tag">
+              {Array.from({ length: 7 }, (_, i) => (
+                <button key={i} type="button" role="radio" aria-checked={form.day === i} className={`chip ${form.day === i ? "on" : ""}`} onClick={() => patch({ day: i })}>
+                  {dayLabel(i)}
+                </button>
+              ))}
+            </div>
+            <div className="slider-stack">
+              <Slider label="Start" value={form.hour} onChange={(v) => patch({ hour: v })} min={0} max={23.5} step={0.5} format={fmtHour} />
+              <Slider label="Dauer" value={form.duration_min} onChange={(v) => patch({ duration_min: v })} min={30} max={600} step={15} format={fmtDur} marks={["30 Min.", "5 Std.", "10 Std."]} />
+              <StopSlider label="Tempo" value={form.intensity} onChange={(v) => patch({ intensity: v })} options={INTENSITIES} />
+              <StopSlider label="Kälteempfinden" value={form.sensitivity} onChange={(v) => patch({ sensitivity: v })} options={SENSITIVITIES} />
+              <Slider label="Höhenmeter" optional autoText="nicht angegeben" fallback={0} value={form.elevation_gain_m} onChange={(v) => patch({ elevation_gain_m: v })} min={0} max={3000} step={50} format={(v) => `${v} m`} />
+            </div>
+          </section>
+
+          <section className="panel">
+            <h2>Ort und Wetter</h2>
+            {!manual ? (
+              <>
+                <p className="place">
+                  {place ? <><strong>{place.name}</strong> <span className="muted small">({place.lat}, {place.lng})</span></> : <span className="muted">Noch kein Ort gewählt.</span>}
+                </p>
+                <form className="search-row" onSubmit={search}>
+                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ort suchen, z. B. Hamburg" aria-label="Ort suchen" />
+                  <button className="btn" disabled={searching}>{searching ? "Suche …" : "Suchen"}</button>
+                  <button type="button" className="btn" onClick={useMyLocation}>Mein Standort</button>
+                </form>
+                {hits.length > 0 && (
+                  <ul className="gear-list">
+                    {hits.map((h) => (
+                      <li key={`${h.lat},${h.lng}`}>
+                        <span>{h.name}</span>
+                        <button type="button" className="btn small" onClick={() => { setPlace({ lat: Math.round(h.lat * 100) / 100, lng: Math.round(h.lng * 100) / 100, name: h.name }); setHits([]); setQuery(""); }}>Wählen</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="hint">Es werden nur der gerundete Ort und die Zeit an Open-Meteo gesendet. Die Vorhersage reicht 15 Tage voraus.</p>
+              </>
+            ) : (
+              <div className="slider-stack">
+                <Slider label="Temperatur" value={Number(manualWx.temp_c)} onChange={(v) => setManualWx({ ...manualWx, temp_c: v })} min={-15} max={40} step={0.5} format={(v) => `${fmtNum(v)} °C`} />
+                <Slider label="Wind" value={Number(manualWx.wind_kmh)} onChange={(v) => setManualWx({ ...manualWx, wind_kmh: v })} min={0} max={70} step={1} format={(v) => `${v} km/h`} />
+                <StopSlider label="Regen" value={manualWx.rain} onChange={(v) => setManualWx({ ...manualWx, rain: v })} options={RAINS} />
+              </div>
+            )}
+            {defs?.weather_enabled && (
+              <div style={{ marginTop: "1rem" }}>
+                <Switch checked={manual} onChange={setManual}>Wetter selbst einstellen, statt die Vorhersage zu nutzen</Switch>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <h2>Gewicht und Reifen</h2>
+            <div className="slider-stack">
+              <Slider label="Dein Gewicht" optional autoText="noch nicht angegeben" fallback={75} value={form.rider_kg} onChange={(v) => patch({ rider_kg: v })} min={40} max={140} step={0.5} format={(v) => `${fmtNum(v)} kg`} />
+              {form.rider_kg !== "" && <button type="button" className="link small save-weight" onClick={saveWeight}>Im Profil speichern</button>}
+              <Slider label="Gepäck, Flaschen, Kleidung" value={Number(form.luggage_kg)} onChange={(v) => patch({ luggage_kg: v })} min={0} max={12} step={0.5} format={(v) => `${fmtNum(v)} kg`} />
+              <Slider label="Gewicht des Rads" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "mtb" ? 13 : 9} value={form.bike_kg} onChange={(v) => patch({ bike_kg: v })} min={6} max={22} step={0.1} format={(v) => `${fmtNum(v)} kg`} />
+              <Slider label="Innenweite der Felge" optional autoText="typisch für den Radtyp" fallback={form.bike_type === "road" ? 19 : 24} value={form.rim_inner_mm} onChange={(v) => patch({ rim_inner_mm: v })} min={15} max={32} step={0.5} format={(v) => `${fmtNum(v)} mm`} />
+            </div>
+            <Segmented
+              label="Reifenkarkasse"
+              value={form.casing}
+              onChange={(v) => patch({ casing: v })}
+              options={[{ value: "supple", label: "Dünn, geschmeidig" }, { value: "standard", label: "Normal" }, { value: "stiff", label: "Pannenschutz" }]}
+            />
+            <Segmented
+              label="Straße"
+              value={form.wetness}
+              onChange={(v) => patch({ wetness: v })}
+              options={[{ value: "auto", label: "Nach Wetter" }, { value: "dry", label: "Trocken" }, { value: "damp", label: "Feucht" }, { value: "wet", label: "Nass" }]}
+            />
+            <div className="switch-row">
+              <Switch checked={form.tubeless} onChange={(v) => patch({ tubeless: v })}>Tubeless</Switch>
+              <Switch checked={form.hookless} onChange={(v) => patch({ hookless: v })}>Hookless-Felgen</Switch>
+            </div>
+          </section>
         </div>
-        {defs && defs.bikes.length === 0 && <p className="hint">Tipp: Lege in der <Link to="/">Garage</Link> ein Rad mit Reifenbreite an, dann füllt sich vieles von selbst.</p>}
 
-        {error && <p className="error" role="alert">{error}</p>}
-        {note && <p className="ok" role="status">{note}</p>}
-        <div className="actions">
-          <button className="btn primary" disabled={busy}>{busy ? "Berechne …" : "Empfehlung berechnen"}</button>
+        <div className={`advisor-results ${busy ? "is-busy" : ""}`} aria-live="polite">
+          {error && <p className="error" role="alert">{error}</p>}
+          {note && <p className="ok" role="status">{note}</p>}
+          {!request && !manual && (
+            <section className="panel result-card">
+              <h2>Wo fährst du?</h2>
+              <p className="muted">Wähle einen Ort, damit BikeHelper das Wetter der Tour abfragen kann. Oder stelle das Wetter selbst ein.</p>
+            </section>
+          )}
+          {result && (
+            <>
+              <TiresResult t={result.tires} missing={result.tires_missing} />
+              <ClothingResult c={result.clothing} />
+              <WeatherResult w={result.weather} />
+              <p className="muted small">
+                Alle Werte sind Richtwerte. Reifendruck: Formel nach Frank Bertos 15-%-Regel mit Zuschlägen für Untergrund und Nässe.
+                Kleidung: Mittel aus gängigen Temperaturtabellen. Die Quellen stehen in der README.
+              </p>
+            </>
+          )}
+          {request && !result && !error && <p className="muted">Berechne …</p>}
         </div>
-      </form>
-
-      {result && (
-        <>
-          <ClothingCard c={result.clothing} />
-          <TiresCard t={result.tires} missing={result.tires_missing} />
-          <WeatherCard w={result.weather} />
-          <p className="muted small">
-            Alle Werte sind Richtwerte. Reifendruck: Formel nach Frank Bertos 15-%-Regel mit Zuschlägen für Untergrund und Nässe.
-            Kleidung: Mittel aus gängigen Temperaturtabellen. Die Quellen stehen in der README.
-          </p>
-        </>
-      )}
+      </div>
     </>
   );
 }

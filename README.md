@@ -32,6 +32,8 @@ Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413�
 
 Die Seite „Ratgeber“ beantwortet für die nächste Tour zwei Fragen. Du wählst Rad, Start, Dauer, Tempo und Ort. Das Wetter kommt aus der 15-Tage-Vorhersage von Open-Meteo (nur gerundeter Ort und Zeit werden gesendet) oder von Hand.
 
+Die Oberfläche arbeitet mit Reglern und Bildkarten: Du wählst dein Rad (oder einen Radtyp) als Zeichnung, stellst Reifenbreite, Untergrund, Start, Dauer, Tempo und Gewicht per Schieberegler ein, und Reifendruck, Kleidung und Wetter passen sich sofort an. Die Garage zeigt jedes Rad als schlichte Strichzeichnung je nach Typ (Rennrad, Gravel, Mountainbike, Sonstiges). Bewegung (Zeichnen, rollender Kilometerzähler, Messuhren) wird abgeschaltet, wenn dein System „Bewegung reduzieren“ eingestellt hat.
+
 **Reifendruck** aus Gewicht, Reifenbreite und Untergrund:
 - Grundformel nach Frank Bertos 15-%-Regel, als Formel gefasst von BikeLab: `P = 600 · L / W² + 0,75 · W − 25` (psi, L Last pro Rad in lb, W echte Reifenbreite in mm), laut Quelle auf etwa ±2 psi genau. Hinten wird direkt gerechnet, vorn sind es 93 %. Das Hinterrad trägt bei Rennrädern 60 %, bei Gravel und MTB 55 % des Systemgewichts.
 - Zu- und Abschläge: Untergrund (fester Schotter −9 %, lockerer −17,5 %, grober −33 %, rauer Asphalt −5 %, nach SILCA und BikeLab), Schlauch +5 %, weiche Karkasse −5 %, steife +5 %, feuchte Straße −5 %, nasse −10 % (Continental nennt rund 10 % weniger bei Regen).

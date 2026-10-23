@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BIKE_TYPES, api } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
+import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
@@ -135,7 +136,7 @@ export default function Garage() {
         </EmptyState>
       ) : (
         <div className="bike-grid">
-          {active.map((b) => <BikeCard key={b.id} bike={b} />)}
+          {active.map((b, i) => <BikeCard key={b.id} bike={b} index={i} />)}
         </div>
       )}
 
@@ -143,7 +144,7 @@ export default function Garage() {
         <>
           <h2 className="section-title">Ausgemustert</h2>
           <div className="bike-grid">
-            {retired.map((b) => <BikeCard key={b.id} bike={b} />)}
+            {retired.map((b, i) => <BikeCard key={b.id} bike={b} index={i} />)}
           </div>
         </>
       )}
@@ -151,9 +152,12 @@ export default function Garage() {
   );
 }
 
-function BikeCard({ bike }) {
+function BikeCard({ bike, index = 0 }) {
   return (
-    <Link to={`/bikes/${bike.id}`} className={`bike-card ${bike.retired ? "retired" : ""}`}>
+    <Link to={`/bikes/${bike.id}`} className={`bike-card ${bike.retired ? "retired" : ""}`} style={{ "--i": index }}>
+      <div className="bike-card-art">
+        <BikeIllustration type={bike.type} tireMm={bike.tire_width_mm} title={BIKE_TYPES[bike.type] ?? "Rad"} />
+      </div>
       <div className="bike-card-head">
         <h3>{bike.name}</h3>
         <span className="muted small">

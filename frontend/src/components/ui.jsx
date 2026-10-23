@@ -1,12 +1,29 @@
+import { useEffect, useState } from "react";
 import { STATUS_LABEL } from "../api.js";
 
-/** Kilometerzähler im Odometer-Stil: jede Ziffer in eigener Kachel. */
+function Digit({ value, order }) {
+  // Startet auf 0 und rollt nach dem ersten Zeichnen auf die Zielziffer
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(value));
+    return () => cancelAnimationFrame(id);
+  }, [value]);
+  return (
+    <span className="odo-digit" aria-hidden="true">
+      <span className="odo-strip" style={{ "--d": shown, "--n": order }}>
+        {Array.from({ length: 10 }, (_, n) => <span key={n}>{n}</span>)}
+      </span>
+    </span>
+  );
+}
+
+/** Kilometerzähler im Odometer-Stil: jede Ziffer rollt wie ein mechanisches Zählwerk. */
 export function Odometer({ km, size = "lg" }) {
   const digits = String(Math.round(km ?? 0)).padStart(5, "0").split("");
   return (
     <div className={`odo odo-${size}`} aria-label={`${Math.round(km ?? 0)} Kilometer`} role="img">
       {digits.map((d, i) => (
-        <span key={i} className="odo-digit">{d}</span>
+        <Digit key={i} value={Number(d)} order={i} />
       ))}
       <span className="odo-unit">km</span>
     </div>
@@ -27,7 +44,7 @@ export function Gauge({ progress = 0, status = "ok" }) {
       aria-label="Verbrauchtes Wartungsintervall"
     >
       {Array.from({ length: ticks }, (_, i) => (
-        <span key={i} className={i < filled ? "tick on" : "tick"} />
+        <span key={i} className={i < filled ? "tick on" : "tick"} style={{ "--i": i }} />
       ))}
     </div>
   );
