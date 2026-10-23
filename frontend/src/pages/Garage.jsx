@@ -6,7 +6,7 @@ import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
-  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, chain_lube: "oil", tubeless: true, hookless: false });
+  const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, purchased_at: "", chain_lube: "oil", tubeless: true, hookless: false });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 

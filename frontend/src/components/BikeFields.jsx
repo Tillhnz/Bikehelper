@@ -18,6 +18,11 @@ export default function BikeFields({ form, setForm }) {
         Reifenbreite und Tubeless übernimmt das Rad vom montierten Reifensatz. Du legst die Sätze auf der Seite des Rades unter „Reifen“ an.
       </p>
       <label>
+        Kaufdatum
+        <input type="date" value={form.purchased_at ?? ""} onChange={set("purchased_at")} />
+        <span className="hint">Teile ohne eigenes Einbaudatum zählen ab diesem Tag.</span>
+      </label>
+      <label>
         Innenweite der Felge (mm)
         <input type="number" min="12" max="40" step="0.5" value={form.rim_inner_mm ?? ""} onChange={set("rim_inner_mm")} placeholder="z. B. 21" />
         <span className="hint">Leer lassen, wenn unbekannt.</span>
@@ -43,6 +48,7 @@ export function bikePayload(form) {
     brand: form.brand || null,
     model: form.model || null,
     start_km: Number(form.start_km) || 0,
+    purchased_at: form.purchased_at || null,
     chain_lube: form.chain_lube === "wax" || form.chain_lube === "hot_wax" || form.chain_lube === "drip_wax" ? "wax" : "oil",
     tire_width_mm: num(form.tire_width_mm),
     rim_inner_mm: num(form.rim_inner_mm),

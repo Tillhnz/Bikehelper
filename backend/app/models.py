@@ -49,6 +49,7 @@ class Bike(Base):
     strava_gear_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     retired: Mapped[bool] = mapped_column(Boolean, default=False)
+    purchased_at: Mapped[date | None] = mapped_column(Date, nullable=True)  # Kaufdatum; gilt als Einbaudatum für Teile ohne eigenes Datum
     # Kette und Ratgeber
     chain_lube: Mapped[str | None] = mapped_column(String(12), nullable=True)  # oil | wax, leer = oil
     tire_width_mm: Mapped[float | None] = mapped_column(Float, nullable=True)   # aufgezogene Reifenbreite laut Aufdruck

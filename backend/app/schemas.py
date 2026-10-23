@@ -49,6 +49,7 @@ class BikeIn(BaseModel):
     strava_gear_id: str | None = None
     notes: str | None = None
     retired: bool = False
+    purchased_at: date | None = None  # Kaufdatum des Rades
     chain_lube: Literal["oil", "wax"] | None = "oil"
     tire_width_mm: float | None = Field(default=None, ge=18, le=80)
     rim_inner_mm: float | None = Field(default=None, ge=12, le=40)
@@ -88,6 +89,8 @@ class ComponentIn(BaseModel):
 
 
 class ComponentOut(ComponentIn):
+    installed_effective: date | None = None  # eigenes Einbaudatum, sonst das Kaufdatum des Rades
+    installed_inherited: bool = False
     id: int
     km: float
     status: str  # ok, soon, due

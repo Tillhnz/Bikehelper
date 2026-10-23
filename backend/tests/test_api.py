@@ -386,3 +386,31 @@ def test_inventory_install_replaces_part_and_counts_down():
         assert c.post(f"/api/inventory/{item['id']}/install", headers=h, json={"bike_id": bike["id"], "installed_at": date.today().isoformat()}).status_code == 409
         other = _user(c, "inv2@example.com")
         assert c.delete(f"/api/inventory/{item['id']}", headers=other).status_code == 404
+
+
+def test_bike_purchase_date_is_install_date_fallback():
+    with TestClient(app) as c:
+        h = _user(c, "buy@example.com")
+        uid = c.get("/api/me", headers=h).json()["id"]
+        bought = date.today() - timedelta(days=40)
+        bike = c.post("/api/bikes", headers=h, json={"name": "Neu", "type": "road", "with_defaults": False,
+                                                    "purchased_at": bought.isoformat()}).json()
+        assert bike["purchased_at"] == bought.isoformat()
+        comp = c.post("/api/components", headers=h, json={"bike_id": bike["id"], "category": "chain", "name": "Kette"}).json()
+        assert comp["installed_at"] is None and comp["installed_inherited"] is True
+        assert comp["installed_effective"] == bought.isoformat()
+        rule = c.post(f"/api/components/{comp['id']}/rules", headers=h, json={"label": "Wechseln", "interval_km": 1000}).json()
+        with SessionLocal() as db:
+            db.add(Activity(user_id=uid, bike_id=bike["id"], name="alt", distance_km=100.0,
+                            start_date=datetime.combine(bought - timedelta(days=5), datetime.min.time())))
+            db.add(Activity(user_id=uid, bike_id=bike["id"], name="neu", distance_km=60.0,
+                            start_date=datetime.combine(bought + timedelta(days=3), datetime.min.time())))
+            db.commit()
+        state = [r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json() if r["id"] == rule["id"]][0]
+        assert state["km_since"] == 60.0 and state["status"] != "unknown"  # Fahrten vor dem Kauf zählen nicht
+        # eigenes Einbaudatum hat Vorrang
+        own = date.today() - timedelta(days=1)
+        body = {k: v for k, v in comp.items() if k not in ("id", "km", "status", "installed_effective", "installed_inherited")}
+        body["installed_at"] = own.isoformat()
+        upd = c.put(f"/api/components/{comp['id']}", headers=h, json=body).json()
+        assert upd["installed_effective"] == own.isoformat() and upd["installed_inherited"] is False

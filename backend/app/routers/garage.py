@@ -12,7 +12,7 @@ from ..schemas import (
 from ..security import current_user
 from ..services import (
     apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
-    measurement_points,
+    effective_installed, measurement_points,
     rule_state, tire_set_km, worst_status,
 )
 
@@ -49,7 +49,7 @@ def _bike_out(db: Session, bike: Bike) -> BikeOut:
     return BikeOut(
         id=bike.id, name=bike.name, type=bike.type, brand=bike.brand, model=bike.model,
         year=bike.year, start_km=bike.start_km, strava_gear_id=bike.strava_gear_id,
-        notes=bike.notes, retired=bike.retired,
+        notes=bike.notes, retired=bike.retired, purchased_at=bike.purchased_at,
         chain_lube=bike.chain_lube or "oil", tire_width_mm=bike.tire_width_mm, rim_inner_mm=bike.rim_inner_mm,
         bike_weight_kg=bike.bike_weight_kg, tubeless=True if bike.tubeless is None else bike.tubeless,
         hookless=bool(bike.hookless),
@@ -66,6 +66,7 @@ def _component_out(db: Session, c: Component) -> ComponentOut:
         id=c.id, bike_id=c.bike_id, category=c.category, name=c.name, brand=c.brand,
         installed_at=c.installed_at, retired_at=c.retired_at, start_km=c.start_km, notes=c.notes,
         wear_limit_pct=c.wear_limit_pct, km=round(component_km(db, c), 1), status=component_status(db, c),
+        installed_effective=effective_installed(c), installed_inherited=not c.installed_at and effective_installed(c) is not None,
     )
 
 

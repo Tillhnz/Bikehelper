@@ -14,7 +14,7 @@ function ruleIntervalText(r) {
 
 function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
   const [form, setForm] = useState({
-    category: "chain", name: "", brand: "", installed_at: today(), start_km: 0, withRules: true,
+    category: "chain", name: "", brand: "", installed_at: "", start_km: 0, withRules: true,
   });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -66,6 +66,7 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
       <label>
         Eingebaut am
         <input type="date" value={form.installed_at} onChange={set("installed_at")} />
+        <span className="hint">Leer lassen, dann gilt das Kaufdatum des Rades.</span>
       </label>
       <label>
         Kilometer vor dem Einbau
@@ -315,7 +316,7 @@ function ComponentCard({ comp, onChanged }) {
     });
 
   const retired = !!comp.retired_at;
-  const noDate = !comp.installed_at;
+  const noDate = !comp.installed_effective;
 
   return (
     <article className={`component ${retired ? "retired" : ""}`}>
@@ -332,7 +333,7 @@ function ComponentCard({ comp, onChanged }) {
       </header>
       <p className="muted small">
         {comp.brand ? `${comp.brand} · ` : ""}
-        {noDate ? "Einbaudatum unbekannt" : `eingebaut am ${fmtDate(comp.installed_at)}`}
+        {noDate ? "Einbaudatum unbekannt" : comp.installed_inherited ? `seit dem Kauf des Rades am ${fmtDate(comp.installed_effective)}` : `eingebaut am ${fmtDate(comp.installed_at)}`}
         {retired ? `, ausgemustert am ${fmtDate(comp.retired_at)}` : ""}
       </p>
 
@@ -384,7 +385,7 @@ function ComponentCard({ comp, onChanged }) {
           <button className="btn primary">Datum speichern</button>
           {comp.installed_at && <button type="button" className="btn" onClick={clearInstallDate}>Datum entfernen</button>}
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
-          <p className="hint span-all">Ohne Einbaudatum zählt BikeHelper erst ab der nächsten eingetragenen Wartung.</p>
+          <p className="hint span-all">Ohne eigenes Einbaudatum gilt das Kaufdatum des Rades, und ohne beides zählt BikeHelper erst ab der nächsten eingetragenen Wartung.</p>
         </form>
       )}
 
@@ -549,6 +550,7 @@ export default function BikeDetail() {
           <p className="muted">
             {BIKE_TYPES[bike.type] ?? bike.type}
             {bike.brand ? ` · ${bike.brand}` : ""}{bike.model ? ` ${bike.model}` : ""}
+            {bike.purchased_at ? ` · gekauft am ${fmtDate(bike.purchased_at)}` : ""}
             {bike.retired ? " · ausgemustert" : ""}
           </p>
           <p className="muted small">

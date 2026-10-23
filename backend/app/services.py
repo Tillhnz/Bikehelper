@@ -67,8 +67,15 @@ def bike_total_km(db: Session, bike: Bike) -> float:
     return bike.start_km + km_between(db, bike.id, None)
 
 
+def effective_installed(comp: Component) -> date | None:
+    """Einbaudatum der Komponente; ohne eigenes Datum gilt das Kaufdatum des Rades."""
+    if comp.installed_at:
+        return comp.installed_at
+    return comp.bike.purchased_at if comp.bike is not None else None
+
+
 def component_km(db: Session, comp: Component) -> float:
-    return comp.start_km + km_between(db, comp.bike_id, comp.installed_at, comp.retired_at)
+    return comp.start_km + km_between(db, comp.bike_id, effective_installed(comp), comp.retired_at)
 
 
 def months_between(start: date, end: date) -> float:
@@ -93,7 +100,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     last = entry.performed_at if entry else None
     variant = entry.variant if entry and rule.label == WAX_LUBE_LABEL else None
     interval_km = wax_interval_km(rule.label, variant, rule.interval_km)
-    base = last or comp.installed_at
+    base = last or effective_installed(comp)
     # Mit Uhrzeit zählen nur Fahrten, die nach der Wartung begannen; ohne Uhrzeit der ganze Tag
     since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
     if base is None:
@@ -317,7 +324,7 @@ def measurement_points(db: Session, comp: Component) -> list[dict]:
     """Messwerte mit den bis dahin gefahrenen Kilometern der Kette (für Liste und Diagramm)."""
     rule = next((r for r in comp.rules if r.label == CHAIN_WEAR_LABEL), None)
     entry = last_log(comp, rule) if rule else None
-    base = comp.installed_at if entry is None else entry.performed_at
+    base = effective_installed(comp) if entry is None else entry.performed_at
     out = []
     since = entry.performed_at if entry else None
     for m in sorted(comp.measurements, key=lambda m: (m.measured_at, m.id)):
