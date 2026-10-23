@@ -126,3 +126,12 @@ def test_map_settings():
 
         gone = c.put("/api/settings/map", headers=h, json={"carto_api_key": ""}).json()
         assert gone["provider"] == "osm" and not gone["has_user_key"]
+
+
+def test_active_import_route_is_not_taken_for_a_job_id():
+    with TestClient(app) as c:
+        c.post("/api/auth/register", json={"email": "imp@example.com", "password": "geheim1234"})
+        t = c.post("/api/auth/login", json={"email": "imp@example.com", "password": "geheim1234"}).json()["access_token"]
+        h = {"Authorization": f"Bearer {t}"}
+        assert c.get("/api/imports/active", headers=h).json() == {"job": None}
+        assert c.get("/api/imports/unbekannt", headers=h).status_code == 404

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
+import { dismiss, isBusy, startFileImport, startStravaImport, useUploads } from "../uploads.js";
 
 // ---------- Hilfsbausteine ----------
 
@@ -73,68 +74,20 @@ function ResultSummary({ s }) {
 
 // ---------- Strava-Export ----------
 
-function StravaImport({ onDone }) {
+function StravaImport() {
   const [files, setFiles] = useState([]);
   const [createBikes, setCreateBikes] = useState(true);
-  const [phase, setPhase] = useState("idle"); // idle | uploading | processing | done | error
-  const [uploadPct, setUploadPct] = useState(0);
-  const [jobId, setJobId] = useState(null);
-  const [job, setJob] = useState(null);
-  const [error, setError] = useState("");
+  const { strava } = useUploads();
+  const { phase, pct: uploadPct, job, error } = strava;
 
-  useEffect(() => {
-    if (!jobId) return undefined;
-    let stop = false;
-    let timer;
-    const tick = async () => {
-      try {
-        const j = await api.get(`/imports/${jobId}`);
-        if (stop) return;
-        setJob(j);
-        if (j.status === "running") {
-          timer = setTimeout(tick, 1500);
-        } else if (j.status === "done") {
-          setPhase("done");
-          onDone();
-        } else {
-          setPhase("error");
-          setError(j.error || "Der Import ist fehlgeschlagen.");
-          onDone();
-        }
-      } catch (err) {
-        if (!stop) {
-          setPhase("error");
-          setError(err.message);
-        }
-      }
-    };
-    timer = setTimeout(tick, 300);
-    return () => { stop = true; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId]);
-
-  async function start(e) {
+  function start(e) {
     e.preventDefault();
     if (!files.length) return;
-    setError("");
-    setJob(null);
-    setJobId(null);
-    setUploadPct(0);
-    setPhase("uploading");
-    try {
-      const fd = new FormData();
-      fd.append("file", files[0]);
-      fd.append("create_bikes", createBikes ? "true" : "false");
-      const { job_id } = await upload("/imports/strava-export", fd, setUploadPct);
-      setPhase("processing");
-      setJobId(job_id);
-    } catch (err) {
-      setPhase("error");
-      setError(err.message);
-    }
+    startStravaImport(files[0], createBikes);
+    setFiles([]);
   }
 
-  const busy = phase === "uploading" || phase === "processing";
+  const busy = isBusy(strava);
 
   return (
     <section className="panel">
@@ -165,45 +118,35 @@ function StravaImport({ onDone }) {
         </div>
       </form>
 
+      {busy && <p className="muted small">Du kannst die Seite wechseln, Upload und Import laufen weiter. Am Ende erscheint eine Meldung.</p>}
       {phase === "uploading" && <Progress value={uploadPct} label="Wird hochgeladen" />}
       {phase === "processing" && (
         <Progress value={job && job.total ? job.processed / job.total : 0} label={job ? `Fahrt ${job.processed} von ${job.total}` : "Wird gestartet"} />
       )}
       {phase === "error" && <p className="error" role="alert">{error}</p>}
-      {phase === "done" && job && <ResultSummary s={job.summary} />}
+      {phase === "done" && job && (
+        <>
+          <ResultSummary s={job.summary} />
+          <button className="link small" onClick={() => dismiss("strava")}>Meldung ausblenden</button>
+        </>
+      )}
     </section>
   );
 }
 
 // ---------- Einzelne Dateien ----------
 
-function FileImport({ bikes, onDone }) {
+function FileImport({ bikes }) {
   const [files, setFiles] = useState([]);
   const [bikeId, setBikeId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [pct, setPct] = useState(0);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const { files: up } = useUploads();
+  const busy = isBusy(up);
 
-  async function send(e) {
+  function send(e) {
     e.preventDefault();
     if (!files.length) return;
-    setBusy(true);
-    setError("");
-    setResult(null);
-    setPct(0);
-    try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("files", f));
-      if (bikeId) fd.append("bike_id", bikeId);
-      setResult(await upload("/activities/upload", fd, setPct));
-      setFiles([]);
-      onDone();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    startFileImport(files, bikeId);
+    setFiles([]);
   }
 
   return (
@@ -233,9 +176,14 @@ function FileImport({ bikes, onDone }) {
           </button>
         </div>
       </form>
-      {busy && <Progress value={pct} label="Wird hochgeladen" />}
-      {error && <p className="error" role="alert">{error}</p>}
-      {result && <ResultSummary s={result} />}
+      {busy && <Progress value={up.pct} label="Wird hochgeladen" />}
+      {up.phase === "error" && <p className="error" role="alert">{up.error}</p>}
+      {up.phase === "done" && up.result && (
+        <>
+          <ResultSummary s={up.result} />
+          <button className="link small" onClick={() => dismiss("files")}>Meldung ausblenden</button>
+        </>
+      )}
     </section>
   );
 }
@@ -570,14 +518,16 @@ export default function Rides() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  const { doneCount } = useUploads();
+  useEffect(() => { if (doneCount > 0) refresh(); }, [doneCount, refresh]);
 
   return (
     <>
       <header className="page-head"><h1>Fahrten</h1></header>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="import-grid">
-        <StravaImport onDone={refresh} />
-        <FileImport bikes={bikes} onDone={refresh} />
+        <StravaImport />
+        <FileImport bikes={bikes} />
       </div>
       <GearAssign gear={gear} bikes={bikes} onDone={refresh} />
       <WeatherPanel refreshKey={refreshKey} />

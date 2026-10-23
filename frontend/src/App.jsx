@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
+import UploadBanner from "./components/UploadBanner.jsx";
+import { resetUploads, resumeActive } from "./uploads.js";
 import Login from "./pages/Login.jsx";
 import Garage from "./pages/Garage.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
@@ -31,7 +33,10 @@ function Shell({ user, onLogout, children }) {
           <button className="link" onClick={onLogout}>Abmelden</button>
         </div>
       </aside>
-      <main className="main">{children}</main>
+      <main className="main">
+        <UploadBanner />
+        {children}
+      </main>
     </div>
   );
 }
@@ -44,6 +49,7 @@ export default function App() {
   const logout = useCallback(() => {
     clearToken();
     resetMapConfig();
+    resetUploads();
     setUser(null);
     navigate("/login");
   }, [navigate]);
@@ -51,6 +57,7 @@ export default function App() {
   const loadUser = useCallback(async () => {
     try {
       setUser(await api.get("/me"));
+      resumeActive();
     } catch {
       setUser(null);
     } finally {

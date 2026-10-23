@@ -401,3 +401,12 @@ input:focus, select:focus { border-color: var(--celeste); }
 
 .map-preview { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; }
 .map-preview img { border: 1px solid var(--line); border-radius: 10px; background: #0b1117; max-width: 100%; height: auto; }
+
+/* ---------- Upload-Meldung ---------- */
+
+.upload-banners { display: grid; gap: 0.75rem; margin-bottom: 1.25rem; }
+.upload-banner { display: grid; gap: 0.6rem; padding: 0.8rem 1rem; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--celeste); border-radius: 10px; }
+.upload-banner.is-done { border-left-color: var(--celeste); }
+.upload-banner.is-error { border-left-color: var(--signal); }
+.upload-banner-main { display: flex; gap: 0.75rem; align-items: baseline; flex-wrap: wrap; }
+.banner-progress { height: 6px; }

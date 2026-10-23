@@ -90,6 +90,13 @@ def start_strava_import(
     return {"job_id": job.id}
 
 
+@router.get("/imports/active")
+def active_import(user: User = Depends(current_user)):
+    """Läuft gerade ein Import? Damit die Oberfläche nach einem Neuladen den Fortschritt wieder anzeigen kann."""
+    job = service.running_job(user.id)
+    return {"job": job.as_dict() if job else None}
+
+
 @router.get("/imports/{job_id}")
 def import_status(job_id: str, user: User = Depends(current_user)):
     job = service.get_job(job_id, user.id)
