@@ -66,7 +66,9 @@ export function upload(path, formData, onProgress) {
           : `Fehler ${xhr.status}`;
       if (data && typeof data.detail === "string") msg = data.detail;
       else if (data && Array.isArray(data.detail)) msg = data.detail.map((d) => d.msg).join(", ");
-      reject(new Error(msg));
+      const err = new Error(msg);
+      err.status = xhr.status;
+      reject(err);
     };
     xhr.send(formData);
   });

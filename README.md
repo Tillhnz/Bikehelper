@@ -124,6 +124,18 @@ Neuer Proxy Host: Domain deiner Wahl, Forward auf `<server-ip>` Port `8080` (Sch
 SSL-Zertifikat über Let's Encrypt, „Force SSL“ und „Websockets Support“ aktivieren.
 Trage dieselbe Adresse (mit `https://`) als `PUBLIC_URL` in der `.env` ein.
 
+**Große Uploads (Strava-Export):** Der Nginx Proxy Manager bricht lange Anfragen standardmäßig nach 60 Sekunden ab und puffert den Upload erst komplett. Dann steht die Fortschrittsanzeige kurz vor Schluss bei 100 %, und es kommt ein Fehler (502/504), obwohl die Datei ankommt. Trage im Proxy Host unter „Advanced“ → „Custom Nginx Configuration“ ein:
+
+```
+client_max_body_size 8g;
+proxy_request_buffering off;
+proxy_read_timeout 900s;
+proxy_send_timeout 900s;
+send_timeout 900s;
+```
+
+BikeHelper erkennt in diesem Fall einen bereits angekommenen Upload und zeigt dessen Fortschritt an, statt ihn noch einmal zu verlangen.
+
 Nach dem Anlegen deines Kontos `ALLOW_REGISTRATION=false` setzen und `docker compose up -d`,
 damit sich niemand Fremdes registrieren kann. Das erste Konto ist immer erlaubt.
 

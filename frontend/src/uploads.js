@@ -109,6 +109,8 @@ function pollJob(jobId) {
 export async function startStravaImport(file, createBikes) {
   if (isBusy(state.strava)) return;
   askNotificationPermission();
+  // Läuft auf dem Server schon ein Import (zum Beispiel von einem früheren Versuch), nicht erneut hochladen
+  if (await resumeActive()) return;
   set("strava", { ...idle(), phase: "uploading", label: file.name });
   try {
     const fd = new FormData();
@@ -118,21 +120,28 @@ export async function startStravaImport(file, createBikes) {
     set("strava", { phase: "processing", pct: 1 });
     pollJob(job_id);
   } catch (err) {
-    set("strava", { phase: "error", error: err.message });
+    // Zeitüberschreitung des Proxys (502/504) oder "läuft schon" (409): Die Datei kann trotzdem angekommen sein
+    if ([409, 502, 504, 524].includes(err.status) && (await resumeActive())) return;
+    const hint = [502, 504, 524].includes(err.status)
+      ? " Wahrscheinlich bricht der Reverse Proxy große Uploads ab, siehe README (Abschnitt Reverse Proxy)."
+      : "";
+    set("strava", { phase: "error", error: err.message + hint });
     notify("Upload fehlgeschlagen", err.message);
   }
 }
 
 /** Nach einem Neuladen: läuft auf dem Server noch ein Import, Fortschritt wieder anzeigen. */
 export async function resumeActive() {
-  if (isBusy(state.strava)) return;
+  if (state.strava.phase === "processing") return true;
   try {
     const { job } = await api.get("/imports/active");
     if (job) {
       set("strava", { ...idle(), phase: "processing", job, label: "Import" });
       pollJob(job.id);
+      return true;
     }
   } catch { /* nicht schlimm */ }
+  return false;
 }
 
 // ---------- Einzelne Dateien ----------
