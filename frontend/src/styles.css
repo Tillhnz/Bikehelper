@@ -398,3 +398,6 @@ input:focus, select:focus { border-color: var(--celeste); }
 .danger-zone { border-color: rgba(255, 107, 107, 0.35); }
 .danger-zone h2 { color: var(--signal); }
 @media (max-width: 800px) { .detail-map { height: 300px; } }
+
+.map-preview { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; }
+.map-preview img { border: 1px solid var(--line); border-radius: 10px; background: #0b1117; max-width: 100%; height: auto; }

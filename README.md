@@ -38,7 +38,8 @@ Sehr große Exporte: Hinter dem Nginx Proxy Manager kann der Upload mit „413�
 
 CARTO zeigt seine Karten nur noch mit einem Schlüssel ohne Wasserzeichen „API KEY REQUIRED“. Der Schlüssel ist kostenlos, braucht kein Konto und gilt für private Projekte bis 5 Millionen Kartenabrufe im Monat: <https://carto.com/basemaps/apikey/>
 
-- **Mit Schlüssel:** `CARTO_API_KEY=…` in die `.env` eintragen und `./install.sh update` ausführen. Dann erscheint die dunkle Karte.
+- **Mit Schlüssel (einfach):** In BikeHelper unter „Einstellungen“ im Bereich „Karten“ einfügen. Er gilt für dein Konto und zeigt sofort eine Vorschau. Dann erscheint die dunkle Karte.
+- **Mit Schlüssel für alle Nutzer:** `CARTO_API_KEY=…` in die `.env` eintragen und `./install.sh update` ausführen. Ein Schlüssel im Konto hat Vorrang.
 - **Ohne Schlüssel:** BikeHelper nimmt die helle OpenStreetMap-Karte. Für private Nutzung in kleinem Umfang ist das in Ordnung (Nutzungsregeln: <https://operations.osmfoundation.org/policies/tiles/>), für viele Nutzer nicht.
 - **Eigener Anbieter:** `MAP_TILE_URL` (mit `{z}/{x}/{y}`) und `MAP_TILE_DARK=false` für helle Karten setzen.
 

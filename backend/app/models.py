@@ -24,6 +24,9 @@ class User(Base):
     strava_expires_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     strava_athlete_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
+    # Kartenhintergrund: eigener CARTO-Schlüssel (hat Vorrang vor dem Schlüssel des Servers)
+    carto_api_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     bikes: Mapped[list["Bike"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 

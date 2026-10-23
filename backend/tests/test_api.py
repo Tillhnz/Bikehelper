@@ -105,3 +105,24 @@ def test_activity_detail_and_delete_all():
         r = c.delete("/api/activities?confirm=true", headers=h1)
         assert r.status_code == 200 and r.json() == {"deleted": 2}
         assert c.get(f"/api/activities/{ido}", headers=h2).status_code == 200  # fremde Fahrten bleiben
+
+
+def test_map_settings():
+    with TestClient(app) as c:
+        c.post("/api/auth/register", json={"email": "map@example.com", "password": "geheim1234"})
+        t = c.post("/api/auth/login", json={"email": "map@example.com", "password": "geheim1234"}).json()["access_token"]
+        h = {"Authorization": f"Bearer {t}"}
+        assert c.get("/api/map-config").status_code == 401
+        assert c.get("/api/map-config", headers=h).json()["provider"] == "osm"
+
+        bad = c.put("/api/settings/map", headers=h, json={"carto_api_key": "x?y=1&z"})
+        assert bad.status_code == 422
+
+        ok = c.put("/api/settings/map", headers=h, json={"carto_api_key": "abc123DEF-_456"}).json()
+        assert ok["provider"] == "carto" and ok["has_user_key"] and ok["key_hint"] == "…_456"
+        assert "abc123DEF" not in str(ok)  # Schlüssel nie zurückgeben
+        cfg = c.get("/api/map-config", headers=h).json()
+        assert cfg["dark"] and cfg["url"].endswith("?key=abc123DEF-_456")
+
+        gone = c.put("/api/settings/map", headers=h, json={"carto_api_key": ""}).json()
+        assert gone["provider"] == "osm" and not gone["has_user_key"]

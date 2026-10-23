@@ -35,3 +35,7 @@ export function loadMapConfig(api) {
 export function tileOptions(cfg) {
   return { maxZoom: cfg.max_zoom, subdomains: cfg.subdomains, attribution: cfg.attribution };
 }
+
+export function resetMapConfig() {
+  mapConfigPromise = null;
+}
