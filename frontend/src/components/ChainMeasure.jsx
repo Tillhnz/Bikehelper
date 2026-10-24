@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
+import { confirmDialog } from "./feedback.jsx";
 
 /** Kleines Diagramm: gemessene Längung über die Kilometer der Kette, mit Grenzwert. */
 function WearChart({ points, limit }) {
@@ -52,7 +53,7 @@ export default function ChainMeasure({ comp, rule, disabled, onChanged }) {
   }
 
   async function remove(p) {
-    if (!window.confirm(`Messung vom ${fmtDate(p.measured_at)} löschen?`)) return;
+    if (!await confirmDialog(`Messung vom ${fmtDate(p.measured_at)} löschen?`)) return;
     setPoints(await api.del(`/measurements/${p.id}`));
     onChanged();
   }

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
 import Shell from "./components/Shell.jsx";
+import { ErrorBoundary, FeedbackHost } from "./components/feedback.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
 import Admin from "./pages/Admin.jsx";
 import Login from "./pages/Login.jsx";
@@ -53,15 +54,20 @@ export default function App() {
 
   if (!user) {
     return (
+      <>
+      <FeedbackHost />
       <Routes>
         <Route path="/login" element={<Login onLoggedIn={loadUser} />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </>
     );
   }
 
   return (
     <Shell user={user} onLogout={logout}>
+      <FeedbackHost />
+      <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/garage" element={<Garage />} />
@@ -76,6 +82,7 @@ export default function App() {
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </Shell>
   );
 }

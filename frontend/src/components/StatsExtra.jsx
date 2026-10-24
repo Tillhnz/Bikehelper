@@ -4,6 +4,7 @@ import { api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import { Bars, HBars } from "./charts.jsx";
 import { Kpi, Panel } from "./statsui.jsx";
 import { EmptyState } from "./ui.jsx";
+import { Loading } from "./feedback.jsx";
 
 const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
@@ -64,7 +65,7 @@ function formText(f) {
 export function LoadView({ bikeId }) {
   const [d, error] = useData(`/stats/extra${bikeId ? `?bike_id=${bikeId}` : ""}`, [bikeId]);
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <p className="muted">Lade …</p>;
+  if (!d) return <Loading />;
   if (d.empty) return <EmptyState title="Keine Fahrten gefunden" text="Importiere Fahrten, dann erscheint hier deine Belastung." />;
   const { series, weekly, now, note } = d.load;
   const thisWeek = weekly[weekly.length - 1], lastWeek = weekly[weekly.length - 2];
@@ -139,7 +140,7 @@ function RideList({ items, unit, fmt = (v) => fmtNum(v) }) {
 export function CompareView({ bikeId }) {
   const [d, error] = useData(`/stats/extra${bikeId ? `?bike_id=${bikeId}` : ""}`, [bikeId]);
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <p className="muted">Lade …</p>;
+  if (!d) return <Loading />;
   if (d.empty) return <EmptyState title="Keine Fahrten gefunden" text="Importiere Fahrten, dann erscheinen hier die Vergleiche." />;
   const { month_matrix: mm, bike_years: by, equivalents: eq, breaks: br } = d;
   return (
@@ -218,7 +219,7 @@ export function ReviewView({ bikeId, years }) {
         {years.map((v) => <button key={v} className={`chip ${v === y ? "on" : ""}`} onClick={() => setYear(v)}>{v}</button>)}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      {!d && !error && <p className="muted">Lade …</p>}
+      {!d && !error && <Loading />}
       {d?.empty && <EmptyState title={`Keine Fahrten ${y}`} />}
       {d && !d.empty && d.totals && <ReviewBody d={d} />}
     </>
@@ -382,7 +383,7 @@ export function PlacesView() {
   }, [d?.status?.running, setD]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <p className="muted">Lade …</p>;
+  if (!d) return <Loading />;
   if (!d.enabled) return <EmptyState title="Orte sind ausgeschaltet" text="Der Administrator hat die Ortssuche abgeschaltet." />;
 
   async function refresh() {

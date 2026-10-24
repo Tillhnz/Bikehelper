@@ -4,6 +4,7 @@ import { BIKE_TYPES, WEATHER_TEXT, api, fmtNum } from "../api.js";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { GroupIcon, Segmented, Slider, StopSlider, Switch } from "../components/controls.jsx";
 import { CountUp, useTween } from "../components/motion.jsx";
+import { Loading } from "../components/feedback.jsx";
 
 const STORE = "bikehelper_advisor_v2";
 const TYPICAL_WIDTH = { road: 28, gravel: 40, mtb: 58, other: 38 };
@@ -493,7 +494,7 @@ export default function Advisor() {
     }
   }
 
-  if (!defs && !error) return <p className="muted">Lade …</p>;
+  if (!defs && !error) return <Loading />;
 
   const bikes = defs?.bikes ?? [];
   const showTypes = !form.bike_id;

@@ -344,3 +344,25 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(40), primary_key=True)
     value: Mapped[str] = mapped_column(Text, default="")
+
+
+class AuditEntry(Base):
+    """Protokoll sicherheitsrelevanter Verwaltungsvorgänge (ohne persönliche Inhalte und ohne Geheimnisse)."""
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    actor: Mapped[str] = mapped_column(String(255))  # E-Mail des Handelnden oder "System"
+    action: Mapped[str] = mapped_column(String(40))
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class PasswordReset(Base):
+    """Einmal gültiger Link zum Zurücksetzen des Passworts; gespeichert wird nur der Hash des Codes."""
+    __tablename__ = "password_resets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -6,6 +6,7 @@ import ChainMeasure from "../components/ChainMeasure.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
+import { confirmDialog, Loading } from "../components/feedback.jsx";
 
 function ruleIntervalText(r) {
   return [r.interval_km && `${fmtKm(r.interval_km)} km`, r.interval_months && `${r.interval_months} Monate`]
@@ -314,7 +315,7 @@ function ComponentCard({ comp, onChanged }) {
 
   const removeLog = (l) =>
     guarded(async () => {
-      if (!window.confirm(`Wartung vom ${fmtDate(l.performed_at)} wirklich löschen?`)) return;
+      if (!await confirmDialog(`Wartung vom ${fmtDate(l.performed_at)} wirklich löschen?`)) return;
       await api.del(`/logs/${l.id}`);
       await refresh();
     });
@@ -328,7 +329,7 @@ function ComponentCard({ comp, onChanged }) {
 
   const remove = () =>
     guarded(async () => {
-      if (!window.confirm(`„${comp.name}“ wirklich löschen?`)) return;
+      if (!await confirmDialog(`„${comp.name}“ wirklich löschen?`)) return;
       await api.del(`/components/${comp.id}`);
       onChanged();
     });
@@ -548,13 +549,13 @@ export default function BikeDetail() {
   }
 
   async function removeBike() {
-    if (!window.confirm(`„${bike.name}“ wirklich löschen? Die Komponenten bleiben ohne Rad erhalten.`)) return;
+    if (!await confirmDialog(`„${bike.name}“ wirklich löschen? Die Komponenten bleiben ohne Rad erhalten.`)) return;
     await api.del(`/bikes/${bike.id}`);
     navigate("/garage");
   }
 
   if (error && !bike) return <p className="error" role="alert">{error}</p>;
-  if (!bike) return <p className="muted">Lade …</p>;
+  if (!bike) return <Loading />;
 
   const legacy = components.filter((c) => c.category === "tire_front" || c.category === "tire_rear");
   const tracked = components.filter((c) => !legacy.includes(c));

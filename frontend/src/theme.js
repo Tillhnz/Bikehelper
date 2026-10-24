@@ -1,0 +1,19 @@
+// Darstellung: "auto" folgt dem Gerät, "light" und "dark" erzwingen eine Seite. Gespeichert wird nur im Browser.
+const KEY = "bikehelper-theme";
+
+export function getTheme() {
+  try { return localStorage.getItem(KEY) || "auto"; } catch { return "auto"; }
+}
+
+export function setTheme(mode) {
+  try { if (mode === "auto") localStorage.removeItem(KEY); else localStorage.setItem(KEY, mode); } catch { /* privater Modus */ }
+  applyTheme();
+}
+
+export function applyTheme() {
+  const mode = getTheme();
+  const root = document.documentElement;
+  if (mode === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", mode);
+  const light = mode === "light" || (mode === "auto" && window.matchMedia?.("(prefers-color-scheme: light)").matches);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f3f6f8" : "#0e1620");
+}

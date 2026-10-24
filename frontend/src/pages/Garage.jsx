@@ -4,6 +4,7 @@ import { BIKE_TYPES, api, fmtKm } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
+import { Loading } from "../components/feedback.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, purchased_at: "", chain_lube: "oil", tubeless: true, hookless: false });
@@ -86,7 +87,7 @@ export default function Garage() {
   useEffect(() => { load(); }, [load]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!bikes) return <p className="muted">Lade …</p>;
+  if (!bikes) return <Loading />;
 
   const active = bikes.filter((b) => !b.retired);
   const retired = bikes.filter((b) => b.retired);

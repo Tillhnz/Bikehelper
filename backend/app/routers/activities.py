@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, timedelta, timezone
 import shutil
 import tempfile
 
@@ -6,11 +7,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, defer
 
+from ..config import settings
 from ..database import get_db
 from ..importers import service
 from ..models import Activity, Bike, User
 from ..schemas import ActivityDetail, ActivityOut, ActivityPage, ActivityUpdate, AssignIn, GearOut
 from ..security import current_user
+from ..stats.overview import get_tz
 from ..weather import service as weather_service
 from .garage import _own_bike
 
@@ -114,6 +117,7 @@ def list_activities(
     unassigned: bool = False,
     bike_id: int | None = None,
     q: str | None = None,
+    day: date | None = None,
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -122,6 +126,10 @@ def list_activities(
         cond.append(Activity.bike_id.is_(None))
     if bike_id is not None:
         cond.append(Activity.bike_id == bike_id)
+    if day is not None:  # Kalendertag in der Zeitzone des Servers
+        tz = get_tz(settings.timezone)
+        start = datetime.combine(day, datetime.min.time()).replace(tzinfo=tz).astimezone(timezone.utc).replace(tzinfo=None)
+        cond += [Activity.start_date >= start, Activity.start_date < start + timedelta(days=1)]
     if q:
         cond.append(Activity.name.ilike(f"%{q.strip()}%"))
     total = db.scalar(select(func.count()).select_from(Activity).where(*cond)) or 0

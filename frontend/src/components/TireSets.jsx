@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import { Gauge } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
+import { confirmDialog } from "./feedback.jsx";
 
 const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
 
@@ -336,7 +337,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
                 key={m.id}
                 m={m}
                 onSave={(body) => run(`/tire-mounts/${m.id}`, body, "put")}
-                onDelete={() => { if (window.confirm("Diesen Zeitraum löschen? Die Kilometer zählen dann nicht mehr auf diesen Satz.")) run(`/tire-mounts/${m.id}`, null, "del"); }}
+                onDelete={async () => { if (await confirmDialog("Diesen Zeitraum löschen? Die Kilometer zählen dann nicht mehr auf diesen Satz.")) run(`/tire-mounts/${m.id}`, null, "del"); }}
               />
             ))}
           </ul>
@@ -438,7 +439,7 @@ export default function TireSets({ bike, onChanged }) {
 
   async function onEdit(ts, patch, remove) {
     if (remove) {
-      if (!window.confirm(`„${ts.name}“ wirklich löschen? Der Verlauf geht verloren.`)) return;
+      if (!await confirmDialog(`„${ts.name}“ wirklich löschen? Der Verlauf geht verloren.`)) return;
       await run(`/tire-sets/${ts.id}`, null, "del");
       return;
     }

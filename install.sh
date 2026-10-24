@@ -10,6 +10,8 @@
 #   ./install.sh lock            Neue Registrierungen sperren
 #   ./install.sh unlock          Neue Registrierungen wieder erlauben
 #   ./install.sh url <adresse>   Öffentliche Adresse ändern (z. B. https://bike.example.de)
+#   ./install.sh backup          Datenbank in den Ordner backups/ sichern
+#   ./install.sh restore <datei> Eine Sicherung zurückspielen (ersetzt alle aktuellen Daten)
 #   ./install.sh logs            Protokolle anzeigen
 #
 # Umgebungsvariablen (optional):
@@ -262,13 +264,39 @@ cmd_logs() {
   (cd "$APP_DIR" && "${DOCKER[@]}" compose logs --tail 100 -f)
 }
 
+cmd_backup() {
+  require_install
+  mkdir -p "$APP_DIR/backups"
+  local f="$APP_DIR/backups/bikehelper-$(date +%Y%m%d-%H%M%S).sql.gz"
+  (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$f")
+  chmod 600 "$f"
+  [ "$(stat -c %s "$f")" -gt 200 ] || { rm -f "$f"; die "Die Sicherung ist leer, bitte Protokolle prüfen."; }
+  ok "Gesichert: $f"
+}
+
+cmd_restore() {
+  [ -n "${1:-}" ] && [ -f "$1" ] || die "Bitte eine Sicherungsdatei angeben, z. B.: ./install.sh restore backups/bikehelper-20261024-120000.sql.gz"
+  require_install
+  local file; file="$(readlink -f "$1")"
+  warn "Das ersetzt ALLE aktuellen Daten durch den Stand der Sicherung."
+  read -r -p "Zum Fortfahren „ja“ eingeben: " answer </dev/tty
+  [ "$answer" = "ja" ] || die "Abgebrochen."
+  (cd "$APP_DIR" && "${DOCKER[@]}" compose stop backend)
+  (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS \"$POSTGRES_DB\"" -c "CREATE DATABASE \"$POSTGRES_DB\""')
+  gunzip -c "$file" | (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -q -U "$POSTGRES_USER" "$POSTGRES_DB"')
+  (cd "$APP_DIR" && "${DOCKER[@]}" compose start backend)
+  ok "Sicherung zurückgespielt."
+}
+
 case "${1:-install}" in
   install)  cmd_install ;;
   update)   cmd_update ;;
   lock)     cmd_registration false ;;
   unlock)   cmd_registration true ;;
   url)      cmd_url "${2:-}" ;;
+  backup)   cmd_backup ;;
+  restore)  cmd_restore "${2:-}" ;;
   logs)     cmd_logs ;;
-  -h|--help|help) sed -n '2,19p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//' ;;
-  *) die "Unbekannter Befehl: $1 (erlaubt: install, update, lock, unlock, url, logs)" ;;
+  -h|--help|help) sed -n '2,23p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//' ;;
+  *) die "Unbekannter Befehl: $1 (erlaubt: install, update, lock, unlock, url, backup, restore, logs)" ;;
 esac

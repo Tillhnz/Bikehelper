@@ -5,6 +5,7 @@ import BikeIllustration from "../components/BikeIllustration.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
 import { EmptyState, StatusPill } from "../components/ui.jsx";
 import { GOAL_META } from "../components/StatsExtra.jsx";
+import { Loading } from "../components/feedback.jsx";
 
 function greeting() {
   const h = new Date().getHours();
@@ -73,7 +74,7 @@ export default function Home() {
   }, [offset]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <p className="muted">Lade …</p>;
+  if (!d) return <Loading />;
 
   const { week, year, maintenance: m, bikes, recent } = d;
   const shown = offset === 0 || !past ? week : past;

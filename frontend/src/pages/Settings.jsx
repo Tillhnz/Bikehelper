@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, clearToken, fmtDateTime, setToken } from "../api.js";
 import { loadMapConfig, resetMapConfig } from "../geo.js";
+import { Loading } from "../components/feedback.jsx";
 
 const PROVIDER_TEXT = {
   carto: "Dunkle CARTO-Karte (mit Schlüssel)",
@@ -81,7 +82,7 @@ function MapSettings() {
   // Vorschaukachel (Mitteleuropa), an ihr erkennt man, ob der Schlüssel gilt: bei falschem Schlüssel erscheint ein Wasserzeichen
   const preview = cfg ? cfg.url.replace("{s}", cfg.subdomains[0]).replace("{z}", "5").replace("{x}", "16").replace("{y}", "10").replace("{r}", "") : null;
 
-  if (!st) return <section className="panel"><h2>Karten</h2>{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Lade …</p>}</section>;
+  if (!st) return <section className="panel"><h2>Karten</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
 
   return (
     <section className="panel">
@@ -158,7 +159,7 @@ function NotifySettings() {
     setTopic("bikehelper-" + Array.from(a, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 14));
   };
 
-  if (!st) return <section className="panel"><h2>Erinnerungen</h2>{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Lade …</p>}</section>;
+  if (!st) return <section className="panel"><h2>Erinnerungen</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
 
   return (
     <section className="panel">
@@ -293,7 +294,7 @@ function WahooSettings() {
   const setBike = (value) =>
     run(() => api.put("/settings/wahoo", { client_id: null, client_secret: null, bike_id: value ? Number(value) : null }));
 
-  if (!st) return <section className="panel"><h2>Wahoo</h2>{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Lade …</p>}</section>;
+  if (!st) return <section className="panel"><h2>Wahoo</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
   if (!st.enabled) return null;
 
   return (

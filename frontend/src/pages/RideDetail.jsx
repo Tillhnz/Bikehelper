@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm, fmtKm1, fmtNum } from "../api.js";
 import { ProfileChart } from "../components/charts.jsx";
 import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
+import { confirmDialog, Loading } from "../components/feedback.jsx";
 
 function RouteMap({ polyline, hoverPoint, cfg }) {
   const boxRef = useRef(null);
@@ -71,7 +72,7 @@ export default function RideDetail() {
   const llPoints = useMemo(() => (profile?.ll ? decodePolyline(profile.ll) : null), [profile]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!a) return <p className="muted">Lade …</p>;
+  if (!a) return <Loading />;
 
   const d = a.details;
   const wetText = a.wet_minutes != null && a.wet_minutes >= 5;
@@ -86,7 +87,7 @@ export default function RideDetail() {
   }
 
   async function remove() {
-    if (!window.confirm(`„${a.name}“ wirklich löschen?`)) return;
+    if (!await confirmDialog(`„${a.name}“ wirklich löschen?`)) return;
     await api.del(`/activities/${a.id}`);
     navigate("/rides");
   }

@@ -6,7 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import notify
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import activities, admin as admin_router, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
+from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
 from . import server_settings
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
@@ -66,6 +66,7 @@ async def security_headers(request, call_next):
 
 app.include_router(auth.router)
 app.include_router(admin_router.router)
+app.include_router(account_router.router)
 app.include_router(home.router)
 app.include_router(garage.router)
 app.include_router(tires.router)

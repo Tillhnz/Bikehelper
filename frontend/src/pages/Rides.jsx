@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 import { dismiss, isBusy, startFileImport, startStravaImport, useUploads } from "../uploads.js";
+import { confirmDialog } from "../components/feedback.jsx";
 
 // ---------- Hilfsbausteine ----------
 
@@ -366,7 +367,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   }
 
   async function remove(a) {
-    if (!window.confirm(`„${a.name}“ wirklich löschen?`)) return;
+    if (!await confirmDialog(`„${a.name}“ wirklich löschen?`)) return;
     try {
       await api.del(`/activities/${a.id}`);
       onChanged();

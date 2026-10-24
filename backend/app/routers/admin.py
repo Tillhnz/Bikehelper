@@ -5,23 +5,29 @@ anderer Nutzer wie Räder, Fahrten, Gewicht oder Orte.
 """
 import hashlib
 import json
+import os
+import platform
 import secrets
+import shutil
+import time
 import urllib.error
 import urllib.request
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from .. import notify, server_settings
+from .. import audit, notify, server_settings
 from ..config import settings
 from ..database import get_db
-from ..models import Invite, User
+from ..models import AuditEntry, Invite, User
 from ..schemas import InviteOut
 from ..security import require_admin
 from .auth import delete_user_data
+
+STARTED = time.time()
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -42,6 +48,7 @@ def create_invite(admin: User = Depends(require_admin), db: Session = Depends(ge
     invite = Invite(code=secrets.token_hex(5).upper())
     db.add(invite)
     db.commit()
+    audit.record(db, admin.email, "invite.create", invite.code)
     return invite
 
 
@@ -52,6 +59,7 @@ def delete_invite(invite_id: int, admin: User = Depends(require_admin), db: Sess
         raise HTTPException(404, "Einladung nicht gefunden")
     db.delete(invite)
     db.commit()
+    audit.record(db, admin.email, "invite.delete", invite.code)
 
 
 # ---------- Konten und Rollen ----------
@@ -85,10 +93,12 @@ def update_user(user_id: int, data: UserPatch, admin: User = Depends(require_adm
         if data.role == "user" and (target.role == "admin") and _admin_count(db) <= 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "Es muss mindestens ein Administrator bleiben.")
         target.role = data.role
+        audit.record(db, admin.email, "user.role", f"{target.email} -> {data.role}")
     if data.active is not None:
         target.active = data.active
         if not data.active:
             target.token_version = (target.token_version or 0) + 1  # bestehende Anmeldungen enden sofort
+        audit.record(db, admin.email, "user.lock" if not data.active else "user.unlock", target.email)
     db.commit()
     return _user_row(target, admin)
 
@@ -103,7 +113,9 @@ def remove_user(user_id: int, admin: User = Depends(require_admin), db: Session 
         raise HTTPException(404, "Konto nicht gefunden")
     if target.role == "admin" and _admin_count(db) <= 1:
         raise HTTPException(status.HTTP_409_CONFLICT, "Es muss mindestens ein Administrator bleiben.")
+    email = target.email
     delete_user_data(db, target)
+    audit.record(db, admin.email, "user.delete", email)
 
 
 # ---------- Servereinstellungen ----------
@@ -123,6 +135,7 @@ def save_settings(data: SettingsIn, admin: User = Depends(require_admin), db: Se
         server_settings.save(db, data.values)
     except server_settings.SettingError as e:
         raise HTTPException(422, str(e))
+    audit.record(db, admin.email, "settings.save", ", ".join(sorted(data.values))[:290])  # nur Namen, nie Werte
     return {"fields": server_settings.describe(db), "smtp_ready": notify.smtp_configured()}
 
 
@@ -167,5 +180,72 @@ def update_status(check: bool = False, admin: User = Depends(require_admin)):
 
 
 @router.post("/update", status_code=202)
-def start_update(admin: User = Depends(require_admin)):
-    return _updater("POST", "/update")
+def start_update(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    r = _updater("POST", "/update")
+    audit.record(db, admin.email, "update.start")
+    return r
+
+
+# ---------- Sicherungen (liegen auf dem Server, werden nicht über die Oberfläche ausgeliefert) ----------
+
+@router.get("/backups")
+def list_backups(admin: User = Depends(require_admin)):
+    return _updater("GET", "/backups")
+
+
+@router.post("/backups", status_code=201)
+def create_backup(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Sichert die Datenbank in den Ordner backups/ auf dem Server. Die Dateien enthalten alle Daten aller Konten,
+    deshalb bietet die Oberfläche sie bewusst nicht zum Herunterladen an."""
+    r = _updater("POST", "/backups", timeout=300)
+    audit.record(db, admin.email, "backup.create", r.get("name", ""))
+    return r
+
+
+# ---------- Protokoll und Zustand ----------
+
+@router.get("/audit")
+def audit_log(limit: int = 100, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    rows = db.scalars(select(AuditEntry).order_by(AuditEntry.id.desc()).limit(max(1, min(limit, 500)))).all()
+    return [{"id": r.id, "at": r.at.isoformat() if r.at else None, "actor": r.actor, "action": r.action, "detail": r.detail} for r in rows]
+
+
+def _db_size(db: Session) -> int | None:
+    try:
+        if db.bind.dialect.name == "postgresql":
+            return int(db.scalar(text("select pg_database_size(current_database())")))
+        if db.bind.dialect.name == "sqlite":
+            path = db.bind.url.database
+            return os.path.getsize(path) if path and os.path.exists(path) else None
+    except Exception:  # Anzeige ist optional
+        return None
+    return None
+
+
+@router.get("/health")
+def health(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Zustand des Servers: Datenbank, Speicherplatz, E-Mail, Update-Dienst. Keine Nutzerdaten."""
+    checks = []
+    try:
+        db.execute(text("select 1"))
+        checks.append({"key": "db", "label": "Datenbank", "ok": True, "text": "erreichbar"})
+    except Exception:
+        checks.append({"key": "db", "label": "Datenbank", "ok": False, "text": "nicht erreichbar"})
+    du = shutil.disk_usage("/")
+    free_pct = du.free / du.total * 100
+    checks.append({"key": "disk", "label": "Speicherplatz", "ok": free_pct >= 10,
+                   "text": f"{du.free / 1e9:.1f} GB frei von {du.total / 1e9:.0f} GB"})
+    smtp = notify.smtp_configured()
+    checks.append({"key": "mail", "label": "E-Mail-Versand", "ok": smtp, "text": "eingerichtet" if smtp else "nicht eingerichtet"})
+    try:
+        _updater("GET", "/status", timeout=5)
+        checks.append({"key": "updater", "label": "Update-Dienst", "ok": True, "text": "läuft"})
+    except HTTPException:
+        checks.append({"key": "updater", "label": "Update-Dienst", "ok": False, "text": "nicht erreichbar"})
+    return {
+        "checks": checks,
+        "users": db.scalar(select(func.count()).select_from(User)) or 0,
+        "db_bytes": _db_size(db),
+        "uptime_s": int(time.time() - STARTED),
+        "python": platform.python_version(),
+    }

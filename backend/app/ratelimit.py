@@ -86,6 +86,19 @@ def check_register(ip: str, now: float | None = None) -> None:
                             headers={"Retry-After": str(wait)})
 
 
+def check_reset(ip: str, email: str, now: float | None = None) -> None:
+    """Drosselt Anfragen für Passwort-Links: je Adresse und je E-Mail nur wenige pro Stunde."""
+    now = time.monotonic() if now is None else now
+    with _lock:
+        wait = max(_retry_after(f"rst-ip:{ip}", 10, REGISTER_WINDOW_S, now) or 0,
+                   _retry_after(f"rst-mail:{email}", 3, REGISTER_WINDOW_S, now) or 0)
+        if not wait:
+            _fails[f"rst-ip:{ip}"].append(now)
+            _fails[f"rst-mail:{email}"].append(now)
+    if wait:
+        raise HTTPException(429, "Zu viele Anfragen. Bitte später erneut versuchen.", headers={"Retry-After": str(wait)})
+
+
 def reset() -> None:
     with _lock:
         _fails.clear()

@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from .. import audit, notify
 from ..config import settings
 from ..database import get_db
 from .. import ratelimit
 from ..models import (
-    Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PlaceVisit, RuleNotice, TireSet, User, UserTire, WahooSeen,
+    Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PasswordReset, PlaceVisit, RuleNotice, TireSet, User, UserTire, WahooSeen,
 )
 from ..schemas import LoginIn, PasswordChangeIn, PasswordConfirmIn, RegisterIn, StravaSettingsIn, TokenOut, UserOut
 from ..security import create_token, current_user, hash_password, is_admin, verify_password
@@ -34,7 +35,7 @@ _DUMMY_HASH = hash_password("dummy-password-for-timing")
 
 @router.get("/config")
 def public_config():
-    return {"allow_registration": settings.allow_registration, "invites": True}
+    return {"allow_registration": settings.allow_registration, "invites": True, "password_reset": notify.smtp_configured()}
 
 
 @router.post("/auth/register", response_model=TokenOut, status_code=201)
@@ -56,6 +57,8 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
     if invite is not None:
         invite.used_by_email, invite.used_at = email, datetime.utcnow()
     db.commit()
+    if invite is not None:
+        audit.record(db, email, "user.register", f"Einladung {invite.code}")
     return TokenOut(access_token=create_token(user))
 
 
@@ -115,6 +118,7 @@ def delete_user_data(db: Session, user: User) -> None:
     for obj in [*comps, *db.scalars(select(TireSet).where(TireSet.user_id == uid)).all()]:
         db.delete(obj)  # Regeln, Wartungseinträge, Messungen, Montagen laufen über die Kaskade mit
     db.flush()
+    db.execute(delete(PasswordReset).where(PasswordReset.user_id == uid))
     for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, UserTire, Bike):
         db.execute(delete(model).where(model.user_id == uid))
     db.delete(user)

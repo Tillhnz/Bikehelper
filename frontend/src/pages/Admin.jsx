@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, fmtDate } from "../api.js";
+import { confirmDialog, toast } from "../components/feedback.jsx";
 
 const ROLE_TEXT = { admin: "Administrator", user: "Nutzer" };
 
@@ -126,7 +127,7 @@ function Accounts({ me }) {
                 </button>
                 <button
                   className="link small danger"
-                  onClick={() => { if (window.confirm(`Konto ${u.email} samt allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) run(() => api.del(`/admin/users/${u.id}`), "Konto gelöscht."); }}
+                  onClick={async () => { if (await confirmDialog(`Konto ${u.email} samt allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) run(() => api.del(`/admin/users/${u.id}`), "Konto gelöscht."); }}
                 >
                   Löschen
                 </button>
@@ -229,7 +230,7 @@ function Updates() {
   }
 
   async function start() {
-    if (!window.confirm("BikeHelper jetzt aktualisieren? Die Seite ist dabei für ein bis zwei Minuten kurz nicht erreichbar. Deine Daten bleiben erhalten.")) return;
+    if (!(await confirmDialog("Die Seite ist dabei ein bis zwei Minuten kurz nicht erreichbar. Deine Daten bleiben erhalten.", { title: "BikeHelper jetzt aktualisieren?", confirmLabel: "Aktualisieren", danger: false }))) return;
     try {
       await api.post("/admin/update", {});
       setError("");
@@ -340,7 +341,7 @@ export default function Admin({ user }) {
       <Updates />
       <Accounts me={user} />
       <Invites />
-      {!defs ? <p className="muted">Lade …</p> : (
+      {!defs ? <Loading /> : (
         <>
           {block({ title: "Zugang", intro: "Wer sich anmelden darf und wie lange Anmeldungen gelten.", spec: ACCESS })}
           {block({ title: "Adresse und Zeit", spec: GENERAL })}

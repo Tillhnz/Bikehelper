@@ -675,3 +675,81 @@ def test_client_ip_uses_the_entry_added_by_the_trusted_proxy():
     req = lambda xff: SimpleNamespace(headers={"x-forwarded-for": xff} if xff else {}, client=SimpleNamespace(host="172.18.0.5"))
     assert ratelimit.client_ip(req("6.6.6.6, 203.0.113.9, 172.18.0.2")) == "203.0.113.9"  # gefälschter Eintrag zählt nicht
     assert ratelimit.client_ip(req("")) == "172.18.0.5"
+
+
+def _admin_headers():
+    from sqlalchemy import select
+    from app.models import User
+    from app.security import create_token
+    with SessionLocal() as db:
+        return {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
+
+
+def test_audit_health_export_and_search():
+    with TestClient(app) as c:
+        h = _user(c, "ex-user@example.com")
+        admin = _admin_headers()
+        # Verwaltungsvorgänge landen im Protokoll, nur der Admin sieht es
+        assert c.get("/api/admin/audit", headers=h).status_code == 403
+        code = c.post("/api/admin/invites", headers=admin).json()["code"]
+        entries = c.get("/api/admin/audit", headers=admin).json()
+        assert any(e["action"] == "invite.create" and e["detail"] == code for e in entries)
+        # Zustand: Update-Dienst ist im Test nicht da, der Rest meldet sich
+        health = c.get("/api/admin/health", headers=admin).json()
+        assert {k["key"] for k in health["checks"]} == {"db", "disk", "mail", "updater"}
+        assert c.get("/api/admin/health", headers=h).status_code == 403
+        # Export enthält eigene Daten, keine Zugangsdaten
+        bike = c.post("/api/bikes", headers=h, json={"name": "Suchrad Zebra", "type": "road"}).json()
+        r = c.get("/api/me/export", headers=h)
+        assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+        data = r.json()
+        assert [b["name"] for b in data["bikes"]] == ["Suchrad Zebra"] and data["account"]["email"] == "ex-user@example.com"
+        assert "password_hash" not in r.text and "strava_client_secret" not in r.text
+        # Suche findet nur eigene Daten
+        found = c.get("/api/search", headers=h, params={"q": "zebra"}).json()
+        assert [b["id"] for b in found["bikes"]] == [bike["id"]]
+        assert c.get("/api/search", headers=admin, params={"q": "zebra"}).json()["bikes"] == []
+        assert c.get("/api/search", headers=h, params={"q": "z"}).status_code == 422
+
+
+def test_password_reset_flow(monkeypatch):
+    from app import notify
+    from app.config import settings
+    sent = []
+    monkeypatch.setattr(notify, "send_email", lambda to, title, body: sent.append((to, body)))
+    with TestClient(app) as c:
+        _user(c, "forgot@example.com")
+        old = (settings.smtp_host, settings.smtp_from)
+        settings.smtp_host, settings.smtp_from = "", ""
+        try:
+            assert c.post("/api/auth/forgot", json={"email": "forgot@example.com"}).status_code == 503
+            assert c.get("/api/config").json()["password_reset"] is False
+            settings.smtp_host, settings.smtp_from = "smtp.test", "bike@example.com"
+            assert c.get("/api/config").json()["password_reset"] is True
+            # Unbekannte Adressen bekommen dieselbe Antwort, aber keine Mail
+            assert c.post("/api/auth/forgot", json={"email": "nobody@example.com"}).status_code == 202
+            assert sent == []
+            assert c.post("/api/auth/forgot", json={"email": "forgot@example.com"}).status_code == 202
+        finally:
+            settings.smtp_host, settings.smtp_from = old
+        assert len(sent) == 1 and sent[0][0] == "forgot@example.com"
+        token = sent[0][1].split("reset=")[1].split()[0]
+        assert c.post("/api/auth/reset", json={"token": "x" * 40, "password": "neuesPasswort9"}).status_code == 400
+        assert c.post("/api/auth/reset", json={"token": token, "password": "neuesPasswort9"}).status_code == 200
+        assert c.post("/api/auth/reset", json={"token": token, "password": "nochmal12345"}).status_code == 400  # nur einmal
+        assert c.post("/api/auth/login", json={"email": "forgot@example.com", "password": "neuesPasswort9"}).status_code == 200
+        assert c.post("/api/auth/login", json={"email": "forgot@example.com", "password": "geheim1234"}).status_code == 401
+
+
+def test_rides_day_filter():
+    with TestClient(app) as c:
+        h = _user(c, "day-user@example.com")
+        from sqlalchemy import select
+        from app.models import User
+        with SessionLocal() as db:
+            uid = db.scalar(select(User.id).where(User.email == "day-user@example.com"))
+            for name, start in (("Morgens", datetime(2026, 5, 3, 7, 0)), ("Anderer Tag", datetime(2026, 5, 4, 12, 0))):
+                db.add(Activity(user_id=uid, name=name, start_date=start, distance_km=10.0, moving_time_s=1800, elevation_m=0))
+            db.commit()
+        r = c.get("/api/activities", headers=h, params={"day": "2026-05-03"}).json()
+        assert [a["name"] for a in r["items"]] == ["Morgens"]

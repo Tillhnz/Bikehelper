@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CATEGORIES, api, fmtDate, fmtNum, today } from "../api.js";
 import { Kpi } from "../components/statsui.jsx";
 import { EmptyState } from "../components/ui.jsx";
+import { confirmDialog, Loading } from "../components/feedback.jsx";
 
 const EMPTY = { category: "chain", name: "", brand: "", spec: "", quantity: 1, min_quantity: "", price_eur: "", purchased_at: "", location: "", notes: "", bike_id: "" };
 
@@ -107,7 +108,7 @@ export default function Inventory() {
 
   const items = useMemo(() => (data?.items ?? []).filter((i) => !cat || i.category === cat), [data, cat]);
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Lade …</p>;
+  if (!data) return <Loading />;
 
   const t = data.totals;
   const bikeName = (id) => bikes.find((b) => b.id === id)?.name;
@@ -124,7 +125,7 @@ export default function Inventory() {
     await load();
   }
   async function remove(i) {
-    if (!window.confirm(`„${i.name}“ aus dem Inventar löschen?`)) return;
+    if (!await confirmDialog(`„${i.name}“ aus dem Inventar löschen?`)) return;
     await api.del(`/inventory/${i.id}`);
     await load();
   }

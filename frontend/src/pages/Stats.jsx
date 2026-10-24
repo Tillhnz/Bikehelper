@@ -5,6 +5,7 @@ import { Bars, CalendarHeat, CumulativeLines, HBars } from "../components/charts
 import { EmptyState } from "../components/ui.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
 import { CompareView, GoalsView, LoadView, PlacesView, ReviewView } from "../components/StatsExtra.jsx";
+import { Loading } from "../components/feedback.jsx";
 
 const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
@@ -34,7 +35,7 @@ export default function Stats() {
   }, [filters]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <p className="muted">Lade …</p>;
+  if (!d) return <Loading />;
 
   const set = (k) => (e) => setFilters({ ...filters, [k]: e.target.value });
   const header = (
