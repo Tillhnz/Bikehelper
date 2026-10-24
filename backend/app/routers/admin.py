@@ -3,7 +3,11 @@
 Der Administrator sieht hier nur Verwaltungsdaten (E-Mail-Adresse, Rolle, Status, Anlagedatum) und nie Inhalte
 anderer Nutzer wie Räder, Fahrten, Gewicht oder Orte.
 """
+import hashlib
+import json
 import secrets
+import urllib.error
+import urllib.request
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import notify, server_settings
+from ..config import settings
 from ..database import get_db
 from ..models import Invite, User
 from ..schemas import InviteOut
@@ -131,3 +136,36 @@ def test_email(admin: User = Depends(require_admin)):
     except Exception as e:  # SMTP-Fehler verständlich weitergeben
         raise HTTPException(502, f"Versand fehlgeschlagen: {e.__class__.__name__}: {e}")
     return {"ok": True, "to": admin.email}
+
+
+# ---------- Updates ----------
+
+def _updater(method: str, path: str, timeout: float = 90):
+    """Spricht den Update-Dienst an. Wirft HTTPException mit verständlicher Meldung."""
+    if not settings.updater_url:
+        raise HTTPException(503, "Der Update-Dienst ist nicht eingerichtet. Führe einmalig ./install.sh update im Terminal aus.")
+    token = hashlib.sha256(("updater:" + settings.secret_key).encode()).hexdigest()
+    req = urllib.request.Request(settings.updater_url.rstrip("/") + path, method=method, headers={"X-Updater-Token": token},
+                                 data=b"" if method == "POST" else None)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read()).get("error", "")
+        except ValueError:
+            msg = ""
+        raise HTTPException(409 if e.code == 409 else 502, msg or f"Der Update-Dienst antwortet mit Fehler {e.code}.")
+    except (urllib.error.URLError, OSError):
+        raise HTTPException(503, "Der Update-Dienst ist nicht erreichbar. Führe einmalig ./install.sh update im Terminal aus, danach geht es hier per Knopf.")
+
+
+@router.get("/update")
+def update_status(check: bool = False, admin: User = Depends(require_admin)):
+    """Aktuelle Version, ob eine neuere da ist (mit check=true) und Stand eines laufenden Updates."""
+    return _updater("GET", "/status" + ("?check=1" if check else ""))
+
+
+@router.post("/update", status_code=202)
+def start_update(admin: User = Depends(require_admin)):
+    return _updater("POST", "/update")

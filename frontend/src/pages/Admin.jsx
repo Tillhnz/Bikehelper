@@ -185,6 +185,90 @@ function Invites() {
   );
 }
 
+function Updates() {
+  const [st, setSt] = useState(null);
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [watching, setWatching] = useState(false);
+
+  const load = useCallback(async (check = false) => {
+    try {
+      const r = await api.get(`/admin/update${check ? "?check=true" : ""}`);
+      setSt(r);
+      setError("");
+      return r;
+    } catch (e) {
+      setError(e.message);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => { load(false); }, [load]);
+
+  // Während des Updates fragen wir regelmäßig nach. Das Backend startet dabei kurz neu, Fehler sind dann normal.
+  useEffect(() => {
+    if (!watching) return undefined;
+    const id = setInterval(async () => {
+      try {
+        const r = await api.get("/admin/update");
+        setSt(r);
+        setError("");
+        if (r.job.state === "done") { setWatching(false); setTimeout(() => window.location.reload(), 1500); }
+        if (r.job.state === "failed") setWatching(false);
+      } catch {
+        setError("");
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [watching]);
+
+  async function check() {
+    setChecking(true);
+    await load(true);
+    setChecking(false);
+  }
+
+  async function start() {
+    if (!window.confirm("BikeHelper jetzt aktualisieren? Die Seite ist dabei für ein bis zwei Minuten kurz nicht erreichbar. Deine Daten bleiben erhalten.")) return;
+    try {
+      await api.post("/admin/update", {});
+      setError("");
+      setWatching(true);
+      setSt((s) => ({ ...s, job: { ...(s?.job || {}), state: "running", log: "", error: null } }));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  const v = st?.version;
+  const job = st?.job;
+  const busy = watching || job?.state === "running" || job?.state === "restarting";
+  return (
+    <section className="panel">
+      <h2>Updates</h2>
+      {v && <p>Installierte Version: <strong>{v.commit}</strong> <span className="muted small">vom {fmtDate(v.date)}, {v.subject}</span></p>}
+      {st?.dirty && <p className="error">Im Projektordner gibt es lokale Änderungen. Das Update bricht dann ab.</p>}
+      {st?.check_error && <p className="error" role="alert">{st.check_error}</p>}
+      {st?.behind === 0 && <p className="ok">BikeHelper ist auf dem neuesten Stand.</p>}
+      {st?.behind > 0 && (
+        <>
+          <p><strong>{st.behind} {st.behind === 1 ? "neue Änderung" : "neue Änderungen"}</strong> verfügbar:</p>
+          <ul className="log-list">{st.changes.map((c) => <li key={c}><span>{c}</span></li>)}</ul>
+        </>
+      )}
+      {busy && <p role="status">{job?.state === "restarting" ? "Starte neu … die Seite lädt gleich von selbst." : "Update läuft … das dauert einige Minuten."}</p>}
+      {job?.state === "failed" && <p className="error" role="alert">{job.error}</p>}
+      {job?.state === "failed" && job.log && <details><summary className="small">Protokoll</summary><pre className="small" style={{ whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 240 }}>{job.log}</pre></details>}
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="actions">
+        <button className="btn" onClick={check} disabled={busy || checking}>{checking ? "Prüfe …" : "Nach Updates suchen"}</button>
+        <button className="btn primary" onClick={start} disabled={busy || st?.behind === 0 || !st}>Jetzt aktualisieren</button>
+      </div>
+      <p className="muted small">Das Update holt die neue Version von GitHub und baut sie neu. Der Update-Dienst darf dafür Docker auf dem Server steuern, ist aber nur über diesen Bereich erreichbar.</p>
+    </section>
+  );
+}
+
 const ACCESS = [
   { key: "allow_registration", type: "bool", label: "Jeder darf sich selbst registrieren", hint: "Aus: nur mit Einladung. Das erste Konto ist immer erlaubt." },
   { key: "token_expire_days", type: "number", label: "Anmeldung gilt (Tage)", min: 1, max: 90 },
@@ -253,6 +337,7 @@ export default function Admin({ user }) {
       <p className="muted lead">Alles, was früher in Dateien auf dem Server stand, stellst du hier ein. Persönliche Daten anderer Nutzer sind für dich nicht einsehbar.</p>
       {error && <p className="error" role="alert">{error}</p>}
 
+      <Updates />
       <Accounts me={user} />
       <Invites />
       {!defs ? <p className="muted">Lade …</p> : (

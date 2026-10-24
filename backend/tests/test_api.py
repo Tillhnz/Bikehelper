@@ -647,6 +647,28 @@ def test_roles_lock_settings_and_privacy():
         assert c.post("/api/auth/login", json={"email": "role-user@example.com", "password": "geheim1234"}).status_code == 200
 
 
+def test_update_endpoints_are_admin_only_and_report_missing_service():
+    with TestClient(app) as c:
+        from sqlalchemy import select
+        from app.config import settings
+        from app.models import User
+        from app.security import create_token
+        h = _user(c, "upd-user@example.com")
+        with SessionLocal() as db:
+            admin = {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
+        assert c.get("/api/admin/update", headers=h).status_code == 403
+        assert c.post("/api/admin/update", headers=h).status_code == 403
+        old = settings.updater_url
+        settings.updater_url = ""
+        try:
+            r = c.get("/api/admin/update", headers=admin)
+            assert r.status_code == 503 and "install.sh update" in r.json()["detail"]
+            settings.updater_url = "http://127.0.0.1:9"  # nichts hört zu
+            assert c.post("/api/admin/update", headers=admin).status_code == 503
+        finally:
+            settings.updater_url = old
+
+
 def test_client_ip_uses_the_entry_added_by_the_trusted_proxy():
     from types import SimpleNamespace
     from app import ratelimit

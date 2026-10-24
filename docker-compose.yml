@@ -42,7 +42,20 @@ services:
       NTFY_SERVER: ${NTFY_SERVER:-https://ntfy.sh}
       WAHOO_ENABLED: ${WAHOO_ENABLED:-true}
       GEO_ENABLED: ${GEO_ENABLED:-true}
+      UPDATER_URL: ${UPDATER_URL:-http://updater:9000}
       NOMINATIM_URL: ${NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+
+  # Führt Updates aus dem Admin-Bereich aus. Kein veröffentlichter Port, nur das Backend erreicht ihn (mit Token).
+  # Der Zugriff auf den Docker-Socket entspricht Root-Rechten auf dem Server. Wer das nicht möchte, entfernt
+  # diesen Block und aktualisiert mit ./install.sh update im Terminal.
+  updater:
+    build: ./updater
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - .:/project
+      - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:
     build: ./frontend
