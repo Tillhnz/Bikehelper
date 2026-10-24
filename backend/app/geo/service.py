@@ -38,6 +38,19 @@ _running: dict[int, dict] = {}
 _cache: dict[int, tuple[dict, set]] = {}   # place_id -> (Geometrie, Kacheln innerhalb)
 
 
+_pace_lock = threading.Lock()
+_last_call = [0.0]
+
+
+def _pace_nominatim() -> None:
+    """Nominatim erlaubt eine Anfrage pro Sekunde für die ganze Installation, auch wenn mehrere Nutzer gleichzeitig laufen."""
+    with _pace_lock:
+        wait = PAUSE_S - (time.monotonic() - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+        _last_call[0] = time.monotonic()
+
+
 def make_reverse() -> Reverse:
     client = httpx.Client(
         timeout=30,
@@ -45,6 +58,7 @@ def make_reverse() -> Reverse:
     )
 
     def reverse(lat: float, lng: float) -> dict | None:
+        _pace_nominatim()
         r = client.get(
             settings.nominatim_url.rstrip("/") + "/reverse",
             params={"lat": f"{lat:.5f}", "lon": f"{lng:.5f}", "format": "jsonv2", "zoom": 10, "addressdetails": 1,

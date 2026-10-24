@@ -421,34 +421,71 @@ function SecuritySettings({ user }) {
 
 function AdminSettings() {
   const [invites, setInvites] = useState(null);
+  const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
-  const load = useCallback(() => api.get("/admin/invites").then(setInvites).catch((e) => setError(e.message)), []);
+  const [msg, setMsg] = useState("");
+  const load = useCallback(async () => {
+    try {
+      setInvites(await api.get("/admin/invites"));
+      setUsers(await api.get("/admin/users"));
+    } catch (e) {
+      setError(e.message);
+    }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
-  const run = async (fn) => {
+  const run = async (fn, done) => {
     setError("");
-    try { await fn(); await load(); } catch (err) { setError(err.message); }
+    setMsg("");
+    try { await fn(); if (done) setMsg(done); await load(); } catch (err) { setError(err.message); }
   };
+  const link = (code) => `${window.location.origin}/login?invite=${code}`;
+  const copy = (code) =>
+    run(async () => { await navigator.clipboard.writeText(link(code)); }, "Einladungslink kopiert.");
 
   return (
     <section className="panel">
-      <h2>Einladungen</h2>
+      <h2>Einladungen und Konten</h2>
       <p className="muted small">
-        Du bist Administrator. Wenn die offene Registrierung ausgeschaltet ist (ALLOW_REGISTRATION=false), können sich neue Nutzer nur mit einem Einladungscode anmelden. Jeder Code gilt einmal.
+        Du bist Administrator. Ist die offene Registrierung ausgeschaltet (ALLOW_REGISTRATION=false, die Voreinstellung), können sich neue Nutzer nur mit einem Einladungscode anmelden. Jeder Code gilt einmal. Schick der Person den Link: Er öffnet direkt die Registrierung mit eingetragenem Code.
       </p>
       <div className="actions">
-        <button className="btn primary" onClick={() => run(() => api.post("/admin/invites", {}))}>Neuen Code erzeugen</button>
+        <button className="btn primary" onClick={() => run(() => api.post("/admin/invites", {}))}>Neue Einladung erzeugen</button>
       </div>
       {invites?.length > 0 && (
         <ul className="log-list">
           {invites.map((i) => (
             <li key={i.id}>
               <span><strong>{i.code}</strong> <span className="muted">{i.used_by_email ? `verwendet von ${i.used_by_email}` : "offen"}</span></span>
-              <button className="link small danger" onClick={() => run(() => api.del(`/admin/invites/${i.id}`))}>Löschen</button>
+              <span className="rule-actions">
+                {!i.used_by_email && <button className="link small" onClick={() => copy(i.code)}>Link kopieren</button>}
+                <button className="link small danger" onClick={() => run(() => api.del(`/admin/invites/${i.id}`))}>Löschen</button>
+              </span>
             </li>
           ))}
         </ul>
       )}
+
+      <h3>Konten ({users.length})</h3>
+      <ul className="log-list">
+        {users.map((u) => (
+          <li key={u.id}>
+            <span>
+              <strong>{u.email}</strong> {u.is_admin && <span className="pill pill-ok">Administrator</span>}
+              <span className="muted"> {u.bikes} Räder, {u.activities} Fahrten</span>
+            </span>
+            {!u.is_admin && (
+              <button
+                className="link small danger"
+                onClick={() => { if (window.confirm(`Konto ${u.email} samt allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) run(() => api.del(`/admin/users/${u.id}`), "Konto gelöscht."); }}
+              >
+                Löschen
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {msg && <p className="ok" role="status">{msg}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );

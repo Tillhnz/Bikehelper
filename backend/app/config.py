@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./bikehelper.db"
     secret_key: str = "dev-secret-change-me"
     public_url: str = "http://localhost:8080"
-    allow_registration: bool = True
+    allow_registration: bool = False  # nur der erste Nutzer und Eingeladene dürfen sich registrieren
+    trusted_proxies: int = 1  # Proxys vor dem Webserver (Nginx Proxy Manager = 1), für die Login-Drosselung
     token_expire_days: int = 7
     weather_enabled: bool = True
     timezone: str = "Europe/Berlin"

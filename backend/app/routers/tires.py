@@ -1,12 +1,12 @@
 """Reifenmanagement: Reifensätze je Rad, welcher gerade montiert ist, und die Kilometer darauf."""
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Bike, TireMount, TireSet, User
+from ..models import TireMount, TireSet, User
 from ..schemas import MountDateIn, MountOut, MountRangeIn, TireSetCreate, TireSetIn, TireSetOut
 from ..security import current_user
 from ..services import (

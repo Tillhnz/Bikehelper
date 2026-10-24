@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -98,10 +98,8 @@ def logout_all(user: User = Depends(current_user), db: Session = Depends(get_db)
     return TokenOut(access_token=create_token(user))
 
 
-@router.post("/me/delete", status_code=204)
-def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Löscht das Konto samt Rädern, Komponenten, Fahrten, Inventar und Zielen. Nicht rückgängig zu machen."""
-    _check_password(user, data.password, request)
+def delete_user_data(db: Session, user: User) -> None:
+    """Entfernt ein Konto samt allen Daten (Räder, Komponenten, Fahrten, Inventar, Ziele …)."""
     uid = user.id
     comps = db.scalars(select(Component).where(Component.user_id == uid)).all()
     rule_ids = [r.id for c in comps for r in c.rules]
@@ -114,6 +112,15 @@ def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depen
         db.execute(delete(model).where(model.user_id == uid))
     db.delete(user)
     db.commit()
+
+
+@router.post("/me/delete", status_code=204)
+def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Löscht das Konto samt allen Daten. Nicht rückgängig zu machen."""
+    _check_password(user, data.password, request)
+    if is_admin(db, user) and db.scalar(select(func.count()).select_from(User)) > 1:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Als Administrator kannst du dein Konto erst löschen, wenn alle anderen Konten entfernt sind.")
+    delete_user_data(db, user)
 
 
 # ---------- Administration (erster Nutzer) ----------
@@ -156,3 +163,28 @@ def save_strava_settings(data: StravaSettingsIn, user: User = Depends(current_us
     user.strava_athlete_id = None
     db.commit()
     return _user_out(user, is_admin(db, user))
+
+
+@router.get("/admin/users")
+def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Konten dieser Installation mit Zahl der Räder und Fahrten (keine Inhalte)."""
+    rows = []
+    for u in db.scalars(select(User).order_by(User.id)):
+        rows.append({
+            "id": u.id, "email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None,
+            "bikes": db.scalar(select(func.count()).select_from(Bike).where(Bike.user_id == u.id)) or 0,
+            "activities": db.scalar(select(func.count()).select_from(Activity).where(Activity.user_id == u.id)) or 0,
+            "is_admin": u.id == admin.id,
+        })
+    return rows
+
+
+@router.delete("/admin/users/{user_id}", status_code=204)
+def remove_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Entfernt ein fremdes Konto samt Daten (zum Beispiel, wenn jemand gehen möchte)."""
+    if user_id == admin.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Das eigene Konto löschst du unter Sicherheit.")
+    target = db.get(User, user_id)
+    if target is None:
+        raise HTTPException(404, "Konto nicht gefunden")
+    delete_user_data(db, target)

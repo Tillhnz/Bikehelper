@@ -4,11 +4,12 @@ import { api, setToken } from "../api.js";
 
 export default function Login({ onLoggedIn }) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login");
+  const inviteParam = new URLSearchParams(window.location.search).get("invite") || "";
+  const [mode, setMode] = useState(inviteParam ? "register" : "login");
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [invite, setInvite] = useState("");
+  const [invite, setInvite] = useState(inviteParam);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 

@@ -186,10 +186,10 @@ Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [
 
 Die App ist für den Betrieb hinter dem Nginx Proxy Manager mit HTTPS gedacht. Eingebaut sind:
 
-- **Login-Drosselung:** Nach 8 Fehlversuchen pro E-Mail (oder 40 pro Adresse) in 15 Minuten antwortet die App mit „Zu viele Fehlversuche“. Registrierungen sind auf 10 pro Stunde und Adresse begrenzt. Die Zähler liegen im Speicher und sind nach einem Neustart leer.
+- **Login-Drosselung:** Nach 8 Fehlversuchen pro E-Mail (oder 40 pro Adresse) in 15 Minuten antwortet die App mit „Zu viele Fehlversuche“. Registrierungen sind auf 10 pro Stunde und Adresse begrenzt. Die Zähler liegen im Speicher und sind nach einem Neustart leer. Hinter dem Nginx Proxy Manager zählt die echte Client-Adresse (`TRUSTED_PROXIES=1`); läuft BikeHelper ohne Proxy davor, setze `TRUSTED_PROXIES=0`.
 - **Anmeldung:** Tokens gelten 7 Tage (`TOKEN_EXPIRE_DAYS`). Unter Einstellungen → Sicherheit kannst du das Passwort ändern oder dich überall abmelden. Beides macht alle älteren Tokens ungültig.
 - **Konto löschen:** Einstellungen → Sicherheit entfernt das Konto samt aller Daten vom Server (Passwort nötig).
-- **Einladungen:** Mit `ALLOW_REGISTRATION=false` kann sich nur noch registrieren, wer einen Einladungscode hat. Der erste Nutzer ist Administrator und erzeugt die Codes unter Einstellungen → Einladungen. Jeder Code gilt einmal.
+- **Einladungen:** Die Registrierung ist standardmäßig geschlossen (`ALLOW_REGISTRATION=false`). Das erste Konto ist immer erlaubt und wird Administrator. Weitere Nutzer brauchen einen Einladungscode: Einstellungen → Einladungen → „Neue Einladung erzeugen“ → „Link kopieren“ und der Person schicken. Der Link öffnet direkt die Registrierung mit eingetragenem Code, und jeder Code gilt einmal. Dort siehst du auch alle Konten (nur Zahl der Räder und Fahrten, keine Inhalte) und kannst Konten samt Daten entfernen. `./install.sh registration true` öffnet die Registrierung für alle, `false` schließt sie wieder.
 - **Header:** Der Webserver setzt Content-Security-Policy, `X-Frame-Options`, `nosniff`, `Referrer-Policy` und `Permissions-Policy`. API-Antworten sind nicht cachebar.
 - **Uploads:** Eine Fahrtdatei darf höchstens 50 MB haben, ein Strava-Export entpackt höchstens 40 GB, die CSV darin höchstens 300 MB. Der Webserver nimmt höchstens 4 GB (Export) bzw. 1 GB (Fahrtdateien) an.
 
@@ -245,8 +245,7 @@ send_timeout 900s;
 
 BikeHelper erkennt in diesem Fall einen bereits angekommenen Upload und zeigt dessen Fortschritt an, statt ihn noch einmal zu verlangen.
 
-Nach dem Anlegen deines Kontos `ALLOW_REGISTRATION=false` setzen und `docker compose up -d`,
-damit sich niemand Fremdes registrieren kann. Das erste Konto ist immer erlaubt.
+Die Registrierung ist standardmäßig geschlossen, nur das erste Konto ist immer erlaubt. Weitere Nutzer lädst du als Administrator per Link ein (siehe Abschnitt Sicherheit).
 
 ## Entwicklung ohne Docker
 

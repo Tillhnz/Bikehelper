@@ -484,7 +484,6 @@ def test_logout_all_password_change_invites_and_account_deletion():
     ratelimit.reset()
     with TestClient(app) as c:
         h = _user(c, "sec-admin@example.com")
-        me = c.get("/api/me", headers=h).json()
         # Passwortwechsel meldet alte Tokens ab
         assert c.put("/api/auth/password", headers=h, json={"current_password": "falsch", "new_password": "neuesPasswort1"}).status_code == 403
         assert c.get("/api/me", headers=h).status_code == 200  # falsches Passwort meldet nicht ab
@@ -591,3 +590,31 @@ def test_tire_catalog_url_import_refuses_private_and_insecure_targets():
             assert r.status_code == 422, url
         # Ohne Suchbegriff liefert der Katalog alle Größen (die Liste wird in der App nach Modell gruppiert)
         assert len(c.get("/api/tire-catalog", headers=h, params={"limit": 300}).json()["items"]) >= 40
+
+
+def test_admin_user_list_and_removal_and_proxy_ip():
+    with TestClient(app) as c:
+        from sqlalchemy import select
+        from app.models import User
+        from app.security import create_token
+        h = _user(c, "victim@example.com")
+        with SessionLocal() as db:
+            admin = {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
+            victim_id = db.scalar(select(User.id).where(User.email == "victim@example.com"))
+        assert c.get("/api/admin/users", headers=h).status_code == 403
+        users = c.get("/api/admin/users", headers=admin).json()
+        assert users[0]["is_admin"] and any(u["email"] == "victim@example.com" for u in users)
+        assert c.delete(f"/api/admin/users/{users[0]['id']}", headers=admin).status_code == 409  # sich selbst nicht
+        assert c.delete(f"/api/admin/users/{victim_id}", headers=h).status_code == 403
+        assert c.delete(f"/api/admin/users/{victim_id}", headers=admin).status_code == 204
+        assert c.get("/api/me", headers=h).status_code == 401
+        # Der Administrator kann sich nicht löschen, solange es andere Konten gibt
+        assert c.post("/api/me/delete", headers=admin, json={"password": "irrelevant"}).status_code in (403, 409)
+
+
+def test_client_ip_uses_the_entry_added_by_the_trusted_proxy():
+    from types import SimpleNamespace
+    from app import ratelimit
+    req = lambda xff: SimpleNamespace(headers={"x-forwarded-for": xff} if xff else {}, client=SimpleNamespace(host="172.18.0.5"))
+    assert ratelimit.client_ip(req("6.6.6.6, 203.0.113.9, 172.18.0.2")) == "203.0.113.9"  # gefälschter Eintrag zählt nicht
+    assert ratelimit.client_ip(req("")) == "172.18.0.5"

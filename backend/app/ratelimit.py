@@ -9,6 +9,8 @@ from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
 
+from .config import settings
+
 WINDOW_S = 15 * 60
 LIMIT_PER_EMAIL = 8
 LIMIT_PER_IP = 40
@@ -20,6 +22,13 @@ _fails: dict[str, deque] = defaultdict(deque)
 
 
 def client_ip(request: Request) -> str:
+    """Adresse des Clients. Hinter Proxys ist X-Forwarded-For fälschbar, deshalb zählt nur der Eintrag, den der
+    letzte vertrauenswürdige Proxy angehängt hat (TRUSTED_PROXIES = Zahl der Proxys vor dem Webserver, z. B. 1 für
+    den Nginx Proxy Manager)."""
+    hops = settings.trusted_proxies
+    parts = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    if hops > 0 and len(parts) > hops:
+        return parts[-(hops + 1)]
     return request.client.host if request.client else "unbekannt"
 
 

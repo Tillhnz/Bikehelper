@@ -1,3 +1,8 @@
+import os
+
+# Die Tests legen viele Konten an; die offene Registrierung ist im Betrieb standardmäßig aus
+os.environ.setdefault("ALLOW_REGISTRATION", "true")
+
 import pytest
 
 
