@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     geo_enabled: bool = True
     nominatim_url: str = "https://nominatim.openstreetmap.org"
 
+    # Wahoo Cloud: Fahrten regelmäßig automatisch abholen (Nutzer verbinden ihr Konto in den Einstellungen)
+    wahoo_enabled: bool = True
+    wahoo_api_url: str = "https://api.wahooligan.com"
+
     class Config:
         env_file = ".env"
 

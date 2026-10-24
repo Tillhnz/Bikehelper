@@ -32,6 +32,16 @@ class User(Base):
     remind_email: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     ntfy_topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # Wahoo Cloud: eigene Entwickler-App des Nutzers (developers.wahooligan.com), Verbindung per OAuth
+    wahoo_client_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    wahoo_client_secret: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    wahoo_access_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    wahoo_refresh_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    wahoo_expires_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    wahoo_bike_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Standardrad für importierte Fahrten
+    wahoo_last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
+
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
     token_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -287,3 +297,12 @@ class Invite(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     used_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class WahooSeen(Base):
+    """Wahoo-Workouts, die schon verarbeitet wurden (importiert, Duplikat oder ohne verwertbare Datei)."""
+    __tablename__ = "wahoo_seen"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    workout_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    status: Mapped[str] = mapped_column(String(12))  # imported | duplicate | skipped

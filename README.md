@@ -123,6 +123,16 @@ Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RA
 - **Anleitungen:** Bei jeder Wartungsregel öffnet „Anleitung“ geprüfte Links, hauptsächlich die Reparaturanleitungen von Park Tool (Englisch, teils mit Video) und für Wachs die von Silca. Die Links liegen im Katalog (`backend/app/catalog.py`, `GUIDES`) und lassen sich dort ändern.
 - **Orte** (Statistik, Reiter „Orte“): Deine Hauptstadt (die Stadt mit den meisten Fahrtstarts) mit Anteil erkundeter Kacheln, weitere Städte und Länder. Grenzen holt BikeHelper einmalig je Ort von OpenStreetMap (Nominatim, höchstens eine Anfrage pro Sekunde) und speichert sie. Dabei gehen nur die Mittelpunkte einzelner Kacheln hinaus. Der Anteil eines Landes ist geschätzt (erkundete Kacheln geteilt durch Landfläche). Mit `GEO_ENABLED=false` ausschalten oder `NOMINATIM_URL` auf einen eigenen Server setzen.
 
+### Wahoo-Import (automatisch)
+
+Fahrten deines Wahoo-ELEMNT werden über die Wahoo Cloud API abgeholt, ohne Strava und ohne Abo:
+
+1. Im [Wahoo-Entwicklerportal](https://developers.wahooligan.com) eine eigene Anwendung anlegen.
+2. Als Redirect-URI `PUBLIC_URL/api/wahoo/callback` eintragen (steht auch in den Einstellungen) und die Berechtigungen `user_read`, `workouts_read` und `offline_data` wählen.
+3. Einstellungen → Wahoo: Client-ID und Client-Secret eintragen, speichern, „Mit Wahoo verbinden“.
+
+Danach holt die App alle 30 Minuten neue Fahrten ab (oder sofort über „Jetzt abholen“) und ordnet sie dem gewählten Rad zu. Doppelte Fahrten, etwa aus einem früheren Strava-Export, werden erkannt. Neue Wahoo-Apps laufen im Testmodus mit höchstens 100 Abrufen pro Stunde und 250 pro Tag, und jede neue Fahrt braucht einen Abruf. Ein großer Altbestand verteilt sich deshalb über mehrere Läufe, die App macht automatisch weiter. Die Zugangsdaten liegen wie die anderen Einstellungen in der Datenbank. Mit `WAHOO_ENABLED=false` schaltest du die Funktion ab.
+
 ## Statistik
 
 Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wetter), **Belastung**, **Jahresrückblick**, **Ziele** und **Vergleiche**.

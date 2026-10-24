@@ -6,9 +6,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import notify
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import activities, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tires, weather as weather_router
+from .routers import activities, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tires, wahoo as wahoo_router, weather as weather_router
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
+from .wahoo import service as wahoo_service
 from .weather import service as weather_service
 
 
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     weather_service.start_background()
     notify.start_background()
     geo_service.start_background()
+    wahoo_service.start_background()
     yield
 
 
@@ -54,6 +56,7 @@ app.include_router(mapconfig.router)
 app.include_router(advisor.router)
 app.include_router(notifications.router)
 app.include_router(places_router.router)
+app.include_router(wahoo_router.router)
 
 
 @app.get("/api/health")
