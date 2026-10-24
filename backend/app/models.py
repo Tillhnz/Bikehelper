@@ -32,6 +32,9 @@ class User(Base):
     remind_email: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     ntfy_topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
+    token_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     bikes: Mapped[list["Bike"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
@@ -273,3 +276,14 @@ class GeoState(Base):
     explored: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class Invite(Base):
+    """Einladungscode, mit dem sich jemand registrieren kann, auch wenn die offene Registrierung aus ist."""
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    used_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

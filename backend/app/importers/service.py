@@ -20,7 +20,8 @@ from ..services import create_default_components
 from .parsers import ParsedActivity, ParseError, is_cycling, parse_activity_file
 from .strava_export import ExportEntry, clean_gear_name, gear_key, index_export
 
-MAX_UPLOAD_FILE_BYTES = 100 * 1024 * 1024
+MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024  # eine einzelne Fahrtdatei (typisch unter 10 MB)
+MAX_ARCHIVE_TOTAL_BYTES = 40 * 1024**3  # entpackte Gesamtgröße eines Strava-Exports
 MAX_ARCHIVE_ENTRIES = 200_000
 COMMIT_EVERY = 100
 
@@ -260,6 +261,8 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
         with SessionLocal() as db, zipfile.ZipFile(zip_path) as zf:
             if len(zf.infolist()) > MAX_ARCHIVE_ENTRIES:
                 raise ParseError("Das Archiv enthält zu viele Dateien.")
+            if sum(i.file_size for i in zf.infolist()) > MAX_ARCHIVE_TOTAL_BYTES:
+                raise ParseError("Das Archiv ist entpackt zu groß.")
             index = index_export(zf)
             if not index.entries:
                 raise ParseError(

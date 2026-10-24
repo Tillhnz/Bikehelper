@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +15,9 @@ from .weather import service as weather_service
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Für den Start genügen create_all und ensure_columns; später wechseln wir auf Alembic-Migrationen.
+    from .config import settings
+    if settings.secret_key in ("dev-secret-change-me", "bitte-aendern") or len(settings.secret_key) < 16:
+        logging.getLogger("bikehelper").warning("SECRET_KEY ist unsicher. Setze einen langen Zufallswert (openssl rand -hex 32).")
     Base.metadata.create_all(engine)
     ensure_columns()
     with SessionLocal() as db:
@@ -26,6 +30,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="BikeHelper", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """API-Antworten enthalten persönliche Daten: nicht zwischenspeichern, Inhaltstyp nicht erraten lassen."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
 app.include_router(auth.router)
 app.include_router(home.router)
 app.include_router(garage.router)

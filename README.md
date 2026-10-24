@@ -155,6 +155,19 @@ Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [
 - **Kacheln:** Zoomstufe 14 (rund 1,5 km). Das größte Quadrat zählt nur vollständig erkundete Kacheln; ein „Gebiet“ umfasst auch diagonal verbundene Kacheln. Das kann von Statshunters leicht abweichen.
 - Zeiten werden in der Zeitzone `TIMEZONE` ausgewertet (Standard `Europe/Berlin`).
 
+## Sicherheit
+
+Die App ist für den Betrieb hinter dem Nginx Proxy Manager mit HTTPS gedacht. Eingebaut sind:
+
+- **Login-Drosselung:** Nach 8 Fehlversuchen pro E-Mail (oder 40 pro Adresse) in 15 Minuten antwortet die App mit „Zu viele Fehlversuche“. Registrierungen sind auf 10 pro Stunde und Adresse begrenzt. Die Zähler liegen im Speicher und sind nach einem Neustart leer.
+- **Anmeldung:** Tokens gelten 7 Tage (`TOKEN_EXPIRE_DAYS`). Unter Einstellungen → Sicherheit kannst du das Passwort ändern oder dich überall abmelden. Beides macht alle älteren Tokens ungültig.
+- **Konto löschen:** Einstellungen → Sicherheit entfernt das Konto samt aller Daten vom Server (Passwort nötig).
+- **Einladungen:** Mit `ALLOW_REGISTRATION=false` kann sich nur noch registrieren, wer einen Einladungscode hat. Der erste Nutzer ist Administrator und erzeugt die Codes unter Einstellungen → Einladungen. Jeder Code gilt einmal.
+- **Header:** Der Webserver setzt Content-Security-Policy, `X-Frame-Options`, `nosniff`, `Referrer-Policy` und `Permissions-Policy`. API-Antworten sind nicht cachebar.
+- **Uploads:** Eine Fahrtdatei darf höchstens 50 MB haben, ein Strava-Export entpackt höchstens 40 GB, die CSV darin höchstens 300 MB. Der Webserver nimmt höchstens 4 GB (Export) bzw. 1 GB (Fahrtdateien) an.
+
+Was du selbst tun musst: HTTPS im Nginx Proxy Manager aktivieren (inklusive „Force SSL“ und HSTS), einen langen `SECRET_KEY` setzen, `ALLOW_REGISTRATION=false` nach dem Anlegen deines Kontos und die Ports von Datenbank und Backend nicht nach außen öffnen. Wer die App mit anderen teilt, sollte regelmäßig ein Backup der Datenbank ziehen (siehe Backup).
+
 ## Schnellinstallation
 
 Auf einer frischen Debian-/Ubuntu-Maschine (VM oder LXC auf Proxmox), per SSH als normaler Benutzer mit sudo oder als root:

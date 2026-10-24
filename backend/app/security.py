@@ -24,9 +24,10 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_token(user_id: int) -> str:
+def create_token(user: User) -> str:
     exp = datetime.now(timezone.utc) + timedelta(days=settings.token_expire_days)
-    return jwt.encode({"sub": str(user_id), "exp": exp}, settings.secret_key, algorithm="HS256")
+    claims = {"sub": str(user.id), "exp": exp, "tv": user.token_version or 0}
+    return jwt.encode(claims, settings.secret_key, algorithm="HS256")
 
 
 def current_user(
@@ -41,6 +42,18 @@ def current_user(
         user = db.get(User, int(payload["sub"]))
     except (jwt.PyJWTError, KeyError, ValueError):
         raise unauthorized
-    if user is None:
-        raise unauthorized
+    if user is None or payload.get("tv", 0) != (user.token_version or 0):
+        raise unauthorized  # abgemeldet (Überall abmelden / Passwort geändert) oder Konto gelöscht
+    return user
+
+
+def is_admin(db: Session, user: User) -> bool:
+    """Admin ist der erste angelegte Nutzer."""
+    from sqlalchemy import select
+    return db.scalar(select(User.id).order_by(User.id).limit(1)) == user.id
+
+
+def require_admin(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    if not is_admin(db, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Nur für den Administrator")
     return user

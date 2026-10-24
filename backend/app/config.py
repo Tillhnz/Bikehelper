@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-change-me"
     public_url: str = "http://localhost:8080"
     allow_registration: bool = True
-    token_expire_days: int = 30
+    token_expire_days: int = 7
     weather_enabled: bool = True
     timezone: str = "Europe/Berlin"
     # Kartenhintergrund: kostenloser CARTO-Schlüssel (dunkle Karte) oder eigene Kachel-URL; ohne beides OpenStreetMap

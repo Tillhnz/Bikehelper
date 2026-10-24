@@ -477,3 +477,63 @@ def test_heatmap_has_days_for_time_lapse_and_tires_are_no_default_components():
         d = c.get("/api/stats/heatmap", headers=h).json()
         assert len(d["lines"]) == len(d["days"]) == len(d["km"]) == 2
         assert d["days"][0] != d["days"][1] and all(len(t) == 3 for t in d["tiles"])
+
+
+def test_logout_all_password_change_invites_and_account_deletion():
+    from app import ratelimit
+    ratelimit.reset()
+    with TestClient(app) as c:
+        h = _user(c, "sec-admin@example.com")
+        me = c.get("/api/me", headers=h).json()
+        # Passwortwechsel meldet alte Tokens ab
+        assert c.put("/api/auth/password", headers=h, json={"current_password": "falsch", "new_password": "neuesPasswort1"}).status_code == 403
+        assert c.get("/api/me", headers=h).status_code == 200  # falsches Passwort meldet nicht ab
+        new = c.put("/api/auth/password", headers=h, json={"current_password": "geheim1234", "new_password": "neuesPasswort1"}).json()
+        assert c.get("/api/me", headers=h).status_code == 401
+        h2 = {"Authorization": f"Bearer {new['access_token']}"}
+        assert c.get("/api/me", headers=h2).status_code == 200
+        # Überall abmelden
+        t2 = c.post("/api/auth/logout-all", headers=h2).json()
+        assert c.get("/api/me", headers=h2).status_code == 401
+        h3 = {"Authorization": f"Bearer {t2['access_token']}"}
+
+        # Einladungen: nur Admin, nur einmal gültig
+        other = _user(c, "sec-other@example.com")
+        assert c.get("/api/admin/invites", headers=other).status_code == 403
+        from sqlalchemy import select
+        from app.models import User
+        from app.security import create_token
+        with SessionLocal() as db:  # Administrator ist der älteste Nutzer der Datenbank
+            admin = {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
+        assert c.get("/api/me", headers=admin).json()["is_admin"] is True
+        assert c.get("/api/me", headers=h3).json()["is_admin"] in (True, False)
+        code = c.post("/api/admin/invites", headers=admin).json()["code"]
+        from app.config import settings
+        old = settings.allow_registration
+        settings.allow_registration = False
+        try:
+            body = {"email": "sec-new@example.com", "password": "geheim1234"}
+            assert c.post("/api/auth/register", json=body).status_code == 403
+            assert c.post("/api/auth/register", json={**body, "invite": code}).status_code == 201
+            assert c.post("/api/auth/register", json={"email": "sec-new2@example.com", "password": "geheim1234", "invite": code}).status_code == 403
+        finally:
+            settings.allow_registration = old
+
+        # Konto löschen: Passwort nötig, danach sind die Daten weg
+        bike = c.post("/api/bikes", headers=other, json={"name": "Weg", "type": "road"}).json()
+        assert c.post("/api/me/delete", headers=other, json={"password": "falsch"}).status_code == 403
+        assert c.post("/api/me/delete", headers=other, json={"password": "geheim1234"}).status_code == 204
+        assert c.get("/api/me", headers=other).status_code == 401
+        assert c.post("/api/auth/login", json={"email": "sec-other@example.com", "password": "geheim1234"}).status_code == 401
+        assert bike["id"]
+
+
+def test_login_is_throttled():
+    from app import ratelimit
+    ratelimit.reset()
+    with TestClient(app) as c:
+        _user(c, "throttle@example.com")
+        for _ in range(ratelimit.LIMIT_PER_EMAIL):
+            assert c.post("/api/auth/login", json={"email": "throttle@example.com", "password": "x" * 9}).status_code == 401
+        assert c.post("/api/auth/login", json={"email": "throttle@example.com", "password": "geheim1234"}).status_code == 429
+    ratelimit.reset()

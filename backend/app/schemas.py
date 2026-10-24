@@ -7,11 +7,27 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    invite: str | None = Field(default=None, max_length=32)  # Einladungscode, wenn die Registrierung geschlossen ist
+
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordConfirmIn(BaseModel):
+    password: str = Field(max_length=128)
+
+
+class InviteOut(BaseModel):
+    id: int
+    code: str
+    used_by_email: str | None = None
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
 
 
 class TokenOut(BaseModel):
@@ -25,6 +41,7 @@ class UserOut(BaseModel):
     strava_configured: bool
     strava_connected: bool
     weight_kg: float | None = None
+    is_admin: bool = False
 
 
 class StravaSettingsIn(BaseModel):

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
+import { api, clearToken, setToken } from "../api.js";
 import { loadMapConfig, resetMapConfig } from "../geo.js";
 
 const PROVIDER_TEXT = {
@@ -239,6 +239,114 @@ function InstallSettings() {
   );
 }
 
+function SecuritySettings({ user }) {
+  const [pw, setPw] = useState({ current: "", next: "" });
+  const [del, setDel] = useState({ open: false, password: "" });
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  async function run(fn, done) {
+    setMsg("");
+    setError("");
+    try {
+      await fn();
+      if (done) setMsg(done);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const changePassword = (e) => {
+    e.preventDefault();
+    return run(async () => {
+      const r = await api.put("/auth/password", { current_password: pw.current, new_password: pw.next });
+      setToken(r.access_token);
+      setPw({ current: "", next: "" });
+    }, "Passwort geändert. Auf allen anderen Geräten bist du jetzt abgemeldet.");
+  };
+
+  const logoutAll = () =>
+    run(async () => {
+      const r = await api.post("/auth/logout-all", {});
+      setToken(r.access_token);
+    }, "Alle anderen Geräte sind abgemeldet. Dieses Gerät bleibt angemeldet.");
+
+  const deleteAccount = (e) => {
+    e.preventDefault();
+    return run(async () => {
+      await api.post("/me/delete", { password: del.password });
+      clearToken();
+      window.location.assign("/");
+    });
+  };
+
+  return (
+    <section className="panel">
+      <h2>Sicherheit</h2>
+      <form className="inline-form" onSubmit={changePassword}>
+        <label>Aktuelles Passwort<input type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} required /></label>
+        <label>Neues Passwort<input type="password" autoComplete="new-password" minLength={8} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} required /></label>
+        <button className="btn primary">Passwort ändern</button>
+      </form>
+      <p className="muted small">Anmeldungen laufen nach 7 Tagen ab. Wenn du ein Gerät verloren hast, melde alle anderen ab:</p>
+      <div className="actions">
+        <button className="btn" onClick={logoutAll}>Überall abmelden</button>
+      </div>
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+
+      <h3>Konto löschen</h3>
+      <p className="muted small">
+        Entfernt {user.email} samt Rädern, Komponenten, Wartungen, Fahrten, Inventar und Zielen vom Server. Das lässt sich nicht rückgängig machen.
+      </p>
+      {!del.open ? (
+        <div className="actions"><button className="btn danger" onClick={() => setDel({ open: true, password: "" })}>Konto löschen …</button></div>
+      ) : (
+        <form className="inline-form" onSubmit={deleteAccount}>
+          <label>Passwort zur Bestätigung<input type="password" autoComplete="current-password" value={del.password} onChange={(e) => setDel({ ...del, password: e.target.value })} required /></label>
+          <button className="btn danger">Konto endgültig löschen</button>
+          <button type="button" className="btn" onClick={() => setDel({ open: false, password: "" })}>Abbrechen</button>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function AdminSettings() {
+  const [invites, setInvites] = useState(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => api.get("/admin/invites").then(setInvites).catch((e) => setError(e.message)), []);
+  useEffect(() => { load(); }, [load]);
+
+  const run = async (fn) => {
+    setError("");
+    try { await fn(); await load(); } catch (err) { setError(err.message); }
+  };
+
+  return (
+    <section className="panel">
+      <h2>Einladungen</h2>
+      <p className="muted small">
+        Du bist Administrator. Wenn die offene Registrierung ausgeschaltet ist (ALLOW_REGISTRATION=false), können sich neue Nutzer nur mit einem Einladungscode anmelden. Jeder Code gilt einmal.
+      </p>
+      <div className="actions">
+        <button className="btn primary" onClick={() => run(() => api.post("/admin/invites", {}))}>Neuen Code erzeugen</button>
+      </div>
+      {invites?.length > 0 && (
+        <ul className="log-list">
+          {invites.map((i) => (
+            <li key={i.id}>
+              <span><strong>{i.code}</strong> <span className="muted">{i.used_by_email ? `verwendet von ${i.used_by_email}` : "offen"}</span></span>
+              <button className="link small danger" onClick={() => run(() => api.del(`/admin/invites/${i.id}`))}>Löschen</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 export default function Settings({ user, onChange }) {
   return (
     <>
@@ -258,6 +366,10 @@ export default function Settings({ user, onChange }) {
       <InstallSettings />
 
       <MapSettings />
+
+      <SecuritySettings user={user} />
+
+      {user.is_admin && <AdminSettings />}
 
       <section className="panel">
         <h2>Strava</h2>

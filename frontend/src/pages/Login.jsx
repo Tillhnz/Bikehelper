@@ -8,6 +8,7 @@ export default function Login({ onLoggedIn }) {
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [invite, setInvite] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -21,7 +22,7 @@ export default function Login({ onLoggedIn }) {
     setBusy(true);
     try {
       const path = mode === "login" ? "/auth/login" : "/auth/register";
-      const { access_token } = await api.post(path, { email, password });
+      const { access_token } = await api.post(path, mode === "login" ? { email, password } : { email, password, invite: invite.trim() || null });
       setToken(access_token);
       await onLoggedIn();
       navigate("/");
@@ -57,11 +58,17 @@ export default function Login({ onLoggedIn }) {
           />
           {mode === "register" && <span className="hint">Mindestens 8 Zeichen.</span>}
         </label>
+        {mode === "register" && !allowRegistration && (
+          <label>
+            Einladungscode
+            <input value={invite} onChange={(e) => setInvite(e.target.value)} maxLength={32} autoComplete="off" />
+            <span className="hint">Die Registrierung ist geschlossen. Den Code bekommst du vom Administrator.</span>
+          </label>
+        )}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn primary" disabled={busy}>
           {mode === "login" ? "Anmelden" : "Konto anlegen"}
         </button>
-        {allowRegistration && (
           <button
             type="button"
             className="link"
@@ -69,7 +76,6 @@ export default function Login({ onLoggedIn }) {
           >
             {mode === "login" ? "Noch kein Konto? Konto anlegen" : "Schon ein Konto? Anmelden"}
           </button>
-        )}
       </form>
     </div>
   );

@@ -220,19 +220,29 @@ def _find_member(names: set[str], filename: str) -> str | None:
     return None
 
 
+MAX_CSV_BYTES = 300 * 1024 * 1024
+
+
+def _read_csv_member(zf: zipfile.ZipFile, name: str) -> bytes:
+    """Liest eine CSV aus dem Archiv, ohne eine Zip-Bombe zu entpacken."""
+    if zf.getinfo(name).file_size > MAX_CSV_BYTES:
+        raise ValueError(f"{name} ist zu groß")
+    return zf.read(name)
+
+
 def index_export(zf: zipfile.ZipFile) -> ExportIndex:
     names = {i.filename for i in zf.infolist() if not i.is_dir()}
 
     bikes: dict[str, tuple[str, str | None, str | None]] = {}
     bikes_member = _find_member(names, "bikes.csv")
     if bikes_member:
-        bikes = read_bikes_csv(_decode(zf.read(bikes_member)))
+        bikes = read_bikes_csv(_decode(_read_csv_member(zf, bikes_member)))
 
     parsed = None
     csv_member = _find_member(names, "activities.csv")
     if csv_member:
         activity_names = {n for n in names if _is_supported(n)}
-        parsed = read_activities_csv(_decode(zf.read(csv_member)), activity_names, frozenset(bikes))
+        parsed = read_activities_csv(_decode(_read_csv_member(zf, csv_member)), activity_names, frozenset(bikes))
     if parsed is not None:
         entries, without_file, has_gear = parsed
         return ExportIndex(entries, without_file, True, bikes, has_gear)
