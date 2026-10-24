@@ -12,7 +12,7 @@ from ..schemas import (
 from ..security import current_user
 from ..services import (
     apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
-    effective_installed, measurement_points,
+    effective_installed, is_tracked, measurement_points,
     rule_state, tire_set_km, worst_status,
 )
 
@@ -43,7 +43,7 @@ def _own_rule(db: Session, user: User, rule_id: int) -> MaintenanceRule:
 
 
 def _bike_out(db: Session, bike: Bike) -> BikeOut:
-    active = [c for c in bike.components if not c.retired_at]
+    active = [c for c in bike.components if not c.retired_at and is_tracked(c)]
     statuses = [component_status(db, c) for c in active]
     ts = current_tire_set(db, bike.id)
     return BikeOut(
@@ -321,6 +321,8 @@ def maintenance_overview(user: User = Depends(current_user), db: Session = Depen
     ).all()
     items = []
     for c in comps:
+        if not is_tracked(c):
+            continue
         for r in c.rules:
             st = rule_state(db, c, r)
             if st["status"] in ("soon", "due"):

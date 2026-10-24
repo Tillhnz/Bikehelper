@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { api, fmtKm } from "../api.js";
+import { api, fmtDate, fmtKm } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 import { loadMapConfig, tileOptions } from "../geo.js";
 
@@ -46,6 +46,10 @@ export default function Heatmap() {
   const [options, setOptions] = useState({ years: [], bikes: [] });
   const [data, setData] = useState(null);
   const [showTiles, setShowTiles] = useState(true);
+  const [timeOn, setTimeOn] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);        // 0,5 = ruhig, 1 = normal, 2 = schnell
+  const [cutoff, setCutoff] = useState(0);      // Tage seit 1970, nur Fahrten bis zu diesem Tag
   const [error, setError] = useState("");
   const [cfg, setCfg] = useState(null);
   const boxRef = useRef(null);
@@ -113,7 +117,8 @@ export default function Heatmap() {
         ctx.fillStyle = st.dark ? "rgba(111, 211, 195, 0.13)" : "rgba(20, 150, 130, 0.14)";
         ctx.strokeStyle = st.dark ? "rgba(111, 211, 195, 0.28)" : "rgba(20, 150, 130, 0.45)";
         ctx.lineWidth = 1;
-        for (const [tx, ty] of st.tiles) {
+        for (const [tx, ty, td] of st.tiles) {
+          if (st.timeOn && td > st.cutoff) continue;
           const x = (tx / n) * world - ox, y = (ty / n) * world - oy;
           if (x > size.x || y > size.y || x + w < 0 || y + w < 0) continue;
           ctx.fillRect(x, y, w, w);
@@ -123,25 +128,38 @@ export default function Heatmap() {
 
       // Strecken: additiv gemischt, damit oft gefahrene Wege heller leuchten
       // Dunkle Karte: additiv gemischt (leuchtet). Helle Karte: normales Überlagern, dichter wird dunkler.
-      ctx.globalCompositeOperation = st.dark ? "lighter" : "source-over";
-      ctx.strokeStyle = st.dark ? "rgba(255, 112, 40, 0.22)" : "rgba(214, 48, 20, 0.30)";
-      ctx.lineWidth = Math.max(1.2, Math.min(3, (z - 5) * 0.35));
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
+      // Im Zeitverlauf leuchten Fahrten der letzten drei Wochen vor dem gewählten Tag hell auf.
+      const baseWidth = Math.max(1.2, Math.min(3, (z - 5) * 0.35));
       const stride = z < 8 ? 4 : z < 10 ? 2 : 1;
       const vx0 = (ox) / world, vy0 = oy / world, vx1 = (ox + size.x) / world, vy1 = (oy + size.y) / world;
-      for (const l of st.lines) {
-        const [bx0, by0, bx1, by1] = l.box;
-        if (bx1 < vx0 || bx0 > vx1 || by1 < vy0 || by0 > vy1) continue;
-        const p = l.pts;
-        ctx.beginPath();
-        ctx.moveTo(p[0] * world - ox, p[1] * world - oy);
-        for (let i = 2; i < p.length; i += 2 * stride) ctx.lineTo(p[i] * world - ox, p[i + 1] * world - oy);
-        ctx.stroke();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      for (const pass of st.timeOn ? [0, 1] : [0]) {
+        ctx.globalCompositeOperation = st.dark ? "lighter" : "source-over";
+        if (pass === 0) {
+          ctx.strokeStyle = st.dark ? "rgba(255, 112, 40, 0.22)" : "rgba(214, 48, 20, 0.30)";
+          ctx.lineWidth = baseWidth;
+        } else {
+          ctx.strokeStyle = st.dark ? "rgba(255, 226, 140, 0.75)" : "rgba(0, 90, 200, 0.75)";
+          ctx.lineWidth = baseWidth + 1;
+        }
+        for (const l of st.lines) {
+          if (st.timeOn) {
+            if (l.day > st.cutoff) continue;
+            if ((st.cutoff - l.day <= 21) !== (pass === 1)) continue;
+          }
+          const [bx0, by0, bx1, by1] = l.box;
+          if (bx1 < vx0 || bx0 > vx1 || by1 < vy0 || by0 > vy1) continue;
+          const p = l.pts;
+          ctx.beginPath();
+          ctx.moveTo(p[0] * world - ox, p[1] * world - oy);
+          for (let i = 2; i < p.length; i += 2 * stride) ctx.lineTo(p[i] * world - ox, p[i + 1] * world - oy);
+          ctx.stroke();
+        }
       }
       ctx.globalCompositeOperation = "source-over";
 
-      if (st.square && st.showTiles) {
+      if (st.square && st.showTiles && !st.timeOn) {
         const [[s, w], [nn, e]] = st.square.bounds;
         const px = (lng, lat) => {
           const sn = Math.sin((lat * Math.PI) / 180);
@@ -167,9 +185,9 @@ export default function Heatmap() {
   useEffect(() => {
     const st = state.current;
     if (!st.map || !data) return;
-    st.lines = data.lines.map((s) => {
+    st.lines = data.lines.map((s, i) => {
       const pts = decodeToMercator(s);
-      return { pts, box: bboxOf(pts) };
+      return { pts, box: bboxOf(pts), day: data.days?.[i] ?? 0, km: data.km?.[i] ?? 0 };
     }).filter((l) => l.pts.length >= 4);
     st.tiles = data.tiles;
     st.zoomTile = data.zoom;
@@ -205,6 +223,51 @@ export default function Heatmap() {
     state.current.schedule?.();
   }, [showTiles]);
 
+  // Zeitraum der Daten und Kennzahlen bis zum gewählten Tag
+  const span = useMemo(() => {
+    if (!data?.days?.length) return null;
+    return { min: Math.min(...data.days), max: Math.max(...data.days) };
+  }, [data]);
+  const upTo = useMemo(() => {
+    if (!data?.days || !timeOn) return null;
+    let rides = 0, km = 0;
+    data.days.forEach((d, i) => { if (d <= cutoff) { rides += 1; km += data.km[i] ?? 0; } });
+    const tiles = data.tiles.reduce((n, t) => n + (t[2] <= cutoff ? 1 : 0), 0);
+    return { rides, km, tiles };
+  }, [data, timeOn, cutoff]);
+
+  useEffect(() => {
+    const st = state.current;
+    st.timeOn = timeOn;
+    st.cutoff = cutoff;
+    st.schedule?.();
+  }, [timeOn, cutoff, data, cfg]);
+
+  // Neue Daten (anderer Filter): Zeitverlauf von vorn
+  useEffect(() => { if (span) setCutoff(timeOn ? span.min : span.max); setPlaying(false); }, [span]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Abspielen: etwa 25 Sekunden für den ganzen Zeitraum bei normaler Geschwindigkeit
+  useEffect(() => {
+    if (!playing || !span) return undefined;
+    let raf = 0, last = performance.now(), pos = cutoff >= span.max ? span.min : cutoff;
+    const perSecond = Math.max(1, (span.max - span.min) / 25) * speed;
+    const tick = (now) => {
+      pos += ((now - last) / 1000) * perSecond;
+      last = now;
+      if (pos >= span.max) { setCutoff(span.max); setPlaying(false); return; }
+      setCutoff(Math.floor(pos));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, speed, span]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleTime() {
+    if (!span) return;
+    if (!timeOn) { setTimeOn(true); setCutoff(span.min); setPlaying(true); }
+    else { setTimeOn(false); setPlaying(false); setCutoff(span.max); }
+  }
+
   const set = (k) => (e) => setFilters({ ...filters, [k]: e.target.value });
   const empty = data && data.lines.length === 0;
 
@@ -221,6 +284,7 @@ export default function Heatmap() {
             <option value="">Alle Räder</option>
             {options.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+          <button className={`chip ${timeOn ? "on" : ""}`} onClick={toggleTime} aria-pressed={timeOn} disabled={!span}>Zeitverlauf</button>
           <button className={`chip ${showTiles ? "on" : ""}`} onClick={() => setShowTiles(!showTiles)} aria-pressed={showTiles}>
             Erkundete Kacheln
           </button>
@@ -231,10 +295,33 @@ export default function Heatmap() {
       {empty && (
         <EmptyState title="Noch keine Strecken" text="Importiere Fahrten mit GPS-Daten, dann erscheinen sie hier." />
       )}
+      {timeOn && span && (
+        <div className="time-bar" role="group" aria-label="Zeitverlauf">
+          <button className="btn small primary" onClick={() => { if (cutoff >= span.max) setCutoff(span.min); setPlaying(!playing); }}>
+            {playing ? "Pause" : cutoff >= span.max ? "Nochmal" : "Abspielen"}
+          </button>
+          <input
+            type="range" min={span.min} max={span.max} step={1} value={Math.min(Math.max(cutoff, span.min), span.max)}
+            style={{ "--pct": `${((cutoff - span.min) / Math.max(1, span.max - span.min)) * 100}%` }}
+            onChange={(e) => { setPlaying(false); setCutoff(Number(e.target.value)); }}
+            aria-label="Datum" aria-valuetext={fmtDate(new Date(cutoff * 86400000).toISOString().slice(0, 10))}
+          />
+          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Geschwindigkeit">
+            <option value={0.5}>langsam</option>
+            <option value={1}>normal</option>
+            <option value={2}>schnell</option>
+            <option value={4}>sehr schnell</option>
+          </select>
+          <div className="time-read">
+            <strong>{fmtDate(new Date(cutoff * 86400000).toISOString().slice(0, 10))}</strong>
+            {upTo && <span className="muted small">{fmtKm(upTo.rides)} Fahrten · {fmtKm(upTo.km)} km · {fmtKm(upTo.tiles)} Kacheln</span>}
+          </div>
+        </div>
+      )}
       <div className="map-wrap" style={empty ? { display: "none" } : undefined}>
         <div ref={boxRef} style={{ height: "100%" }} />
         {!data && !error && <div className="map-badge">Lade Strecken …</div>}
-        {data && !empty && (
+        {data && !empty && !timeOn && (
           <div className="map-badge">
             {fmtKm(data.lines.length)} Fahrten · {fmtKm(data.tiles.length)} Kacheln
             {data.max_square && showTiles ? ` · größtes Quadrat ${data.max_square.size} × ${data.max_square.size}` : ""}

@@ -122,7 +122,7 @@ Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wett
 - **Ziele:** Jahresziele für Kilometer, Höhenmeter, Fahrten und Fahrzeit mit Vergleich zum gleichmäßigen Plan, Hochrechnung aufs Jahresende und dem nötigen Wochenwert.
 - **Vergleiche:** Kilometer pro Monat und Jahr, Räder pro Jahr, Tempo, Profil, Tageszeit, Jahreszeiten, Tempo pro Monat, Meilensteine (500 bis 100.000 km), Bestenlisten und Vergleiche wie Erdumrundungen.
 
-Die Heatmap zoomt beim Öffnen auf dein Heimatgebiet; „Alles anzeigen“ zeigt auch Ausreißer wie Urlaubsfahrten.
+Die Heatmap zoomt beim Öffnen auf dein Heimatgebiet und hat einen **Zeitverlauf**: Er spielt ab, wie die Touren über die Jahre dazugekommen sind (neue Fahrten leuchten kurz hell auf, dazu Zähler für Fahrten, Kilometer und Kacheln). Mit dem Regler springst du zu jedem Tag.  „Alles anzeigen“ zeigt auch Ausreißer wie Urlaubsfahrten.
 
 ## Kettenlehre, Erinnerungen und App
 

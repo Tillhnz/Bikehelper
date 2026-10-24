@@ -538,8 +538,10 @@ export default function BikeDetail() {
   if (error && !bike) return <p className="error" role="alert">{error}</p>;
   if (!bike) return <p className="muted">Lade …</p>;
 
-  const active = components.filter((c) => !c.retired_at);
-  const retired = components.filter((c) => c.retired_at);
+  const legacy = components.filter((c) => c.category === "tire_front" || c.category === "tire_rear");
+  const tracked = components.filter((c) => !legacy.includes(c));
+  const active = tracked.filter((c) => !c.retired_at);
+  const retired = tracked.filter((c) => c.retired_at);
 
   return (
     <>
@@ -596,7 +598,7 @@ export default function BikeDetail() {
       {active.length === 0 && !adding ? (
         <EmptyState
           title="Noch keine Komponenten"
-          text="Füge Kette, Kassette, Reifen und weitere Teile hinzu, damit BikeHelper den Verschleiß mitzählt."
+          text="Füge Kette, Kassette, Bremsen und weitere Teile hinzu, damit BikeHelper den Verschleiß mitzählt. Reifen verwaltest du unter „Reifen“."
         >
           <div className="actions" style={{ justifyContent: "center" }}>
             <button className="btn primary" onClick={addStandard}>Standardkomponenten anlegen</button>
@@ -607,6 +609,19 @@ export default function BikeDetail() {
         <div className="component-list">
           {active.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} />)}
         </div>
+      )}
+
+      {legacy.length > 0 && (
+        <details className="howto legacy-tires">
+          <summary>Frühere Reifen-Einträge ({legacy.length})</summary>
+          <p className="muted small">
+            Reifen laufen jetzt über die Reifensätze weiter oben. Diese Einträge zählen nicht mehr zur Wartung und lösen keine
+            Meldungen aus. Du kannst sie löschen, sobald du die Reifensätze angelegt hast.
+          </p>
+          <div className="component-list">
+            {legacy.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} />)}
+          </div>
+        </details>
       )}
 
       {retired.length > 0 && (

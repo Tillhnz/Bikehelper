@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import SessionLocal
 from .models import Component, RuleNotice, User
-from .services import rule_state
+from .services import is_tracked, rule_state
 
 log = logging.getLogger("bikehelper.notify")
 
@@ -39,6 +39,8 @@ def collect_changes(db: Session, user: User, record: bool = True) -> list[dict]:
     comps = db.scalars(select(Component).where(Component.user_id == user.id, Component.retired_at.is_(None))).all()
     out = []
     for c in comps:
+        if not is_tracked(c):
+            continue
         for r in c.rules:
             st = rule_state(db, c, r)["status"]
             notice = db.get(RuleNotice, r.id)

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -74,21 +74,34 @@ def heatmap(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    """Alle Strecken (vereinfachte Polylines) plus erkundete Kacheln für die Karte."""
-    _, rows = _load(db, user, bike_id, year)
-    tiles: set = set()
-    lines = []
+    """Alle Strecken (vereinfachte Polylines) plus erkundete Kacheln für die Karte.
+
+    Für den Zeitverlauf gibt es zu jeder Strecke Tag (Tage seit 1970, Ortszeit) und Kilometer und zu jeder Kachel den
+    Tag der ersten Fahrt hindurch.
+    """
+    tz, rows = _load(db, user, bike_id, year)
+    epoch = date(1970, 1, 1)
+    tiles: dict = {}
+    lines, days, kms = [], [], []
     for a, r in rows:
+        day = (local(a.start_date, tz).date() - epoch).days
         if a.polyline:
             lines.append(a.polyline)
-        tiles |= r.tiles or set()
-    size, at = T.max_square(tiles)
+            days.append(day)
+            kms.append(round(a.distance_km, 1))
+        for t in r.tiles or ():
+            if t not in tiles or day < tiles[t]:
+                tiles[t] = day
+    size, at = T.max_square(set(tiles))
     square = None
     if at:
         s, w, _, _ = T.tile_bounds(at[0] + size - 1, at[1] + size - 1)
         _, _, n, e = T.tile_bounds(at[0], at[1])
         square = {"size": size, "bounds": [[s, w], [n, e]]}
-    return {"lines": lines, "tiles": [list(t) for t in sorted(tiles)], "zoom": T.ZOOM, "max_square": square}
+    return {
+        "lines": lines, "days": days, "km": kms,
+        "tiles": [[x, y, tiles[(x, y)]] for x, y in sorted(tiles)], "zoom": T.ZOOM, "max_square": square,
+    }
 
 
 def _today(tz):

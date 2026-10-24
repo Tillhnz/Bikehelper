@@ -4,9 +4,12 @@ from sqlalchemy.orm import Session
 
 from ..catalog import CATALOG, chain_rules
 from ..database import get_db
-from ..models import Bike, Component, InventoryItem, MaintenanceRule, User
+import re
+
+from ..models import Bike, Component, InventoryItem, MaintenanceRule, TireSet, User
 from ..schemas import InstallIn, InventoryIn, InventoryOut
 from ..security import current_user
+from ..services import current_tire_set, mount_tire_set
 
 router = APIRouter(prefix="/api", tags=["inventory"])
 
@@ -81,6 +84,19 @@ def install_item(item_id: int, data: InstallIn, user: User = Depends(current_use
     bike = _check_bike(db, user, data.bike_id)
     if item.quantity < 1:
         raise HTTPException(409, "Dieses Teil ist nicht mehr auf Lager.")
+    if item.category == "tires":
+        # Reifen laufen über die Reifensätze: neuen Satz anlegen und montieren
+        m = re.search(r"(\d{2}(?:[.,]\d)?)\s*(?:mm)?", item.spec or "")
+        width = float(m.group(1).replace(",", ".")) if m else None
+        prev = current_tire_set(db, bike.id)
+        ts = TireSet(user_id=user.id, bike_id=bike.id, name=item.name, brand=item.brand,
+                     width_mm=width if width and 18 <= width <= 85 else None, notes=item.notes)
+        db.add(ts)
+        db.flush()
+        mount_tire_set(db, ts, data.installed_at)
+        item.quantity -= 1
+        db.commit()
+        return {"component_id": None, "tire_set_id": ts.id, "replaced": prev.name if prev else None, "item": _out(item)}
     replaced = None
     if item.category in CATALOG:
         for c in bike.components:

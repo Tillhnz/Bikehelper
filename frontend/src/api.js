@@ -87,6 +87,7 @@ export const CATEGORIES = {
   chain: "Kette",
   cassette: "Kassette",
   chainring: "Kettenblatt",
+  tires: "Reifen",
   tire_front: "Reifen vorn",
   tire_rear: "Reifen hinten",
   brake_pads: "Bremsbeläge",

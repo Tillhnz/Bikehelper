@@ -32,7 +32,7 @@ function ItemForm({ initial, bikes, onSave, onCancel, title }) {
       <h2 className="span-all">{title}</h2>
       <label>Art
         <select value={f.category} onChange={set("category")}>
-          {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(CATEGORIES).filter(([k]) => !k.startsWith("tire_")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
       <label>Name<input value={f.name} onChange={set("name")} placeholder="z. B. Schwalbe G-One RS" required autoFocus /></label>
@@ -81,7 +81,10 @@ function InstallForm({ item, bikes, onDone, onCancel }) {
       <label>Datum<input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
       <button className="btn primary">Einbauen</button>
       <button type="button" className="btn" onClick={onCancel}>Abbrechen</button>
-      <p className="hint span-all">Ein vorhandenes Teil derselben Art am Rad wird ausgemustert. Das neue Teil bekommt die Wartungsregeln und zählt ab 0 km.</p>
+      <p className="hint span-all">
+        {item.category === "tires"
+          ? "Es entsteht ein neuer Reifensatz am Rad und wird montiert. Der bisherige Satz endet am Vortag."
+          : "Ein vorhandenes Teil derselben Art am Rad wird ausgemustert. Das neue Teil bekommt die Wartungsregeln und zählt ab 0 km."}</p>
       {error && <p className="error" role="alert">{error}</p>}
     </form>
   );

@@ -414,3 +414,21 @@ def test_bike_purchase_date_is_install_date_fallback():
         body["installed_at"] = own.isoformat()
         upd = c.put(f"/api/components/{comp['id']}", headers=h, json=body).json()
         assert upd["installed_effective"] == own.isoformat() and upd["installed_inherited"] is False
+
+
+def test_heatmap_has_days_for_time_lapse_and_tires_are_no_default_components():
+    with TestClient(app) as c:
+        h = _user(c, "time@example.com")
+        uid = c.get("/api/me", headers=h).json()["id"]
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "gravel", "with_defaults": True}).json()
+        cats = {x["category"] for x in c.get(f"/api/components?bike_id={bike['id']}", headers=h).json()}
+        assert "chain" in cats and "tire_front" not in cats and "tire_rear" not in cats
+        assert "tire_front" not in c.get("/api/catalog", headers=h).json()["components"]
+        with SessionLocal() as db:
+            for i, day in enumerate((datetime(2025, 5, 3, 9), datetime(2025, 6, 7, 9))):
+                db.add(Activity(user_id=uid, bike_id=bike["id"], name=f"t{i}", distance_km=30.0 + i,
+                                start_date=day, polyline="_p~iF~ps|U_ulLnnqC_mqNvxq`@"))
+            db.commit()
+        d = c.get("/api/stats/heatmap", headers=h).json()
+        assert len(d["lines"]) == len(d["days"]) == len(d["km"]) == 2
+        assert d["days"][0] != d["days"][1] and all(len(t) == 3 for t in d["tiles"])

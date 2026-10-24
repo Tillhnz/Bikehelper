@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import wear as wear_model
-from .catalog import CATALOG, CHAIN_WEAR_LABEL, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from .catalog import CATALOG, CHAIN_WEAR_LABEL, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
 from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
@@ -65,6 +65,11 @@ def wear_between(
 
 def bike_total_km(db: Session, bike: Bike) -> float:
     return bike.start_km + km_between(db, bike.id, None)
+
+
+def is_tracked(comp: Component) -> bool:
+    """Ältere Reifen-Komponenten zählen nicht mehr zur Wartung (Reifen laufen über die Reifensätze)."""
+    return comp.category not in LEGACY_CATEGORIES
 
 
 def effective_installed(comp: Component) -> date | None:

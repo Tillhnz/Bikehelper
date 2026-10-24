@@ -194,18 +194,18 @@ CATALOG: dict[str, ComponentTemplate] = {
 
 BIKE_TEMPLATES: dict[str, tuple[str, ...]] = {
     "road": (
-        "chain", "cassette", "chainring", "tire_front", "tire_rear", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
         "cables", "bar_tape", "headset", "bottom_bracket", "hubs",
     ),
     "gravel": (
-        "chain", "cassette", "chainring", "tire_front", "tire_rear", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
         "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs",
     ),
     "mtb": (
-        "chain", "cassette", "chainring", "tire_front", "tire_rear", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
         "cables", "sealant", "headset", "bottom_bracket", "hubs",
     ),
-    "other": ("chain", "cassette", "tire_front", "tire_rear", "brake_pads", "cables"),
+    "other": ("chain", "cassette", "brake_pads", "cables"),
 }
 
 
@@ -213,10 +213,15 @@ def categories_for(bike_type: str) -> tuple[str, ...]:
     return BIKE_TEMPLATES.get(bike_type, BIKE_TEMPLATES["other"])
 
 
+# Reifen verwaltet die Reifensatz-Verwaltung (Kilometer je Mantelsatz). Ältere Reifen-Komponenten bleiben erhalten,
+# zählen aber nicht mehr zur Wartung und werden nicht mehr neu angelegt.
+LEGACY_CATEGORIES = ("tire_front", "tire_rear")
+
+
 def catalog_payload() -> dict:
     """Für die Oberfläche: Katalog je Kategorie und die Vorlagen je Radtyp."""
     return {
-        "components": {k: asdict(v) for k, v in CATALOG.items()},
+        "components": {k: asdict(v) for k, v in CATALOG.items() if k not in LEGACY_CATEGORIES},
         "chain_lubes": {k: {"name": v["name"], "lube": asdict(v["lube"]), "wear": asdict(v["wear"])} for k, v in CHAIN_LUBES.items()},
         "wax_variants": WAX_VARIANTS,
         "bike_templates": {k: list(v) for k, v in BIKE_TEMPLATES.items()},
