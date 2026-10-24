@@ -4,6 +4,7 @@ import { BIKE_TYPES, api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js"
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
 import { EmptyState, StatusPill } from "../components/ui.jsx";
+import { GOAL_META } from "../components/StatsExtra.jsx";
 
 function greeting() {
   const h = new Date().getHours();
@@ -49,7 +50,6 @@ export default function Home() {
 
   const { week, year, maintenance: m, bikes, recent } = d;
   const t = week.totals;
-  const goalPct = year.goal_km ? Math.min(100, (year.km / year.goal_km) * 100) : null;
 
   return (
     <>
@@ -120,15 +120,38 @@ export default function Home() {
           )}
 
           <div className="home-grid">
-            <Panel title={`Jahr ${year.year}`}>
-              <div className="goal-num"><strong>{fmtKm(year.km)}</strong> <span className="muted">{year.goal_km ? `von ${fmtKm(year.goal_km)} km` : "km"}</span></div>
-              {goalPct !== null ? (
-                <>
-                  <div className="goal-bar" role="progressbar" aria-valuenow={Math.round(goalPct)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${goalPct}%` }} /></div>
-                  <p className="small muted">{fmtNum(goalPct, 0)} % deines Jahresziels. <Link to="/stats" className="link">Ziele ansehen</Link></p>
-                </>
+            <Panel title={`Dein Ziel ${year.year}`} sub={year.goals?.length ? `Noch ${year.days_left} Tage bis Jahresende` : undefined}>
+              {year.goals?.length ? (
+                <ul className="goal-list">
+                  {year.goals.map((g) => {
+                    const m = GOAL_META[g.metric];
+                    const perWeek = g.per_week_needed;
+                    return (
+                      <li key={g.metric}>
+                        <div className="goal-num"><strong>{fmtKm(g.done)}</strong> <span className="muted">von {fmtKm(g.target)} {m.unit} · {m.label}</span></div>
+                        <div className="goal-bar" role="progressbar" aria-valuenow={Math.round(g.percent)} aria-valuemin={0} aria-valuemax={100}>
+                          <span style={{ width: `${Math.min(100, g.percent)}%` }} />
+                          <i style={{ left: `${Math.min(100, (g.plan / g.target) * 100)}%` }} title="Plan bei gleichmäßigem Tempo" />
+                        </div>
+                        <p className="small">
+                          {g.reached_on ? `Geschafft am ${fmtDate(g.reached_on)}.` : (
+                            <>
+                              Noch {fmtKm(g.remaining)} {m.unit}
+                              {perWeek != null && <>, das sind <strong>{fmtKm(perWeek)} {m.unit} pro Woche</strong> ({fmtKm(perWeek / 7)} pro Tag)</>}.
+                              {" "}{g.on_track ? "Im aktuellen Tempo schaffst du es." : `Im aktuellen Tempo erreichst du ${fmtKm(g.projected)} ${m.unit}.`}
+                            </>
+                          )}
+                        </p>
+                      </li>
+                    );
+                  })}
+                  <li><Link to="/stats" className="link small">Ziele ändern</Link></li>
+                </ul>
               ) : (
-                <p className="small muted">Setze dir in der <Link to="/stats" className="link">Statistik</Link> ein Jahresziel.</p>
+                <>
+                  <div className="goal-num"><strong>{fmtKm(year.km)}</strong> <span className="muted">km in diesem Jahr</span></div>
+                  <p className="small muted">Setze dir in der <Link to="/stats" className="link">Statistik</Link> ein Jahresziel. Hier siehst du dann, was du pro Woche fahren musst, um es zu erreichen.</p>
+                </>
               )}
             </Panel>
             <Panel title="Letzte Fahrten">

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -8,8 +8,10 @@ from ..config import settings
 from ..database import get_db
 from ..models import Activity, Bike, Goal, User
 from ..security import current_user
+from ..stats import extra as X
 from ..stats.overview import get_tz, local
 from . import garage
+from .stats import _goal_targets, _load
 
 router = APIRouter(prefix="/api", tags=["home"])
 
@@ -59,6 +61,11 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
     year_km = sum(r[1] for r in rows if r[0].year == today.year)
 
     goal = db.scalar(select(Goal).where(Goal.user_id == user.id, Goal.year == today.year, Goal.metric == "km"))
+    targets = _goal_targets(db, user, today.year)
+    goals = []
+    if targets:
+        _, year_rows = _load(db, user, None, today.year, with_tiles=False)
+        goals = X.goals_progress([r for _, r in year_rows], tz, today.year, today, targets)
     bikes = db.scalars(select(Bike).where(Bike.user_id == user.id, Bike.retired.is_(False)).order_by(Bike.id)).all()
     bike_week: dict[int, float] = {}
     monday = today - timedelta(days=today.weekday())
@@ -74,7 +81,8 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
     return {
         "today": today.isoformat(),
         "week": week,
-        "year": {"year": today.year, "km": round(year_km, 1), "goal_km": goal.target if goal else None},
+        "year": {"year": today.year, "km": round(year_km, 1), "goal_km": goal.target if goal else None,
+                 "days_left": (date(today.year, 12, 31) - today).days, "goals": goals},
         "maintenance": {"status": maintenance["status"], "items": maintenance["items"][:6], "total": len(maintenance["items"])},
         "bikes": bike_out,
         "recent": [{"id": a.id, "name": a.name, "date": local(a.start_date, tz).isoformat(), "km": round(a.distance_km, 1),

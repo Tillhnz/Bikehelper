@@ -274,7 +274,7 @@ function ReviewBody({ d }) {
   );
 }
 
-const GOAL_META = {
+export const GOAL_META = {
   km: { label: "Kilometer", unit: "km", step: 100 },
   elev_m: { label: "Höhenmeter", unit: "m", step: 1000 },
   rides: { label: "Fahrten", unit: "Fahrten", step: 5 },
