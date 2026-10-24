@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken } from "../api.js";
+import ThemeToggle from "../components/ThemeToggle.jsx";
 
 export default function Login({ onLoggedIn }) {
   const navigate = useNavigate();
@@ -54,6 +55,7 @@ export default function Login({ onLoggedIn }) {
 
   return (
     <div className="login">
+      <ThemeToggle className="theme-toggle-corner" />
       <div className="login-art" aria-hidden="true">
         <div className="login-km">
           <span>0</span><span>0</span><span>0</span><span>0</span><span>0</span>

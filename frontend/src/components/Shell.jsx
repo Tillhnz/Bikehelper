@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import Search from "./Search.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 import UploadBanner from "./UploadBanner.jsx";
 
 const NAV = [
@@ -25,9 +26,12 @@ export default function Shell({ user, onLogout, children }) {
     <div className="shell">
       <a className="skip-link" href="#inhalt">Zum Inhalt springen</a>
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          BikeHelper
+        <div className="brand-row">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true" />
+            BikeHelper
+          </div>
+          <ThemeToggle />
         </div>
         <Search />
         <nav aria-label="Hauptmenü">
