@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+import ssl
 import threading
 import time
 from datetime import datetime
@@ -78,9 +79,14 @@ def send_email(to: str, title: str, body: str) -> None:
     msg["From"] = settings.smtp_from or settings.smtp_user
     msg["To"] = to
     msg.set_content(f"{body}\n\n{settings.public_url}")
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as s:
-        if settings.smtp_starttls:
-            s.starttls()
+    # Port 465 verschlüsselt von Anfang an (SMTPS); sonst normal verbinden und mit STARTTLS (587) verschlüsseln
+    if settings.smtp_port == 465:
+        server = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=20, context=ssl.create_default_context())
+    else:
+        server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20)
+    with server as s:
+        if settings.smtp_port != 465 and settings.smtp_starttls:
+            s.starttls(context=ssl.create_default_context())
         if settings.smtp_user:
             s.login(settings.smtp_user, settings.smtp_password)
         s.send_message(msg)

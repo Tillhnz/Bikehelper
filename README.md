@@ -156,6 +156,17 @@ Die Heatmap zoomt beim Öffnen auf dein Heimatgebiet und hat einen **Zeitverlauf
 
 **Erinnerungen.** Unter Einstellungen wählst du E-Mail und/oder Push per ntfy. BikeHelper meldet jede Wartung einmal, wenn sie „bald“ und einmal, wenn sie „fällig“ wird, nur zwischen 8 und 21 Uhr. Für ntfy installierst du die App ntfy aufs Handy und abonnierst dasselbe Thema (am besten zufällig, das Thema ist wie ein Passwort). Für E-Mail trägst du in der `.env` einen SMTP-Server ein (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`). Mit „Testnachricht senden“ prüfst du beides.
 
+**E-Mail einrichten, Schritt für Schritt.** Trage in der `.env` im Projektordner ein, und starte dann mit `docker compose up -d` neu (die Werte werden nur beim Start gelesen):
+
+| Anbieter | `SMTP_HOST` | `SMTP_PORT` | `SMTP_USER` / `SMTP_FROM` | `SMTP_PASSWORD` |
+|---|---|---|---|---|
+| Gmail | `smtp.gmail.com` | `587` | deine Gmail-Adresse | App-Passwort (Google-Konto → Sicherheit → Bestätigung in zwei Schritten → App-Passwörter), nicht dein Login-Passwort |
+| GMX | `mail.gmx.net` | `587` | deine GMX-Adresse | dein Passwort, SMTP-Versand muss in den GMX-Einstellungen erlaubt sein |
+| web.de | `smtp.web.de` | `587` | deine web.de-Adresse | dein Passwort, SMTP muss freigeschaltet sein |
+| Eigener Mailserver | dein Server | `587` oder `465` | Konto auf dem Server | dessen Passwort |
+
+Danach unter Einstellungen → Erinnerungen „E-Mail“ einschalten und „Testnachricht senden“ klicken. Die Mail geht an die E-Mail-Adresse deines BikeHelper-Kontos. Kommt ein Fehler, steht der Grund in der Meldung, bei Gmail meist ein falsches Passwort (das App-Passwort ohne Leerzeichen eintragen). Schau sonst in `docker compose logs backend`. Das Passwort steht nur in der `.env` auf deinem Server.
+
 **Als App installieren.** Über https (also über den Reverse Proxy) bietet der Browser „App installieren“ an, in den Einstellungen gibt es dafür einen Knopf. Die App öffnet ohne Browserleiste; ohne Verbindung erscheint die zuletzt geladene Oberfläche, Daten kommen immer live vom Server.
 
 ## Wetter
