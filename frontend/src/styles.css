@@ -1001,3 +1001,16 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 @media (prefers-color-scheme: light){
   :root:not([data-theme="dark"]) .cal-1{fill:#bfe8e1}:root:not([data-theme="dark"]) .cal-2{fill:#7fd0c4}:root:not([data-theme="dark"]) .cal-3{fill:#2fa593}:root:not([data-theme="dark"]) .cal-4{fill:#0b6b5e}
 }
+
+.check-guide{margin:.75rem 0}
+.check-guide h4{margin:1rem 0 .3rem;font-size:1rem}
+.check-guide ol,.check-guide ul{margin:.2rem 0 .6rem;padding-left:1.3rem}
+.check-guide li{margin:.25rem 0}
+.check-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.check-good,.check-bad{border:1px solid var(--line);border-radius:var(--r-ctl);padding:.2rem .9rem .4rem}
+.check-good{border-left:4px solid var(--celeste)}
+.check-bad{border-left:4px solid var(--signal)}
+.check-good h4{color:var(--celeste)}
+.check-bad h4{color:var(--signal)}
+.check-act{background:var(--panel-2);border-radius:var(--r-ctl);padding:.6rem .8rem;margin:.5rem 0 0}
+@media (max-width:800px){.check-cols{grid-template-columns:1fr}}

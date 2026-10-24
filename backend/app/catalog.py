@@ -224,6 +224,7 @@ def catalog_payload() -> dict:
         "components": {k: asdict(v) for k, v in CATALOG.items() if k not in LEGACY_CATEGORIES},
         "chain_lubes": {k: {"name": v["name"], "lube": asdict(v["lube"]), "wear": asdict(v["wear"])} for k, v in CHAIN_LUBES.items()},
         "wax_variants": WAX_VARIANTS,
+        "checks": {k: asdict(v) for k, v in CHECKS.items()},
         "bike_templates": {k: list(v) for k, v in BIKE_TEMPLATES.items()},
     }
 
@@ -329,3 +330,275 @@ def guides_for(label: str) -> list[dict]:
 INSPECTIONS = {"Belagstärke prüfen": "Bremsbeläge wechseln"}
 WEAR_TO_INSPECTION = {v: k for k, v in INSPECTIONS.items()}
 INSPECTION_RESULTS = ("good", "watch", "replace")
+
+
+# ---------- Sichtprüfung je Komponente ----------
+# Kurz gehalten und bewusst vorsichtig: Was man ohne Spezialwerkzeug sehen, fühlen und hören kann, woran man ein gutes oder
+# ein schlechtes Teil erkennt und was dann zu tun ist. Grenzwerte stehen in den Regeln; im Zweifel zählt die Angabe des Herstellers.
+@dataclass(frozen=True)
+class Check:
+    tools: str                 # was man braucht
+    how: tuple[str, ...]       # Schritte der Prüfung
+    good: tuple[str, ...]      # so sieht ein gutes Teil aus
+    bad: tuple[str, ...]       # Warnzeichen
+    act: str                   # was dann zu tun ist
+
+
+CHECKS: dict[str, Check] = {
+    "chain": Check(
+        tools="Lappen, Kettenlehre (am besten), gute Beleuchtung",
+        how=(
+            "Kette mit einem Lappen abwischen, damit du Metall und Glieder siehst.",
+            "Kettenlehre einhängen und ablesen: Sie zeigt, ob die Längung unter dem Grenzwert liegt (0,5 % bei 11- und 12-fach, 0,75 % bei 10-fach und weniger).",
+            "Ohne Lehre: Kette vorn am Kettenblatt ein Stück vom Zahn abheben. Lässt sie sich deutlich abziehen, sodass ein Zahn sichtbar wird, ist sie gelängt.",
+            "Kurbel langsam rückwärts drehen und Glied für Glied ansehen. Achte auf steife Glieder, die an einer Stelle abknicken, und auf Laschen, die seitlich verdreht sind.",
+        ),
+        good=(
+            "Lehre bleibt unter dem Grenzwert.",
+            "Alle Glieder laufen leicht und gleichmäßig durch die Umlenkrollen.",
+            "Metall glänzt oder ist bei Wachs matt hellgrau, ohne Rost.",
+            "Läuft leise und schaltet sauber.",
+        ),
+        bad=(
+            "Lehre zeigt Grenzwert oder mehr.",
+            "Rost, steife Glieder, verdrehte oder verbogene Laschen.",
+            "Risse in einer Lasche oder ein herausstehender Nietkopf.",
+            "Schwarze, schmierige Paste, Knacken oder Springen unter Last.",
+        ),
+        act="Bei Grenzwert die Kette zeitnah wechseln, bevor sie Kassette und Kettenblätter mit abnutzt. Bei Rissen oder gebrochenem Glied nicht weiterfahren.",
+    ),
+    "cassette": Check(
+        tools="Taschenlampe, saubere Kassette",
+        how=(
+            "Kassette und Ritzel mit Lappen oder Bürste reinigen.",
+            "Zähne von der Seite ansehen und mit dem Profil neuer Ritzel vergleichen, falls du eines zur Hand hast.",
+            "Kurbel drehen und prüfen, ob die Kette unter Last (kräftig antreten) springt.",
+            "Mit der Hand am Ritzelpaket rütteln: Es darf nichts wackeln und der Verschlussring muss fest sitzen.",
+        ),
+        good=(
+            "Zähne sind symmetrisch und trapezförmig.",
+            "Die Kette liegt ruhig auf und springt nicht.",
+            "Schaltvorgänge laufen ohne Schleifen und Rattern.",
+        ),
+        bad=(
+            "Zähne sind spitz oder hakenförmig wie Haifischflossen.",
+            "Eine neue Kette springt unter Last.",
+            "Rost, abgebrochene Zähne oder ein wackelndes Ritzelpaket.",
+        ),
+        act="Die Kassette zusammen mit einer neuen Kette wechseln, wenn die Zähne verschlissen sind. Einzelne Ritzel zu tauschen lohnt kaum.",
+    ),
+    "chainring": Check(
+        tools="Taschenlampe, Inbusschlüssel passend zu den Schrauben",
+        how=(
+            "Kettenblätter reinigen und die Zähne von der Seite ansehen.",
+            "Kurbel langsam drehen und den Abstand zu Umwerfer oder Kettenstrebe beobachten: Er soll nicht pendeln.",
+            "Die Befestigungsschrauben auf festen Sitz prüfen, ohne sie mit Gewalt zu belasten (Drehmoment nach Herstellerangabe).",
+        ),
+        good=(
+            "Zähne sind gleichmäßig und beidseitig symmetrisch.",
+            "Das Blatt läuft ohne Schlag.",
+            "Alle Schrauben sitzen fest.",
+        ),
+        bad=(
+            "Zähne sind spitz, hakenförmig oder abgebrochen.",
+            "Das Blatt schlägt seitlich oder ist verbogen.",
+            "Lockere Schrauben, Risse an Zähnen oder Armen.",
+        ),
+        act="Verschlissene oder verbogene Blätter wechseln, am besten mit neuer Kette. Rissige Teile nicht weiterfahren.",
+    ),
+    "tires": Check(
+        tools="Taschenlampe, Pumpe mit Manometer, Fingernagel oder kleine Nadel",
+        how=(
+            "Reifen auf den vorgeschriebenen Druck bringen und das Rad langsam drehen.",
+            "Die Lauffläche Streifen für Streifen absuchen: Profil, Mitte und Schultern. Der Hinterreifen verschleißt in der Mitte zuerst.",
+            "Flanken ansehen und mit dem Daumen biegen: Risse, poröser Gummi, Beulen.",
+            "Eingedrungene Steinchen oder Glas mit Fingernagel oder Nadel entfernen und prüfen, wie tief der Schnitt geht.",
+            "Auf der Flanke das Herstelldatum (DOT-Nummer) suchen, falls vorhanden.",
+        ),
+        good=(
+            "Die Lauffläche ist gleichmäßig gerundet, das Profil oder die Verschleißmarken sind noch sichtbar.",
+            "Flanken sind geschmeidig, ohne Risse.",
+            "Nur kleine, oberflächliche Schnitte im Gummi.",
+            "Der Reifen hält den Druck.",
+        ),
+        bad=(
+            "Die Mitte ist flach geschliffen, Verschleißmarken sind weg.",
+            "Die Gewebelage (Karkasse) schimmert durch oder Fäden sind sichtbar.",
+            "Tiefe Schnitte, Beulen, Blasen oder Risse in der Flanke.",
+            "Der Gummi ist spröde, hart und rissig, besonders bei alten Reifen.",
+            "Mehrere Platten in kurzer Zeit.",
+        ),
+        act="Bei sichtbarer Karkasse, Beulen oder tiefen Schnitten sofort wechseln. Alte, rissige Reifen auch bei gutem Profil erneuern. Hinterreifen häufiger prüfen als den vorderen.",
+    ),
+    "brake_pads": Check(
+        tools="Taschenlampe, bei Scheibenbremsen ein Schieber oder Lineal, saubere Hände",
+        how=(
+            "Scheibenbremse: Von oben oder unten mit Taschenlampe in den Sattel sehen. Du siehst zwei Beläge links und rechts der Scheibe. Miss das Belagmaterial ohne die metallische Trägerplatte.",
+            "Felgenbremse: Belag von vorn ansehen und die Rillen oder Verschleißmarke im Gummi suchen.",
+            "Die Scheibe ansehen: Sie soll glatt sein. Die Mindestdicke steht meist auf der Scheibe (häufig 1,5 mm).",
+            "Rad drehen und achten, ob etwas schleift. Beim Bremsen auf Quietschen, Rubbeln oder Nachlassen achten.",
+        ),
+        good=(
+            "Belag ist dicker als etwa 1,5 mm und beide Seiten sind ähnlich abgenutzt.",
+            "Beläge sind matt und trocken.",
+            "Scheibe ist glatt, gerade und über der Mindestdicke.",
+            "Die Bremse greift gleichmäßig und leise.",
+        ),
+        bad=(
+            "Belag ist dünner als 1 bis 1,5 mm oder die Trägerplatte ist zu sehen.",
+            "Glasierte, glänzende Oberfläche oder Ölflecken (Verschmutzung).",
+            "Metallisches Schleifen, Pulsieren oder starkes Quietschen.",
+            "Verzogene, tief eingelaufene oder zu dünne Scheibe, bei Felgenbremsen eine abgefahrene Verschleißmarke.",
+        ),
+        act="Beläge je Bremse paarweise wechseln und danach einbremsen. Verölte Beläge und Scheiben reinigen oder tauschen. Bei metallischem Schleifen sofort nicht mehr fahren, sonst wird die Scheibe zerstört.",
+    ),
+    "brake_fluid": Check(
+        tools="Lappen, Taschenlampe",
+        how=(
+            "Den Bremshebel mehrmals ziehen: Spüre den Druckpunkt. Er soll fest und klar sein.",
+            "Hebel bei gedrückter Stellung 10 Sekunden halten: Er darf nicht langsam nachgeben.",
+            "Leitung, Anschlüsse am Hebel und am Sattel, den Ausgleichsbehälter und die Kolben auf feuchte Stellen absuchen.",
+            "Die Leitung entlang ansehen: Knicke, Scheuerstellen, Risse. Bei DOT-Bremsen die Farbe im Behälter prüfen, falls einsehbar.",
+        ),
+        good=(
+            "Fester Druckpunkt, der Hebel geht nicht bis zum Lenker.",
+            "Leitung und Anschlüsse sind trocken.",
+            "Die Bremskraft bleibt auch bei langen Abfahrten gleich.",
+        ),
+        bad=(
+            "Der Hebel fühlt sich schwammig an oder lässt sich bis zum Lenker ziehen.",
+            "Der Druckpunkt wandert oder wird nach einer Abfahrt weich.",
+            "Feuchte oder ölige Stellen an Anschlüssen oder am Sattel.",
+            "Geknickte, scheuernde oder gerissene Leitung, dunkle Bremsflüssigkeit bei DOT.",
+        ),
+        act="Bei schwammigem Hebel entlüften, spätestens nach dem empfohlenen Intervall die Flüssigkeit wechseln. Bei Leckage nicht weiterfahren und zur Werkstatt. DOT-Flüssigkeit greift Lack an.",
+    ),
+    "cables": Check(
+        tools="Lappen, Taschenlampe",
+        how=(
+            "Die Züge von Hebel bis Bremse oder Schaltwerk mit den Augen und Fingern abfahren.",
+            "Hüllenenden ansehen: Sitzen die Endkappen, sind die Hüllen ausgefranst, geknickt oder verrostet?",
+            "Zug an den Klemmschrauben und dort, wo er sichtbar aus der Hülle kommt, auf Rost und gespreizte Drähte prüfen.",
+            "Hebel betätigen und loslassen: Er soll zügig zurückfedern. Bei der Schaltung prüfen, ob sie sauber und ohne Verzögerung schaltet.",
+        ),
+        good=(
+            "Züge glänzen, sind sauber und haben keine abstehenden Drähte.",
+            "Hüllen sind glatt, ohne Knicke, Endkappen sitzen.",
+            "Hebel gehen leicht und federn schnell zurück.",
+            "Die Schaltung ist präzise.",
+        ),
+        bad=(
+            "Rost, ausgefranste oder gespreizte Drähte.",
+            "Geknickte, gerissene oder aufgeplatzte Hüllen, fehlende Endkappen.",
+            "Hebel gehen schwer oder federn träge zurück.",
+            "Die Schaltung ist ungenau, obwohl sie eingestellt ist.",
+        ),
+        act="Zug und Hülle gemeinsam erneuern, sobald sie rostig, ausgefranst oder zäh sind. Ein gerissener Bremszug ist ein Sicherheitsrisiko: lieber früher wechseln.",
+    ),
+    "bar_tape": Check(
+        tools="Gute Beleuchtung",
+        how=(
+            "Das Band auf der ganzen Länge ansehen, besonders an den Bremsgriffen und in den Unterlenker-Kurven.",
+            "Enden und Klebestellen prüfen: Hält das Isolierband, sind Lenkerstopfen gesetzt?",
+            "Mit dem Daumen drücken: Das Polster soll noch nachgeben und nicht hart oder klebrig sein.",
+            "Bei Carbon-Lenkern an freiliegenden Stellen auf Risse achten.",
+        ),
+        good=(
+            "Das Band liegt glatt, gleichmäßig und ohne Lücken.",
+            "Die Enden sind verklebt und beide Lenkerstopfen sitzen.",
+            "Das Material ist griffig und dämpft.",
+        ),
+        bad=(
+            "Durchgescheuerte oder aufgerissene Stellen, besonders an den Griffen.",
+            "Lösende Wicklung, offene Enden, fehlende Stopfen.",
+            "Hart, speckig oder klebrig.",
+            "Risse oder Beschädigungen am Lenker unter dem Band.",
+        ),
+        act="Band erneuern, wenn es verschlissen ist oder sich löst. Fehlende Lenkerstopfen sofort ersetzen, ein offenes Lenkerende ist bei Stürzen gefährlich.",
+    ),
+    "sealant": Check(
+        tools="Ventilkernwerkzeug, kleiner Messbecher oder Spritze, Lappen",
+        how=(
+            "Das Rad schütteln oder drehen und lauschen: Du solltest die Flüssigkeit schwappen hören.",
+            "Ventil nach oben stellen, den Ventilkern herausdrehen und den Inhalt mit einem Zahnstocher oder einem Dichtmilch-Prüfstab ansehen.",
+            "Bei Zweifel eine Reifenseite abdrücken und die Dichtmilch am Reifen und an der Felge ansehen.",
+            "Auf Luftverlust über Nacht, Spritzer an der Flanke und nasse Stellen am Ventil achten.",
+        ),
+        good=(
+            "Die Dichtmilch ist flüssig und milchig, mit wenig Klümpchen.",
+            "Das Schwappen ist deutlich hörbar.",
+            "Der Reifen verliert über Nacht nur wenig Druck.",
+        ),
+        bad=(
+            "Kaum oder kein Schwappen: Die Milch ist eingetrocknet.",
+            "Klumpen, Krümel oder eine gummiartige Haut im Reifen.",
+            "Wiederholter Luftverlust, Spritzer an den Flanken.",
+            "Nasse oder verklebte Ventile.",
+        ),
+        act="Nachfüllen, wenn die Menge abnimmt, und komplett erneuern, wenn sie verklumpt ist. Dabei Ventil, Ventilkern und Felgenband mitprüfen. Menge je Reifen nach Herstellerangabe.",
+    ),
+    "headset": Check(
+        tools="Lappen",
+        how=(
+            "Vorderbremse ziehen und das Rad am Lenker mehrmals vor und zurück schieben. Lege dabei einen Finger an den Spalt zwischen Steuerrohr und oberer Kappe: Du spürst kein Klacken oder Ruckeln.",
+            "Vorderrad anheben und den Lenker langsam nach links und rechts drehen. Es soll gleichmäßig, leicht und leise laufen.",
+            "Auf Rasten (eine Mittelstellung, in die der Lenker fällt) und Knarzen achten.",
+            "Dichtung und Kappe ansehen: Wasserspuren, Rost, Risse.",
+        ),
+        good=(
+            "Kein Spiel, kein Klacken beim Bremsen.",
+            "Der Lenker dreht sich gleichmäßig und leise.",
+            "Die Dichtungen sitzen und sind trocken.",
+        ),
+        bad=(
+            "Klacken oder Spiel beim Vor- und Zurückschieben mit gezogener Bremse.",
+            "Rasten in der Mittelstellung, Rauheit oder Knirschen.",
+            "Knarzen beim Lenken oder Treten im Wiegetritt.",
+            "Rost oder Wasser am Steuersatz.",
+        ),
+        act="Bei Spiel die Vorspannung nachstellen und Vorbau anziehen. Bei Rauheit oder Rasten Lager reinigen und fetten oder erneuern. Fahre nicht mit lockerem Steuersatz.",
+    ),
+    "bottom_bracket": Check(
+        tools="Lappen, gute Beleuchtung",
+        how=(
+            "Beide Kurbeln seitlich greifen und abwechselnd hin und her bewegen: Es darf kein Spiel zu spüren sein.",
+            "Die Kette vom Blatt nehmen, die Kurbel kräftig anwerfen und auslaufen lassen: Sie soll lange und gleichmäßig drehen.",
+            "Beim Treten auf Knacken und Knarzen hören, besonders im Antritt und am Berg.",
+            "Am Gehäuse nach Wasser, Rost und Entwässerungslöchern sehen.",
+        ),
+        good=(
+            "Kein Spiel in der Kurbel.",
+            "Gleichmäßiger, leiser Lauf mit langem Auslaufen.",
+            "Das Gehäuse ist sauber und trocken.",
+        ),
+        bad=(
+            "Spürbares Spiel, die Kurbel wackelt seitlich.",
+            "Rauheit, Knirschen oder Rattern beim Drehen.",
+            "Knacken im Antritt, das nicht von den Pedalen kommt.",
+            "Wasser, Rost oder braune Brühe am Gehäuse.",
+        ),
+        act="Lose Lager nach Herstellerangabe nachziehen. Bei Rauheit oder Spiel das Innenlager wechseln. Knacken zuerst bei Pedalen und Kurbelschrauben suchen, bevor das Lager getauscht wird.",
+    ),
+    "hubs": Check(
+        tools="Lappen, ein Rad oder eine Aufhängung zum freien Drehen",
+        how=(
+            "Rad anheben und anwerfen: Es soll lange und gleichmäßig auslaufen.",
+            "Beim Drehen die Achse zwischen zwei Fingern halten und auf Rauheit oder Rasten spüren.",
+            "Das Rad am Reifen seitlich bewegen: Spiel in der Nabe fühlt sich wie ein leichtes Klacken an.",
+            "Den Freilauf in Fahrtrichtung drehen und hören: Er soll gleichmäßig surren oder klicken und sicher greifen.",
+            "Dichtungen an den Naben ansehen: Wasser oder Rost.",
+        ),
+        good=(
+            "Lange, gleichmäßige Drehung und leises Laufgeräusch.",
+            "Kein Spiel in der Achse.",
+            "Der Freilauf greift sofort und rutscht nicht durch.",
+        ),
+        bad=(
+            "Schleifen, Knirschen oder Rauheit beim Drehen.",
+            "Rasten, die man zwischen den Fingern spürt.",
+            "Seitliches Spiel in der Nabe.",
+            "Freilauf rutscht durch oder klemmt, Rost oder Wasser an den Dichtungen.",
+        ),
+        act="Bei Spiel die Lager nachstellen, bei Rauheit reinigen, fetten oder erneuern. Rutscht der Freilauf durch, nicht mehr belasten und warten lassen.",
+    ),
+}

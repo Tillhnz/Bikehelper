@@ -3,6 +3,7 @@ import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import { Gauge } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
 import { confirmDialog } from "./feedback.jsx";
+import CheckGuide from "./CheckGuide.jsx";
 
 const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
 
@@ -475,6 +476,8 @@ export default function TireSets({ bike, onChanged }) {
         {!form && <button className="btn primary" onClick={() => setForm({ mode: "add" })}>Reifensatz hinzufügen</button>}
       </header>
       {error && <p className="error" role="alert">{error}</p>}
+
+      <CheckGuide category="tires" />
 
       {form && (
         <SetForm

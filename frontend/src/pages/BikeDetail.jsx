@@ -7,6 +7,7 @@ import BikeIllustration from "../components/BikeIllustration.jsx";
 import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 import { confirmDialog, Loading } from "../components/feedback.jsx";
+import CheckGuide from "../components/CheckGuide.jsx";
 
 function ruleIntervalText(r) {
   return [r.interval_km && `${fmtKm(r.interval_km)} km`, r.interval_months && `${r.interval_months} Monate`]
@@ -369,6 +370,8 @@ function ComponentCard({ comp, onChanged }) {
           ))}
         </ul>
       )}
+
+      <CheckGuide category={comp.category} />
 
       {comp.category === "chain" && (
         <ChainMeasure comp={comp} rule={rules.find((r) => r.measure !== undefined && r.measure !== null) ?? rules.find((r) => r.label === "Kette wechseln")} disabled={retired} onChanged={refresh} />

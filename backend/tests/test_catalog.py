@@ -58,3 +58,14 @@ def test_every_catalog_rule_has_guides():
         for g in gs:
             assert g.url.startswith("https://") and g.title and g.source
     assert guides_for("gibt es nicht") == []
+
+
+def test_every_category_has_a_visual_check():
+    from app.catalog import CATALOG, CHECKS, LEGACY_CATEGORIES, catalog_payload
+    for cat in CATALOG:
+        if cat in LEGACY_CATEGORIES:
+            continue
+        c = CHECKS[cat]
+        assert c.how and c.good and c.bad and c.act and c.tools, cat
+    assert "tires" in CHECKS
+    assert set(catalog_payload()["checks"]) == set(CHECKS)
