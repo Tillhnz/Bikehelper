@@ -94,7 +94,7 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
 
 function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax" });
+  const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax", result: "good" });
   const [hintOpen, setHintOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const unknown = rule.status === "unknown";
@@ -107,11 +107,17 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
     rule.interval_months && `${fmtNum(rule.months_since)} von ${rule.interval_months} Monaten`,
   ].filter(Boolean).join(" · ");
 
+  const a = rule.assessment;
+  const RESULTS = { good: "gut", watch: "Beobachtung", replace: "wechseln" };
+  const assessLine = a && (rule.is_inspection
+    ? `Letzte Prüfung am ${fmtDate(a.date)}: ${RESULTS[a.result]}${a.result === "watch" ? ", früher erneut prüfen" : ""}.`
+    : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}, angepasstes Intervall ${fmtKm(a.interval_km)} km.`);
+
   async function submit(e) {
     e.preventDefault();
     await onDone(done);
     setOpen(false);
-    setDone({ performed_at: today(), time: nowTime(), note: "", variant: done.variant });
+    setDone({ performed_at: today(), time: nowTime(), note: "", variant: done.variant, result: "good" });
   }
 
   return (
@@ -146,6 +152,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
           statt {fmtKm(rule.km_since)} km.
         </p>
       )}
+      {assessLine && <p className="muted small wet-line">{assessLine}</p>}
       {hintOpen && rule.hint && <p className="hint-box small">{rule.hint}</p>}
       {guideOpen && (
         <ul className="guide-list">
@@ -169,6 +176,16 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               Wachsart
               <select value={done.variant} onChange={(e) => setDone({ ...done, variant: e.target.value })}>
                 {rule.variants.map((v) => <option key={v.key} value={v.key}>{v.name}, alle {fmtKm(v.interval_km)} km</option>)}
+              </select>
+            </label>
+          )}
+          {rule.is_inspection && (
+            <label>
+              Ergebnis
+              <select value={done.result} onChange={(e) => setDone({ ...done, result: e.target.value })}>
+                <option value="good">Gut, noch lange nutzbar</option>
+                <option value="watch">Beobachtung, bald wechseln</option>
+                <option value="replace">Wechseln, jetzt</option>
               </select>
             </label>
           )}
@@ -247,6 +264,7 @@ function ComponentCard({ comp, onChanged }) {
       await api.post(`/rules/${r.id}/done`, {
         performed_at: data.performed_at, performed_time: toTime(data.time), note: data.note || null,
         variant: r.variants ? data.variant : null,
+        result: r.is_inspection ? data.result : null,
       });
       await refresh();
     });
@@ -369,7 +387,7 @@ function ComponentCard({ comp, onChanged }) {
                   <span>
                     <strong>{fmtDate(l.performed_at)}{l.performed_time ? `, ${l.performed_time.slice(0, 5)} Uhr` : ""}</strong>{" "}
                     <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : "ganze Komponente"}</span>
-                    {variant ? `, ${variant}` : ""}{l.note ? ` – ${l.note}` : ""}
+                    {variant ? `, ${variant}` : ""}{l.result ? `, Ergebnis: ${{ good: "gut", watch: "Beobachtung", replace: "wechseln" }[l.result]}` : ""}{l.note ? ` – ${l.note}` : ""}
                   </span>
                   <button className="link small danger" onClick={() => removeLog(l)}>Löschen</button>
                 </li>

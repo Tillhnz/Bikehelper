@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import wear as wear_model
-from .catalog import CATALOG, CHAIN_WEAR_LABEL, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from .catalog import CATALOG, CHAIN_WEAR_LABEL, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
 from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
@@ -98,6 +98,23 @@ def last_log(comp: Component, rule: MaintenanceRule) -> MaintenanceLog | None:
     return max(logs, key=lambda l: (l.performed_at, l.performed_time or time.min, l.id or 0), default=None)
 
 
+# Wie stark ein Prüfergebnis das nächste Prüfintervall verkürzt
+WATCH_RECHECK_FACTOR = 0.4
+# Anteil des Wechselintervalls, der zum Prüfzeitpunkt höchstens (gut) bzw. mindestens (beobachten) verbraucht gilt
+GOOD_MAX_RATIO = 0.5
+WATCH_MIN_RATIO = 0.8
+
+
+def inspection_result(comp: Component, rule: MaintenanceRule, after: date | None = None) -> MaintenanceLog | None:
+    """Jüngster Prüfeintrag mit Ergebnis für die Prüfregel dieser Wechselregel (nur Einträge ab `after`)."""
+    name = WEAR_TO_INSPECTION.get(rule.label)
+    sib = next((r for r in comp.rules if r.label == name), None) if name else None
+    if sib is None:
+        return None
+    logs = [l for l in comp.logs if l.rule_id == sib.id and l.result and (after is None or l.performed_at >= after)]
+    return max(logs, key=lambda l: (l.performed_at, l.performed_time or time.min, l.id or 0), default=None)
+
+
 def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date | None = None) -> dict:
     """Verbrauch eines Wartungsintervalls seit der letzten Wartung (oder dem Einbau)."""
     today = today or date.today()
@@ -105,6 +122,18 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     last = entry.performed_at if entry else None
     variant = entry.variant if entry and rule.label == WAX_LUBE_LABEL else None
     interval_km = wax_interval_km(rule.label, variant, rule.interval_km)
+    interval_months = rule.interval_months
+    assessment = None
+    if rule.label in INSPECTIONS and entry is not None and entry.result:
+        wear_rule = next((r for r in comp.rules if r.label == INSPECTIONS[rule.label]), None)
+        wear_last = last_log(comp, wear_rule) if wear_rule else None
+        if wear_last is None or wear_last.performed_at < entry.performed_at:  # nach dem Wechsel gilt es nicht mehr
+            factor = WATCH_RECHECK_FACTOR if entry.result == "watch" else 1.0
+            if interval_km:
+                interval_km = interval_km * factor
+            if interval_months:
+                interval_months = max(1, round(interval_months * factor))
+            assessment = {"result": entry.result, "date": entry.performed_at.isoformat(), "interval_km": round(interval_km) if interval_km else None}
     base = last or effective_installed(comp)
     # Mit Uhrzeit zählen nur Fahrten, die nach der Wartung begannen; ohne Uhrzeit der ganze Tag
     since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
@@ -113,7 +142,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         return {
             "km_since": 0.0, "wet_km": 0.0, "effective_km": 0.0, "months_since": 0.0,
             "progress": 0.0, "status": "unknown", "last_done": None, "interval_km_eff": interval_km,
-            "variant": variant, "measure": None,
+            "variant": variant, "measure": None, "assessment": None,
         }
 
     km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
@@ -144,9 +173,27 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             "rate_pct_per_1000": round(proj.rate_pct_per_1000, 3),
         }
     elif interval_km:
-        ratios.append(effective / interval_km)
-    if rule.interval_months:
-        ratios.append(months_since / rule.interval_months)
+        ratio = effective / interval_km
+        insp = inspection_result(comp, rule, last)
+        if insp is not None:
+            # Prüfung (gut / beobachten / wechseln) ersetzt die reine Kilometerschätzung ab dem Prüfzeitpunkt
+            i_since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
+            eff_at = wear_between(db, comp.bike_id, i_since, insp.performed_at, rule.wet_factor)[2]
+            if last is None:
+                eff_at += comp.start_km
+            calc = eff_at / interval_km
+            at = {"good": min(calc, GOOD_MAX_RATIO), "watch": max(calc, WATCH_MIN_RATIO)}.get(insp.result, max(calc, 1.0))
+            ratio = at + max(0.0, effective - eff_at) / interval_km
+            factor = effective / km if km > 0 else 1.0
+            assessment = {
+                "result": insp.result, "date": insp.performed_at.isoformat(),
+                "interval_km": round(eff_at + (1 - at) * interval_km),
+                "km_left": round(max(0.0, 1 - ratio) * interval_km / factor),
+            }
+            interval_km = eff_at + (1 - at) * interval_km
+        ratios.append(ratio)
+    if interval_months:
+        ratios.append(months_since / interval_months)
     progress = max(ratios) if ratios else 0.0
 
     if comp.retired_at:
@@ -168,6 +215,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         "interval_km_eff": interval_km,
         "variant": variant,
         "measure": measure,
+        "assessment": assessment,
     }
 
 

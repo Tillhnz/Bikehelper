@@ -106,6 +106,16 @@ Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCera
 
 **Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
 
+### Prüfergebnis bei Bremsbelägen
+
+Beim Eintragen von „Belagstärke prüfen“ wählst du das Ergebnis und die App passt die Intervalle an:
+
+- **Gut:** Die Beläge gelten zum Prüfzeitpunkt höchstens zur Hälfte verbraucht. Das Wechselintervall verlängert sich entsprechend, die nächste Prüfung kommt nach dem normalen Intervall.
+- **Beobachtung:** Die Beläge gelten mindestens zu 80 % verbraucht („bald fällig“), die nächste Prüfung kommt nach 40 % des normalen Intervalls (200 statt 500 km).
+- **Wechseln:** „Bremsbeläge wechseln“ ist sofort fällig.
+
+Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RATIO`, `WATCH_RECHECK_FACTOR` in `services.py`). Nach dem Eintrag „Bremsbeläge wechseln“ zählt das alte Ergebnis nicht mehr.
+
 ## Startseite, Inventar, Anleitungen und Orte
 
 - **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche, die wichtigsten Wartungen, deine Räder mit Kilometerstand und Wochenkilometern, Jahresstand mit Ziel und die letzten Fahrten.

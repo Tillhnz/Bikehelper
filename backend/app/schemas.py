@@ -116,6 +116,8 @@ class RuleOut(RuleIn):
     variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
     guides: list[dict] | None = None  # Anleitungen und Videos zur Aufgabe
     measure: dict | None = None  # Hochrechnung aus der letzten Kettenmessung (nur Verschleißregel der Kette)
+    is_inspection: bool = False  # Prüfregel: beim Eintragen wird ein Ergebnis gewählt
+    assessment: dict | None = None  # Prüfergebnis, das Intervall dieser Regel beeinflusst (Prüf- und Wechselregel)
     km_since: float
     wet_km: float
     effective_km: float  # gefahrene km inklusive Nässe-Zuschlag
@@ -130,6 +132,7 @@ class RuleDoneIn(BaseModel):
     performed_time: time | None = None  # Ortszeit
     note: str | None = None
     variant: Literal["hot_wax", "drip_wax"] | None = None  # nur für die Wachsregel
+    result: Literal["good", "watch", "replace"] | None = None  # nur für Prüfregeln
 
 
 class ReplaceIn(BaseModel):
@@ -152,6 +155,7 @@ class LogOut(LogIn):
     id: int
     rule_id: int | None = None
     variant: str | None = None
+    result: str | None = None
 
 
 class ActivityOut(BaseModel):

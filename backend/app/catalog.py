@@ -323,3 +323,9 @@ GUIDES: dict[str, tuple[Guide, ...]] = {
 
 def guides_for(label: str) -> list[dict]:
     return [asdict(g) for g in GUIDES.get(label, ())]
+
+
+# Prüfregel -> Verschleißregel, die sich nach dem Prüfergebnis richtet
+INSPECTIONS = {"Belagstärke prüfen": "Bremsbeläge wechseln"}
+WEAR_TO_INSPECTION = {v: k for k, v in INSPECTIONS.items()}
+INSPECTION_RESULTS = ("good", "watch", "replace")

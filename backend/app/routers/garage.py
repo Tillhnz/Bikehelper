@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..catalog import WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload, guides_for
+from ..catalog import INSPECTIONS, WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload, guides_for
 from ..database import get_db
 from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, User
 from ..schemas import (
@@ -73,13 +73,15 @@ def _component_out(db: Session, c: Component) -> ComponentOut:
 def _rule_out(db: Session, c: Component, r: MaintenanceRule) -> RuleOut:
     st = rule_state(db, c, r)
     interval_km = st.pop("interval_km_eff")
+    if interval_km is not None:
+        interval_km = max(1, round(interval_km))  # Prüfergebnisse können das Intervall krumm machen
     variants = (
         [WaxVariantOut(key=k, name=v["name"], interval_km=v["interval_km"]) for k, v in WAX_VARIANTS.items()]
         if r.label == WAX_LUBE_LABEL else None
     )
     return RuleOut(
         id=r.id, label=r.label, interval_km=interval_km, interval_months=r.interval_months,
-        wet_factor=r.wet_factor or 1.0, hint=r.hint, variants=variants, guides=guides_for(r.label), **st,
+        wet_factor=r.wet_factor or 1.0, hint=r.hint, is_inspection=r.label in INSPECTIONS, variants=variants, guides=guides_for(r.label), **st,
     )
 
 
@@ -247,6 +249,8 @@ def rule_done(rule_id: int, data: RuleDoneIn, user: User = Depends(current_user)
     values = data.model_dump()
     if rule.label != WAX_LUBE_LABEL:
         values["variant"] = None  # die Wachsart gibt es nur bei der Wachsregel
+    if rule.label not in INSPECTIONS:
+        values["result"] = None  # ein Prüfergebnis gibt es nur bei Prüfregeln
     log = MaintenanceLog(component_id=rule.component_id, rule_id=rule.id, **values)
     db.add(log)
     db.commit()

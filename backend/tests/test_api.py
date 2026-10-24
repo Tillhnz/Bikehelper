@@ -332,6 +332,51 @@ def test_chain_measurement_drives_the_wear_rule():
                       json={"measured_at": date.today().isoformat(), "wear_pct": 0.1}).status_code == 404
 
 
+def test_brake_pad_inspection_result_adjusts_intervals():
+    with TestClient(app) as c:
+        h = _user(c, "pads@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        uid = c.get("/api/me", headers=h).json()["id"]
+        start = date.today() - timedelta(days=60)
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "brake_pads", "name": "Beläge", "installed_at": start.isoformat(),
+        }).json()
+        with SessionLocal() as db:
+            for i in range(3):
+                db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=400.0,
+                                start_date=datetime.combine(start + timedelta(days=i + 1), datetime.min.time())))
+            db.commit()
+
+        def rules():
+            rs = c.get(f"/api/components/{comp['id']}/rules", headers=h).json()
+            return next(r for r in rs if r["label"] == "Belagstärke prüfen"), next(r for r in rs if r["label"] == "Bremsbeläge wechseln")
+
+        check, wear = rules()
+        assert check["is_inspection"] and not wear["is_inspection"] and wear["assessment"] is None
+        base = wear["progress"]  # 1200 von 1500 km: bald fällig
+        assert base >= 0.8
+
+        today = date.today().isoformat()
+        good = c.post(f"/api/rules/{check['id']}/done", headers=h, json={"performed_at": today, "result": "good"}).json()
+        assert good["result"] == "good"
+        check, wear = rules()
+        assert wear["assessment"]["result"] == "good" and wear["progress"] <= 0.55 and wear["status"] == "ok"
+        assert wear["interval_km"] > 1500  # Intervall verlängert
+
+        c.delete(f"/api/logs/{good['id']}", headers=h)
+        c.post(f"/api/rules/{check['id']}/done", headers=h, json={"performed_at": today, "result": "watch"})
+        check, wear = rules()
+        assert wear["progress"] >= 0.8 and check["interval_km"] == 200  # 500 km * 0,4
+
+        c.post(f"/api/rules/{check['id']}/done", headers=h, json={"performed_at": today, "result": "replace"})
+        assert rules()[1]["status"] == "due"
+
+        # Nach dem Wechsel zählt das alte Ergebnis nicht mehr
+        c.post(f"/api/rules/{wear['id']}/done", headers=h, json={"performed_at": (date.today() + timedelta(days=1)).isoformat()})
+        check, wear = rules()
+        assert wear["assessment"] is None and check["assessment"] is None
+
+
 def test_notification_settings_roundtrip():
     with TestClient(app) as c:
         h = _user(c, "notify@example.com")

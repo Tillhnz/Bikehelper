@@ -157,6 +157,7 @@ class MaintenanceLog(Base):
     performed_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     variant: Mapped[str | None] = mapped_column(String(12), nullable=True)  # Wachsart: hot_wax | drip_wax
+    result: Mapped[str | None] = mapped_column(String(10), nullable=True)  # Prüfergebnis: good | watch | replace
 
     component: Mapped[Component] = relationship(back_populates="logs")
 
