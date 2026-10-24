@@ -99,6 +99,18 @@ def check_reset(ip: str, email: str, now: float | None = None) -> None:
         raise HTTPException(429, "Zu viele Anfragen. Bitte später erneut versuchen.", headers={"Retry-After": str(wait)})
 
 
+def check_mechanic(user_id: int, now: float | None = None) -> None:
+    """Höchstens 5 Zugriffsanfragen pro Tag und Nutzer (gegen Ausprobieren fremder Adressen und Mail-Spam)."""
+    now = time.monotonic() if now is None else now
+    with _lock:
+        wait = _retry_after(f"mech:{user_id}", 5, 24 * 3600, now)
+        if not wait:
+            _fails[f"mech:{user_id}"].append(now)
+    if wait:
+        raise HTTPException(429, "Heute wurden schon genug Anfragen gesendet. Bitte morgen erneut versuchen.",
+                            headers={"Retry-After": str(wait)})
+
+
 def reset() -> None:
     with _lock:
         _fails.clear()

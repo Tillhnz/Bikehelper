@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CATEGORIES, api, today } from "../api.js";
+import { CATEGORIES, api, safeUrl, today } from "../api.js";
 import { toast } from "./feedback.jsx";
 
 const REPLACE = /wechsel|tausch|erneuer|ersetz/i;
@@ -26,7 +26,7 @@ export default function ShoppingList({ onClose }) {
     (REPLACE.test(i.rule) ? buy : care).push({ ...i, stock });
   }
 
-  const lineBuy = (i) => `- ${CATEGORIES[i.category] ?? i.component}${i.bike ? ` für ${i.bike}` : ""} (${i.component}, ${i.status === "due" ? "fällig" : "bald fällig"})${i.stock ? `, ${i.stock}x auf Lager` : ""}`;
+  const lineBuy = (i) => `- ${CATEGORIES[i.category] ?? i.component}${i.bike ? ` für ${i.bike}` : ""} (${i.component}, ${i.status === "due" ? "fällig" : "bald fällig"})${i.stock ? `, ${i.stock}x auf Lager` : ""}${safeUrl(i.shop_url) ? ` – ${safeUrl(i.shop_url)}` : ""}`;
   const text = `Einkaufsliste ${new Date(today() + "T00:00:00").toLocaleDateString("de-DE")}\n\nTeile:\n${buy.filter((i) => !i.stock).map(lineBuy).join("\n") || "- nichts zu besorgen"}\n\n` +
     (buy.some((i) => i.stock) ? `Schon im Lager:\n${buy.filter((i) => i.stock).map(lineBuy).join("\n")}\n\n` : "") +
     (care.length ? `Pflege und Prüfung:\n${care.map((i) => `- ${i.rule}: ${i.component}${i.bike ? ` (${i.bike})` : ""}`).join("\n")}\n` : "");
@@ -43,7 +43,7 @@ export default function ShoppingList({ onClose }) {
           <h3>Teile besorgen</h3>
           {buy.filter((i) => !i.stock).length === 0 ? <p className="muted">Alles Nötige ist im Lager oder es steht kein Wechsel an.</p> : (
             <ul className="shop-list">{buy.filter((i) => !i.stock).map((i) => (
-              <li key={`${i.component_id}-${i.rule}`}><span className="box" aria-hidden="true" /> <strong>{CATEGORIES[i.category] ?? i.component}</strong>{i.bike ? ` für ${i.bike}` : ""} <span className="muted small">({i.component}, {i.status === "due" ? "fällig" : "bald fällig"})</span></li>
+              <li key={`${i.component_id}-${i.rule}`}><span className="box" aria-hidden="true" /> <strong>{CATEGORIES[i.category] ?? i.component}</strong>{i.bike ? ` für ${i.bike}` : ""} <span className="muted small">({i.component}, {i.status === "due" ? "fällig" : "bald fällig"})</span>{safeUrl(i.shop_url) && <> <a className="no-print" href={safeUrl(i.shop_url)} target="_blank" rel="noopener noreferrer">Kaufen</a></>}</li>
             ))}</ul>
           )}
           {buy.some((i) => i.stock) && (

@@ -163,7 +163,7 @@ export default function Garage() {
   );
 }
 
-function BikeCard({ bike, index = 0 }) {
+export function BikeCard({ bike, index = 0 }) {
   return (
     <Link to={`/bikes/${bike.id}`} className={`bike-card ${bike.retired ? "retired" : ""}`} style={{ "--i": index }}>
       <div className="bike-card-art">

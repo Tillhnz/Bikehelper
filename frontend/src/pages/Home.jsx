@@ -7,6 +7,7 @@ import { EmptyState, StatusPill } from "../components/ui.jsx";
 import { GOAL_META } from "../components/StatsExtra.jsx";
 import QuickDone from "../components/QuickDone.jsx";
 import WetNotice from "../components/WetNotice.jsx";
+import MechanicRequests from "../components/MechanicRequests.jsx";
 import { Loading } from "../components/feedback.jsx";
 
 function greeting() {
@@ -97,6 +98,8 @@ export default function Home() {
         <h1>{greeting()}</h1>
         <p className="muted">{new Date(d.today + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
+
+      <MechanicRequests items={d.mechanic_requests} />
 
       {!d.has_rides && bikes.length === 0 ? (
         <EmptyState title="Willkommen bei BikeHelper" text="Lege zuerst dein Rad an und importiere dann deine Fahrten.">

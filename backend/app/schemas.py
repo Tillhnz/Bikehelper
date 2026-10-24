@@ -4,6 +4,18 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+def clean_shop_url(v: str | None) -> str | None:
+    """Einkaufslinks: leer wird zu None, sonst nur http(s) (nie javascript: oder data:)."""
+    if v is None:
+        return None
+    v = v.strip()
+    if not v:
+        return None
+    if not v.lower().startswith(("http://", "https://")) or " " in v:
+        raise ValueError("Der Link muss mit http:// oder https:// beginnen.")
+    return v
+
+
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -43,6 +55,7 @@ class UserOut(BaseModel):
     weight_kg: float | None = None
     is_admin: bool = False
     role: str = "user"
+    mechanic_enabled: bool = False
 
 
 class StravaSettingsIn(BaseModel):
@@ -92,6 +105,7 @@ class BikeOut(BikeIn):
     due_count: int
     unknown_count: int = 0  # Komponenten ohne Einbaudatum, bei denen noch nichts gezählt werden kann
     tire_set: MountedTireSet | None = None  # aktuell montierter Reifensatz
+    shared_from: str | None = None  # E-Mail des Besitzers, wenn das Rad einem Partner gehört (Mechanics-Modus)
 
 
 class ComponentIn(BaseModel):
@@ -104,6 +118,12 @@ class ComponentIn(BaseModel):
     start_km: float = 0
     notes: str | None = None
     wear_limit_pct: float | None = None  # Kette: Grenzwert der Kettenlehre
+    shop_url: str | None = Field(default=None, max_length=500)  # eigener Einkaufslink
+
+    @field_validator("shop_url")
+    @classmethod
+    def _shop_url(cls, v):
+        return clean_shop_url(v)
 
 
 class ComponentOut(ComponentIn):
@@ -174,6 +194,7 @@ class LogOut(LogIn):
     rule_id: int | None = None
     variant: str | None = None
     result: str | None = None
+    performed_by: str | None = None  # E-Mail des Mechanikers, falls nicht der Besitzer eingetragen hat
 
 
 class ActivityOut(BaseModel):
@@ -245,6 +266,12 @@ class TireSetIn(BaseModel):
     watts_note: str | None = Field(default=None, max_length=200)
     source_url: str | None = Field(default=None, max_length=255, pattern=r"^https?://")
     casing: Literal["supple", "standard", "stiff"] | None = None  # Karkasse, wird vom Ratgeber genutzt
+    shop_url: str | None = Field(default=None, max_length=500)  # eigener Einkaufslink
+
+    @field_validator("shop_url")
+    @classmethod
+    def _shop_url(cls, v):
+        return clean_shop_url(v)
 
 
 class TireSetCreate(TireSetIn):

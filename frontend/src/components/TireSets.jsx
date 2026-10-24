@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
+import { api, fmtDate, fmtKm, fmtNum, safeUrl, today } from "../api.js";
 import { Gauge } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
 import { confirmDialog } from "./feedback.jsx";
 import CheckGuide from "./CheckGuide.jsx";
 
-const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
+const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", shop_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
 
 const num = (v) => (v === "" || v == null ? null : Number(v));
 
@@ -25,6 +25,7 @@ function setPayload(f) {
     watts: num(f.watts),
     watts_note: f.watts_note || null,
     source_url: f.source_url || null,
+    shop_url: f.shop_url?.trim() || null,
     casing: f.casing || null,
   };
 }
@@ -187,6 +188,11 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
         Quelle des Werts (Link)
         <input type="url" value={f.source_url ?? ""} onChange={set("source_url")} placeholder="https://" />
       </label>
+      <label>
+        Einkaufslink
+        <input type="url" value={f.shop_url ?? ""} onChange={set("shop_url")} placeholder="https://" maxLength={500} />
+        <span className="hint">Hier kaufst du diesen Reifen nach.</span>
+      </label>
       <label className="check span-all">
         <input type="checkbox" checked={!!f.tubeless} onChange={(e) => setF({ ...f, tubeless: e.target.checked })} />
         Tubeless
@@ -271,7 +277,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           <p className="muted small">{fmtKm(ts.km)} von {fmtKm(ts.max_km)} km erwartet</p>
         </>
       )}
-      {(ts.weight_g || ts.watts || ts.casing || ts.brand) && (
+      {(ts.weight_g || ts.watts || ts.casing || ts.brand || ts.shop_url) && (
         <p className="tire-facts small">
           {ts.casing && <span>Karkasse: {CASING_TEXT[ts.casing]}</span>}
           {ts.weight_g && <span>{fmtNum(ts.weight_g, 0)} g je Reifen</span>}
@@ -284,6 +290,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
               {bestWatts != null && ts.watts <= bestWatts + 0.05 && <span className="muted"> (bester deiner Sätze)</span>}
             </span>
           )}
+          {safeUrl(ts.shop_url) && <a href={safeUrl(ts.shop_url)} target="_blank" rel="noopener noreferrer">Nachkaufen</a>}
           {ts.source_url && <a href={ts.source_url} target="_blank" rel="noopener noreferrer">Quelle</a>}
           {!ts.watts && <a href={`https://duckduckgo.com/?q=${encodeURIComponent(`${ts.brand ?? ""} ${ts.name} Rollwiderstand Watt`)}`} target="_blank" rel="noopener noreferrer">Rollwiderstand nachschlagen</a>}
         </p>

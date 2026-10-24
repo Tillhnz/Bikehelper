@@ -7,6 +7,7 @@ import UploadBanner from "./UploadBanner.jsx";
 const NAV = [
   { to: "/", label: "Start", end: true, icon: "M4 12 A8 8 0 0 1 20 12 M12 12 L16 8 M6 20 H18" },
   { to: "/garage", label: "Garage", icon: "M3 11 L12 4 L21 11 V20 H3 Z M8 20 V14 H16 V20" },
+  { to: "/mechanic", label: "Werkstatt", mech: true, icon: "M14.5 6.5 A4 4 0 0 0 9 11 L4 16 L8 20 L13 15 A4 4 0 0 0 17.5 9.5 L15 12 L12 9 Z" },
   { to: "/advisor", label: "Ratgeber", icon: "M4 7 H20 M4 17 H20 M9 4 V10 M15 14 V20" },
   { to: "/rides", label: "Fahrten", icon: "M8 6 H20 M8 12 H20 M8 18 H20 M4 6 H4.01 M4 12 H4.01 M4 18 H4.01" },
   { to: "/heatmap", label: "Heatmap", icon: "M12 21 C7 15 5 12 5 9 A7 7 0 0 1 19 9 C19 12 17 15 12 21 Z M12 11 A2 2 0 1 0 12.01 11" },
@@ -35,7 +36,7 @@ export default function Shell({ user, onLogout, children }) {
         </div>
         <Search />
         <nav aria-label="Hauptmenü">
-          {NAV.map((n) => (
+          {NAV.filter((n) => !n.mech || user.mechanic_enabled).map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}>
               <svg viewBox="0 0 24 24" className="nav-icon" aria-hidden="true" focusable="false"><path d={n.icon} /></svg>
               <span className="nav-label">{n.label}</span>

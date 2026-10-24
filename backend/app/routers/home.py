@@ -10,7 +10,7 @@ from ..models import Activity, Bike, Component, Goal, MaintenanceLog, User
 from ..security import current_user
 from ..stats import extra as X
 from ..stats.overview import get_tz, local
-from . import garage
+from . import garage, mechanic
 from .stats import _goal_targets, _load
 
 router = APIRouter(prefix="/api", tags=["home"])
@@ -156,4 +156,5 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "recent": [{"id": a.id, "name": a.name, "date": local(a.start_date, tz).isoformat(), "km": round(a.distance_km, 1),
                     "elev_m": round(a.elevation_m or 0), "time_s": a.moving_time_s} for a in acts[:4]],
         "has_rides": bool(acts),
+        "mechanic_requests": mechanic.pending_for(db, user),
     }

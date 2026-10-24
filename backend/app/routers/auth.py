@@ -9,6 +9,7 @@ from ..config import settings
 from ..database import get_db
 from .. import ratelimit
 from ..models import (
+    MechanicGrant,
     Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PasswordReset, PlaceVisit, RuleNotice, TireSet, User, UserTire, WahooSeen,
 )
 from ..schemas import LoginIn, PasswordChangeIn, PasswordConfirmIn, RegisterIn, StravaSettingsIn, TokenOut, UserOut
@@ -26,6 +27,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         weight_kg=u.weight_kg,
         is_admin=admin,
         role="admin" if admin else "user",
+        mechanic_enabled=bool(u.mechanic_enabled),
     )
 
 
@@ -122,6 +124,7 @@ def delete_user_data(db: Session, user: User) -> None:
         db.delete(obj)  # Regeln, Wartungseinträge, Messungen, Montagen laufen über die Kaskade mit
     db.flush()
     db.execute(delete(PasswordReset).where(PasswordReset.user_id == uid))
+    db.execute(delete(MechanicGrant).where((MechanicGrant.owner_id == uid) | (MechanicGrant.mechanic_id == uid)))
     for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, UserTire, Bike):
         db.execute(delete(model).where(model.user_id == uid))
     db.delete(user)

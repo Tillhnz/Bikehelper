@@ -40,6 +40,7 @@ class User(Base):
     wahoo_expires_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     wahoo_bike_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Standardrad für importierte Fahrten
     wahoo_last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    mechanic_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # Mechanics-Modus aktiviert (eigener Tab)
     wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
 
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
@@ -101,7 +102,7 @@ class TireSet(Base):
     watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     casing: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    casing: Mapped[str | None] = mapped_column(String(10), nullable=True)  # supple | standard | stiff (Ratgeber)
+    shop_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # eigener Einkaufslink für Ersatz
 
     bike: Mapped[Bike] = relationship(back_populates="tire_sets")
     mounts: Mapped[list["TireMount"]] = relationship(back_populates="tire_set", cascade="all, delete-orphan")
@@ -133,6 +134,7 @@ class Component(Base):
     start_km: Mapped[float] = mapped_column(Float, default=0)  # Kilometer, die das Teil schon hatte
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     wear_limit_pct: Mapped[float | None] = mapped_column(Float, nullable=True)  # Kette: 0,5 (11/12-fach) oder 0,75 %
+    shop_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # eigener Einkaufslink für Ersatz
 
     bike: Mapped[Bike | None] = relationship(back_populates="components")
     measurements: Mapped[list["ChainMeasurement"]] = relationship(back_populates="component", cascade="all, delete-orphan")
@@ -182,6 +184,7 @@ class MaintenanceLog(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     variant: Mapped[str | None] = mapped_column(String(12), nullable=True)  # Wachsart: hot_wax | drip_wax
     result: Mapped[str | None] = mapped_column(String(10), nullable=True)  # Prüfergebnis: good | watch | replace
+    performed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)  # E-Mail des Mechanikers, wenn nicht der Besitzer eintrug
 
     component: Mapped[Component] = relationship(back_populates="logs")
 
@@ -366,3 +369,17 @@ class PasswordReset(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class MechanicGrant(Base):
+    """Freigabe: `mechanic` darf die Räder von `owner` einsehen und bearbeiten (Garage, Teile, Wartung, Reifen).
+    Erst nach Bestätigung durch den Besitzer aktiv (status = "active"), jederzeit widerrufbar."""
+    __tablename__ = "mechanic_grants"
+    __table_args__ = (UniqueConstraint("owner_id", "mechanic_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    mechanic_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | active
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

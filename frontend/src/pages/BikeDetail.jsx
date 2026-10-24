@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, nowTime, toTime, today } from "../api.js";
+import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, nowTime, safeUrl, toTime, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import ChainMeasure from "../components/ChainMeasure.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
@@ -209,6 +209,7 @@ function ComponentCard({ comp, onChanged }) {
   const [rule, setRule] = useState({ label: "", interval_km: "", interval_months: "", wet_factor: 1 });
   const [repl, setRepl] = useState({ performed_at: today(), name: comp.name, brand: comp.brand ?? "" });
   const [installed, setInstalled] = useState(comp.installed_at || today());
+  const [shop, setShop] = useState(comp.shop_url ?? "");
   const [error, setError] = useState("");
 
   const loadDetails = useCallback(async () => {
@@ -298,6 +299,16 @@ function ComponentCard({ comp, onChanged }) {
     });
   };
 
+  const saveShop = (e) => {
+    e.preventDefault();
+    return guarded(async () => {
+      const { id, km, status, ...rest } = comp;
+      await api.put(`/components/${id}`, { ...rest, shop_url: shop.trim() || null });
+      setPanel(null);
+      onChanged();
+    });
+  };
+
   const clearInstallDate = () =>
     guarded(async () => {
       const { id, km, status, ...rest } = comp;
@@ -355,6 +366,7 @@ function ComponentCard({ comp, onChanged }) {
         {comp.brand ? `${comp.brand} · ` : ""}
         {noDate ? "Einbaudatum unbekannt" : comp.installed_inherited ? `seit dem Kauf des Rades am ${fmtDate(comp.installed_effective)}` : `eingebaut am ${fmtDate(comp.installed_at)}`}
         {retired ? `, ausgemustert am ${fmtDate(comp.retired_at)}` : ""}
+        {safeUrl(comp.shop_url) && <> · <a href={safeUrl(comp.shop_url)} target="_blank" rel="noopener noreferrer">Nachkaufen</a></>}
       </p>
 
       {rules.length > 0 && (
@@ -392,6 +404,7 @@ function ComponentCard({ comp, onChanged }) {
                     <strong>{fmtDate(l.performed_at)}{l.performed_time ? `, ${l.performed_time.slice(0, 5)} Uhr` : ""}</strong>{" "}
                     <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : "ganze Komponente"}</span>
                     {variant ? `, ${variant}` : ""}{l.result ? `, Ergebnis: ${{ good: "gut", watch: "Beobachtung", replace: "wechseln" }[l.result]}` : ""}{l.note ? ` – ${l.note}` : ""}
+                    {l.performed_by && <span className="muted small"> (durch {l.performed_by})</span>}
                   </span>
                   <button className="link small danger" onClick={() => removeLog(l)}>Löschen</button>
                 </li>
@@ -418,6 +431,15 @@ function ComponentCard({ comp, onChanged }) {
           <label className="grow">Notiz<input value={log.note} onChange={(e) => setLog({ ...log, note: e.target.value })} placeholder="z. B. gereinigt und geölt" /></label>
           <button className="btn primary">Wartung speichern</button>
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+        </form>
+      )}
+
+      {panel === "shop" && (
+        <form className="inline-form" onSubmit={saveShop}>
+          <label className="grow">Einkaufslink<input type="url" value={shop} onChange={(e) => setShop(e.target.value)} placeholder="https://" maxLength={500} /></label>
+          <button className="btn primary">Link speichern</button>
+          <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+          <p className="hint span-all">Hier kaufst du dieses Teil nach. Der Link gehört zu diesem Rad und wird beim Wechsel automatisch ans neue Teil übernommen. Leer lassen entfernt ihn.</p>
         </form>
       )}
 
@@ -451,6 +473,7 @@ function ComponentCard({ comp, onChanged }) {
             {noDate ? "Einbaudatum eintragen" : "Einbaudatum ändern"}
           </button>
           <button className="btn small" onClick={() => setPanel("replace")}>Teil gewechselt</button>
+          <button className="btn small" onClick={() => setPanel("shop")}>{comp.shop_url ? "Einkaufslink ändern" : "Einkaufslink"}</button>
           <button className="btn small" onClick={() => setPanel("log")}>Wartung eintragen</button>
           <button className="btn small" onClick={() => setPanel("rule")}>Regel hinzufügen</button>
           <button className="btn small" onClick={retire}>Ausmustern</button>
@@ -546,7 +569,7 @@ export default function BikeDetail() {
   }
 
   async function toggleRetired() {
-    const { id: _id, total_km, component_count, due_count, unknown_count, tire_set, ...rest } = bike;
+    const { id: _id, total_km, component_count, due_count, unknown_count, tire_set, shared_from, ...rest } = bike;
     await api.put(`/bikes/${bike.id}`, { ...rest, retired: !bike.retired });
     load();
   }
@@ -568,6 +591,9 @@ export default function BikeDetail() {
   return (
     <>
       <p><Link to="/garage" className="link">← Zurück zur Garage</Link></p>
+      {bike.shared_from && (
+        <p className="notice" role="note">Das Rad gehört <strong>{bike.shared_from}</strong>. Du bearbeitest es als Mechaniker; Änderungen sieht der Besitzer sofort.</p>
+      )}
       <header className="bike-hero">
         <div>
           <h1>{bike.name}</h1>
@@ -587,7 +613,7 @@ export default function BikeDetail() {
             <button className="btn small" onClick={toggleRetired}>
               {bike.retired ? "Wieder aktivieren" : "Ausmustern"}
             </button>
-            <button className="link small danger" onClick={removeBike}>Rad löschen</button>
+            {!bike.shared_from && <button className="link small danger" onClick={removeBike}>Rad löschen</button>}
           </div>
         </div>
         <div className="bike-hero-art">

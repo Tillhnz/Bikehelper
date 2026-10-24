@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..access import can_use
 from ..database import get_db
 from ..models import TireMount, TireSet, User
 from ..schemas import MountDateIn, MountOut, MountRangeIn, TireSetCreate, TireSetIn, TireSetOut
@@ -12,14 +13,14 @@ from ..security import current_user
 from ..services import (
     find_overlap, mount_km, mount_tire_set, open_mount, sync_bike_tires, tire_set_km, unmount_tire_set,
 )
-from .garage import _own_bike
+from .garage import _shared_bike
 
 router = APIRouter(prefix="/api", tags=["tires"])
 
 
 def _own_set(db: Session, user: User, set_id: int) -> TireSet:
     ts = db.get(TireSet, set_id)
-    if not ts or ts.user_id != user.id:
+    if not ts or not can_use(db, user, ts.user_id):
         raise HTTPException(404, "Reifensatz nicht gefunden")
     return ts
 
@@ -32,7 +33,7 @@ def _out(db: Session, ts: TireSet) -> TireSetOut:
         id=ts.id, bike_id=ts.bike_id, name=ts.name, brand=ts.brand, width_mm=ts.width_mm, tubeless=ts.tubeless,
         start_km=ts.start_km, max_km=ts.max_km, notes=ts.notes, retired=ts.retired,
         model_key=ts.model_key, category=ts.category, weight_g=ts.weight_g, watts=ts.watts,
-        watts_note=ts.watts_note, source_url=ts.source_url, casing=ts.casing,
+        watts_note=ts.watts_note, source_url=ts.source_url, casing=ts.casing, shop_url=ts.shop_url,
         km=round(km, 1), mounted=current is not None and not ts.retired,
         mounted_since=current.from_date if current else None,
         progress=round(km / ts.max_km, 3) if ts.max_km else None,
@@ -45,15 +46,15 @@ def _out(db: Session, ts: TireSet) -> TireSetOut:
 
 @router.get("/bikes/{bike_id}/tire-sets", response_model=list[TireSetOut])
 def list_tire_sets(bike_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    _own_bike(db, user, bike_id)
+    _shared_bike(db, user, bike_id)
     sets = db.scalars(select(TireSet).where(TireSet.bike_id == bike_id).order_by(TireSet.retired, TireSet.name)).all()
     return [_out(db, ts) for ts in sets]
 
 
 @router.post("/bikes/{bike_id}/tire-sets", response_model=TireSetOut, status_code=201)
 def create_tire_set(bike_id: int, data: TireSetCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    bike = _own_bike(db, user, bike_id)
-    ts = TireSet(user_id=user.id, bike_id=bike.id, **data.model_dump(exclude={"mount_from"}))
+    bike = _shared_bike(db, user, bike_id)
+    ts = TireSet(user_id=bike.user_id, bike_id=bike.id, **data.model_dump(exclude={"mount_from"}))
     db.add(ts)
     db.flush()
     if data.mount_from and not ts.retired:
@@ -133,7 +134,7 @@ def add_mount(set_id: int, data: MountRangeIn, user: User = Depends(current_user
 @router.put("/tire-mounts/{mount_id}", response_model=TireSetOut)
 def update_mount(mount_id: int, data: MountRangeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     m = db.get(TireMount, mount_id)
-    if not m or m.tire_set.user_id != user.id:
+    if not m or not can_use(db, user, m.tire_set.user_id):
         raise HTTPException(404, "Zeitraum nicht gefunden")
     _check_range(db, m.tire_set, data, m.id)
     m.from_date, m.to_date = data.from_date, data.to_date
@@ -144,7 +145,7 @@ def update_mount(mount_id: int, data: MountRangeIn, user: User = Depends(current
 @router.delete("/tire-mounts/{mount_id}", response_model=TireSetOut)
 def delete_mount(mount_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     m = db.get(TireMount, mount_id)
-    if not m or m.tire_set.user_id != user.id:
+    if not m or not can_use(db, user, m.tire_set.user_id):
         raise HTTPException(404, "Zeitraum nicht gefunden")
     ts = m.tire_set
     db.delete(m)

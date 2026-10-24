@@ -174,3 +174,13 @@ export const WEATHER_TEXT = (code) => {
   if (code >= 95) return "Gewitter";
   return null;
 };
+
+/** Nur http(s)-Links werden als Verweis verwendet (nie javascript: oder data:), auch wenn der Server sie schon prüft. */
+export const safeUrl = (u) => {
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:" ? p.href : null;
+  } catch {
+    return null;
+  }
+};

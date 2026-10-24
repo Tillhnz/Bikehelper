@@ -144,6 +144,14 @@ Beim Anlegen eines Reifensatzes suchst du den Reifen im Katalog (Marke, Modell, 
 
 Der mitgelieferte Katalog (`backend/app/data/tires.csv`) ist bewusst klein: Er enthält nur Herstellerangaben (Breite, Gewicht, Art) mit Link zur Produktseite, aber keine Messwerte. Watt-Werte sind urheberrechtlich geschützte Messreihen einzelner Prüfstände und gehören nicht in ein öffentliches Repository. Du kannst sie unter Reifen → „Reifenkatalog erweitern“ als CSV für dein eigenes Konto einlesen (Spalten: `brand, model, category, width_mm, tubeless, weight_g, watts, watts_note, source_url, casing`). Eigene Einträge sieht nur dein Konto. Alternativ lädt „Reifenkatalog erweitern“ eine CSV von einer https-Adresse deiner Wahl (zum Beispiel eine Datei in einem eigenen GitHub-Repository; lokale und private Adressen sind gesperrt). Eine offene Reifendatenbank mit Rollwiderstandswerten, die man direkt einbinden könnte, habe ich nicht gefunden. Neue Zeilen für die mitgelieferte Liste kannst du per Pull Request ergänzen.
 
+## Einkaufslinks und Mechanics-Modus
+
+**Einkaufslink:** Bei jeder Komponente und jedem Reifensatz kannst du einen Link hinterlegen, wo du das Teil nachkaufst (nur `http`/`https`). Er gehört zu deinem Rad, erscheint als „Nachkaufen“, steht in der Einkaufsliste und wird bei „Teil gewechselt“ ans neue Teil übernommen.
+
+**Mechanics-Modus:** In den Einstellungen schaltest du den Tab „Werkstatt“ frei. Dort fragst du mit der E-Mail-Adresse eines Partner-Kontos den Zugriff an. Die Antwort verrät nicht, ob es das Konto gibt; ist der E-Mail-Versand eingerichtet, bekommt der Partner zusätzlich eine Mail. Er sieht die Anfrage auf seiner Startseite und lässt sie zu oder lehnt sie ab. Entziehen kann er den Zugriff jederzeit in den Einstellungen, der Mechaniker kann ihn zurückgeben.
+
+Mit Zugriff darf der Mechaniker Räder, Komponenten, Wartungsregeln und -einträge, Messwerte und Reifensätze des Partners ansehen und ändern; neue Teile gehören dem Besitzer, Wartungseinträge tragen „durch <Mechaniker>“. Nicht möglich: ein Rad löschen sowie Zugriff auf Fahrten, Lager, Ziele, Orte, Gewicht und Einstellungen. Die Kilometer einer Komponente sind sichtbar, weil sie aus den Fahrten des Besitzers berechnet werden, die Fahrten selbst nicht. Pro Nutzer sind höchstens 5 Anfragen am Tag möglich.
+
 ## Statistik
 
 Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wetter), **Belastung**, **Jahresrückblick**, **Ziele** und **Vergleiche**.

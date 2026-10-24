@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, clearToken, download, fmtDateTime, setToken } from "../api.js";
 import { loadMapConfig, resetMapConfig } from "../geo.js";
-import { Loading, toast } from "../components/feedback.jsx";
+import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
 import { getTheme, setTheme } from "../theme.js";
 
 const PROVIDER_TEXT = {
@@ -421,6 +421,57 @@ function SecuritySettings({ user }) {
   );
 }
 
+function MechanicSettings({ user, onChange }) {
+  const [st, setSt] = useState(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => api.get("/mechanic/state").then(setSt).catch((e) => setError(e.message)), []);
+  useEffect(() => { load(); }, [load]);
+
+  async function toggle(enabled) {
+    try {
+      await api.put("/mechanic/enabled", { enabled });
+      onChange({ ...user, mechanic_enabled: enabled });
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  }
+
+  async function revoke(g) {
+    const text = g.status === "active" ? `${g.email} den Zugriff auf deine Räder entziehen?` : `Anfrage von ${g.email} entfernen?`;
+    if (!await confirmDialog(text)) return;
+    try {
+      await api.del(`/mechanic/grants/${g.id}`);
+      await load();
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  }
+
+  return (
+    <section className="panel">
+      <h2>Mechanics-Modus</h2>
+      <p className="muted">Mit dem Mechanics-Modus bekommst du den Tab „Werkstatt“. Dort siehst und bearbeitest du deine Räder und die Räder von Partnern, die dir den Zugriff erlaubt haben.</p>
+      <label className="check">
+        <input type="checkbox" checked={!!user.mechanic_enabled} onChange={(e) => toggle(e.target.checked)} />
+        Tab „Werkstatt“ anzeigen
+      </label>
+      <h3>Wer auf meine Räder zugreifen darf</h3>
+      {error && <p className="error" role="alert">{error}</p>}
+      {!st ? <Loading /> : st.access_given.length === 0 ? <p className="muted">Niemand. Anfragen erscheinen auf deiner Startseite und werden erst nach deiner Bestätigung wirksam.</p> : (
+        <ul className="log-list">
+          {st.access_given.map((g) => (
+            <li key={g.id}>
+              <span><strong>{g.email}</strong> <span className="muted">{g.status === "active" ? "darf Räder, Teile, Wartung und Reifen bearbeiten" : "wartet auf deine Bestätigung"}</span></span>
+              <button className="link small danger" onClick={() => revoke(g)}>{g.status === "active" ? "Zugriff entziehen" : "Entfernen"}</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="hint">Fahrten, Lager, Ziele, Orte und Einstellungen bleiben immer privat. Löschen kann nur du ein Rad.</p>
+    </section>
+  );
+}
+
 function AppearanceSettings() {
   const [mode, setMode] = useState(getTheme());
   function pick(m) { setMode(m); setTheme(m); }
@@ -474,6 +525,8 @@ export default function Settings({ user, onChange }) {
       <ProfileSettings user={user} onChange={onChange} />
 
       <AppearanceSettings />
+
+      <MechanicSettings user={user} onChange={onChange} />
 
       <NotifySettings />
 

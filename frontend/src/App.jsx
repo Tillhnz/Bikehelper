@@ -9,6 +9,7 @@ import Admin from "./pages/Admin.jsx";
 import Login from "./pages/Login.jsx";
 import Home from "./pages/Home.jsx";
 import Garage from "./pages/Garage.jsx";
+import Mechanic from "./pages/Mechanic.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Inventory from "./pages/Inventory.jsx";
 import Rides from "./pages/Rides.jsx";
@@ -71,6 +72,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/garage" element={<Garage />} />
+        {user.mechanic_enabled && <Route path="/mechanic" element={<Mechanic />} />}
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/advisor" element={<Advisor />} />

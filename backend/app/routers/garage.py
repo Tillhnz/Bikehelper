@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..catalog import INSPECTIONS, WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload, guides_for
 from ..database import get_db
+from ..access import can_use
 from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, User
 from ..schemas import (
     BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
@@ -28,18 +29,31 @@ def _own_bike(db: Session, user: User, bike_id: int) -> Bike:
     return bike
 
 
+def _shared_bike(db: Session, user: User, bike_id: int) -> Bike:
+    """Eigenes Rad oder Rad eines Partners, der dem Nutzer als Mechaniker Zugriff gegeben hat."""
+    bike = db.get(Bike, bike_id)
+    if not bike or not can_use(db, user, bike.user_id):
+        raise HTTPException(404, "Rad nicht gefunden")
+    return bike
+
+
 def _own_component(db: Session, user: User, comp_id: int) -> Component:
     comp = db.get(Component, comp_id)
-    if not comp or comp.user_id != user.id:
+    if not comp or not can_use(db, user, comp.user_id):
         raise HTTPException(404, "Komponente nicht gefunden")
     return comp
 
 
 def _own_rule(db: Session, user: User, rule_id: int) -> MaintenanceRule:
     rule = db.get(MaintenanceRule, rule_id)
-    if not rule or rule.component.user_id != user.id:
+    if not rule or not can_use(db, user, rule.component.user_id):
         raise HTTPException(404, "Regel nicht gefunden")
     return rule
+
+
+def _by(user: User, owner_id: int) -> str | None:
+    """Wer hat eingetragen? Nur gesetzt, wenn ein Mechaniker für einen Partner arbeitet."""
+    return user.email if user.id != owner_id else None
 
 
 def _bike_out(db: Session, bike: Bike) -> BikeOut:
@@ -65,7 +79,7 @@ def _component_out(db: Session, c: Component) -> ComponentOut:
     return ComponentOut(
         id=c.id, bike_id=c.bike_id, category=c.category, name=c.name, brand=c.brand,
         installed_at=c.installed_at, retired_at=c.retired_at, start_km=c.start_km, notes=c.notes,
-        wear_limit_pct=c.wear_limit_pct, km=round(component_km(db, c), 1), status=component_status(db, c),
+        wear_limit_pct=c.wear_limit_pct, shop_url=c.shop_url, km=round(component_km(db, c), 1), status=component_status(db, c),
         installed_effective=effective_installed(c), installed_inherited=not c.installed_at and effective_installed(c) is not None,
     )
 
@@ -117,27 +131,34 @@ def add_standard_components(
     bike_id: int, data: StandardComponentsIn, user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
     """Ergänzt fehlende Standardkomponenten (Kategorien, die das Rad schon hat, bleiben unberührt)."""
-    bike = _own_bike(db, user, bike_id)
-    created = create_default_components(db, user.id, bike, data.categories)
+    bike = _shared_bike(db, user, bike_id)
+    created = create_default_components(db, bike.user_id, bike, data.categories)
     db.commit()
     return [_component_out(db, c) for c in created]
 
 
 @router.get("/bikes/{bike_id}", response_model=BikeOut)
 def get_bike(bike_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return _bike_out(db, _own_bike(db, user, bike_id))
+    bike = _shared_bike(db, user, bike_id)
+    out = _bike_out(db, bike)
+    if bike.user_id != user.id:
+        out.shared_from = db.get(User, bike.user_id).email
+    return out
 
 
 @router.put("/bikes/{bike_id}", response_model=BikeOut)
 def update_bike(bike_id: int, data: BikeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    bike = _own_bike(db, user, bike_id)
+    bike = _shared_bike(db, user, bike_id)
     old_lube = bike.chain_lube or "oil"
     for k, v in data.model_dump().items():
         setattr(bike, k, v)
     if (bike.chain_lube or "oil") != old_lube:
         apply_chain_lube(db, bike)
     db.commit()
-    return _bike_out(db, bike)
+    out = _bike_out(db, bike)
+    if bike.user_id != user.id:
+        out.shared_from = db.get(User, bike.user_id).email
+    return out
 
 
 @router.delete("/bikes/{bike_id}", status_code=204)
@@ -155,18 +176,21 @@ def list_components(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    q = select(Component).where(Component.user_id == user.id)
     if bike_id is not None:
-        q = q.where(Component.bike_id == bike_id)
+        bike = _shared_bike(db, user, bike_id)  # auch Räder von Partnern
+        q = select(Component).where(Component.user_id == bike.user_id, Component.bike_id == bike_id)
+    else:
+        q = select(Component).where(Component.user_id == user.id)
     comps = db.scalars(q.order_by(Component.retired_at.is_not(None), Component.category, Component.name)).all()
     return [_component_out(db, c) for c in comps]
 
 
 @router.post("/components", response_model=ComponentOut, status_code=201)
 def create_component(data: ComponentIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    owner_id = user.id
     if data.bike_id is not None:
-        _own_bike(db, user, data.bike_id)
-    comp = Component(user_id=user.id, **data.model_dump())
+        owner_id = _shared_bike(db, user, data.bike_id).user_id
+    comp = Component(user_id=owner_id, **data.model_dump())
     db.add(comp)
     db.commit()
     return _component_out(db, comp)
@@ -175,8 +199,8 @@ def create_component(data: ComponentIn, user: User = Depends(current_user), db: 
 @router.put("/components/{comp_id}", response_model=ComponentOut)
 def update_component(comp_id: int, data: ComponentIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     comp = _own_component(db, user, comp_id)
-    if data.bike_id is not None:
-        _own_bike(db, user, data.bike_id)
+    if data.bike_id is not None and _shared_bike(db, user, data.bike_id).user_id != comp.user_id:
+        raise HTTPException(404, "Rad nicht gefunden")  # Teile wandern nie zwischen Konten
     for k, v in data.model_dump().items():
         setattr(comp, k, v)
     db.commit()
@@ -193,9 +217,9 @@ def replace_component(
         raise HTTPException(409, "Dieses Teil ist bereits ausgemustert.")
     old.retired_at = data.performed_at
     new = Component(
-        user_id=user.id, bike_id=old.bike_id, category=old.category,
+        user_id=old.user_id, bike_id=old.bike_id, category=old.category,
         name=data.name or old.name, brand=data.brand if data.brand is not None else old.brand,
-        installed_at=data.performed_at, start_km=0,
+        installed_at=data.performed_at, start_km=0, shop_url=old.shop_url,
     )
     new.rules = [
         MaintenanceRule(
@@ -251,7 +275,7 @@ def rule_done(rule_id: int, data: RuleDoneIn, user: User = Depends(current_user)
         values["variant"] = None  # die Wachsart gibt es nur bei der Wachsregel
     if rule.label not in INSPECTIONS:
         values["result"] = None  # ein Prüfergebnis gibt es nur bei Prüfregeln
-    log = MaintenanceLog(component_id=rule.component_id, rule_id=rule.id, **values)
+    log = MaintenanceLog(component_id=rule.component_id, rule_id=rule.id, performed_by=_by(user, rule.component.user_id), **values)
     db.add(log)
     db.commit()
     return log
@@ -267,7 +291,7 @@ def list_logs(comp_id: int, user: User = Depends(current_user), db: Session = De
 def create_log(comp_id: int, data: LogIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Wartung für die ganze Komponente (setzt alle ihre Regeln zurück)."""
     comp = _own_component(db, user, comp_id)
-    log = MaintenanceLog(component_id=comp.id, **data.model_dump())
+    log = MaintenanceLog(component_id=comp.id, performed_by=_by(user, comp.user_id), **data.model_dump())
     db.add(log)
     db.commit()
     return log
@@ -277,7 +301,7 @@ def create_log(comp_id: int, data: LogIn, user: User = Depends(current_user), db
 def delete_log(log_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Entfernt einen Wartungseintrag, zum Beispiel bei einem falschen Datum. Die Zähler rechnen danach neu."""
     log = db.get(MaintenanceLog, log_id)
-    if not log or log.component.user_id != user.id:
+    if not log or not can_use(db, user, log.component.user_id):
         raise HTTPException(404, "Wartungseintrag nicht gefunden")
     db.delete(log)
     db.commit()
@@ -307,7 +331,7 @@ def add_measurement(comp_id: int, data: MeasurementIn, user: User = Depends(curr
 @router.delete("/measurements/{m_id}", response_model=list[MeasurementOut])
 def delete_measurement(m_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     m = db.get(ChainMeasurement, m_id)
-    if not m or m.component.user_id != user.id:
+    if not m or not can_use(db, user, m.component.user_id):
         raise HTTPException(404, "Messwert nicht gefunden")
     comp = m.component
     db.delete(m)
@@ -333,7 +357,7 @@ def maintenance_overview(user: User = Depends(current_user), db: Session = Depen
                 items.append({
                     "component_id": c.id, "component": c.name, "category": c.category,
                     "bike_id": c.bike_id, "bike": c.bike.name if c.bike else None,
-                    "rule_id": r.id, "is_inspection": r.label in INSPECTIONS,
+                    "shop_url": c.shop_url, "rule_id": r.id, "is_inspection": r.label in INSPECTIONS,
                     "rule": r.label, "wet_factor": r.wet_factor or 1.0, **{k: v for k, v in st.items() if k != "interval_km_eff"},
                 })
     items.sort(key=lambda i: i["progress"], reverse=True)

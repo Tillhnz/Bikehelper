@@ -638,7 +638,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
   .sidebar-foot { margin: 0; }
   .sidebar nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0;
     background: rgba(18, 28, 40, 0.97); backdrop-filter: blur(8px);
     border-top: 1px solid var(--line);
     padding: 0.3rem 0.2rem calc(0.3rem + env(safe-area-inset-bottom));
@@ -1030,3 +1030,9 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .wet-notice p{margin:.25rem 0}
 .wet-icon{width:28px;height:28px;color:#4f8cff;flex:none;margin-top:.1rem}
 .wet-body{min-width:0}
+
+/* Mechanics-Modus */
+.notice{background:var(--panel);border:1px solid var(--line);border-left:4px solid #e0a030;border-radius:var(--r-panel);padding:.8rem 1.1rem;margin:0 0 1rem}
+.mech-requests{display:grid;gap:.7rem;margin-bottom:1.1rem}
+.notice-card{display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-left:4px solid #e0a030;border-radius:var(--r-panel);padding:1rem 1.2rem}
+.notice-card p{margin:.25rem 0 0}

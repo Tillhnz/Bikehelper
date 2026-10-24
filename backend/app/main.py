@@ -6,7 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import audit, notify
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
+from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
 from . import server_settings
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
@@ -61,6 +61,7 @@ _AREAS = (
     ("/api/tire-catalog", "Reifenkatalog"), ("/api/inventory", "Lager"), ("/api/activities", "Fahrten"),
     ("/api/imports", "Fahrten"), ("/api/stats/goals", "Ziele"), ("/api/settings", "Einstellungen"),
     ("/api/notifications", "Erinnerungen"), ("/api/wahoo", "Wahoo"), ("/api/places", "Orte"), ("/api/advisor", "Ratgeber"),
+    ("/api/mechanic", "Mechanics"),
 )
 _SPECIAL = {
     "/api/auth/password": ("password", "Passwort geändert"), "/api/auth/logout-all": ("logout.all", "Überall abgemeldet"),
@@ -110,6 +111,7 @@ app.include_router(admin_router.router)
 app.include_router(account_router.router)
 app.include_router(home.router)
 app.include_router(garage.router)
+app.include_router(mechanic_router.router)
 app.include_router(tires.router)
 app.include_router(tire_catalog_router.router)
 app.include_router(inventory.router)
