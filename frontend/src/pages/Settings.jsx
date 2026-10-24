@@ -95,6 +95,34 @@ function MapSettings() {
       </p>
       {st.server_custom_url ? (
         <p className="muted">Der Server nutzt eine eigene Kachel-URL aus der Konfiguration. Ein Schlüssel hier ändert daran nichts.</p>
+      ) : st.server_has_key && !st.has_user_key ? (
+        <>
+          <p className="muted">Die Karte wird vom Administrator bereitgestellt. Du musst nichts einrichten.</p>
+          <details className="howto">
+            <summary>Eigenen CARTO-Schlüssel verwenden (optional)</summary>
+            <>
+          <p className="muted">
+            Die dunkle Karte stammt von CARTO und braucht einen kostenlosen Schlüssel. Ohne ihn zeigt CARTO ein Wasserzeichen,
+            BikeHelper nimmt dann stattdessen die helle OpenStreetMap-Karte. Den Schlüssel gibt es ohne Konto auf{" "}
+            <a href="https://carto.com/basemaps/apikey/" target="_blank" rel="noreferrer">carto.com/basemaps/apikey</a>,
+            er kommt per E-Mail und gilt für private Projekte bis 5 Millionen Kartenabrufe im Monat.
+          </p>
+          <form className="inline-form" onSubmit={(e) => { e.preventDefault(); save(key.trim(), "Schlüssel gespeichert."); }}>
+            <label className="grow">
+              CARTO-Schlüssel
+              <input
+                value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false}
+                placeholder={st.has_user_key ? "Neuen Schlüssel einfügen, um ihn zu ersetzen" : "Schlüssel aus der E-Mail einfügen"}
+              />
+            </label>
+            <button className="btn primary" disabled={!key.trim() || busy}>Speichern</button>
+            {st.has_user_key && (
+              <button type="button" className="btn" disabled={busy} onClick={() => save("", "Schlüssel entfernt.")}>Entfernen</button>
+            )}
+          </form>
+            </>
+          </details>
+        </>
       ) : (
         <>
           <p className="muted">
