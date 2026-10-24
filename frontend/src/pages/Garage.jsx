@@ -5,6 +5,7 @@ import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 import { Loading } from "../components/feedback.jsx";
+import ShoppingList from "../components/ShoppingList.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, purchased_at: "", chain_lube: "oil", tubeless: true, hookless: false });
@@ -72,6 +73,7 @@ export default function Garage() {
   const [bikes, setBikes] = useState(null);
   const [overview, setOverview] = useState({ items: [] });
   const [adding, setAdding] = useState(false);
+  const [shop, setShop] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -98,11 +100,14 @@ export default function Garage() {
         <h1>Garage</h1>
         {!adding && (
           <div className="actions" style={{ margin: 0 }}>
+            <button className="btn" onClick={() => setShop((v) => !v)} aria-expanded={shop}>Einkaufsliste</button>
             <Link className="btn" to="/inventory">Inventar</Link>
             <button className="btn primary" onClick={() => setAdding(true)}>Rad hinzufügen</button>
           </div>
         )}
       </header>
+
+      {shop && <ShoppingList onClose={() => setShop(false)} />}
 
       {adding && (
         <BikeForm onCreated={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />

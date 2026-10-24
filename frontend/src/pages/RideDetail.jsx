@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm, fmtKm1, fmtNum } from "../api.js";
 import { ProfileChart } from "../components/charts.jsx";
 import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
+import AfterRide from "../components/AfterRide.jsx";
 import { confirmDialog, Loading } from "../components/feedback.jsx";
 
 function RouteMap({ polyline, hoverPoint, cfg }) {
@@ -118,6 +119,8 @@ export default function RideDetail() {
           <button className="link small danger" onClick={remove}>Löschen</button>
         </div>
       </header>
+
+      <AfterRide bikeId={a.bike_id} />
 
       <div className="kpis">
         <Stat value={fmtKm1(a.distance_km)} unit="km" label="Strecke" />

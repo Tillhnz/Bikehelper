@@ -333,6 +333,7 @@ def maintenance_overview(user: User = Depends(current_user), db: Session = Depen
                 items.append({
                     "component_id": c.id, "component": c.name, "category": c.category,
                     "bike_id": c.bike_id, "bike": c.bike.name if c.bike else None,
+                    "rule_id": r.id, "is_inspection": r.label in INSPECTIONS,
                     "rule": r.label, "wet_factor": r.wet_factor or 1.0, **{k: v for k, v in st.items() if k != "interval_km_eff"},
                 })
     items.sort(key=lambda i: i["progress"], reverse=True)

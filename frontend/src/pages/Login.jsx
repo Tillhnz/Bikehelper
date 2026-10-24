@@ -4,8 +4,12 @@ import { api, setToken } from "../api.js";
 
 export default function Login({ onLoggedIn }) {
   const navigate = useNavigate();
-  const inviteParam = new URLSearchParams(window.location.search).get("invite") || "";
-  const [mode, setMode] = useState(inviteParam ? "register" : "login");
+  const query = new URLSearchParams(window.location.search);
+  const inviteParam = query.get("invite") || "";
+  const resetToken = query.get("reset") || "";
+  const [mode, setMode] = useState(resetToken ? "reset" : inviteParam ? "register" : "login"); // login | register | forgot | reset
+  const [resetAvailable, setResetAvailable] = useState(false);
+  const [info, setInfo] = useState("");
   const [allowRegistration, setAllowRegistration] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,14 +18,28 @@ export default function Login({ onLoggedIn }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get("/config").then((c) => setAllowRegistration(c.allow_registration)).catch(() => {});
+    api.get("/config").then((c) => { setAllowRegistration(c.allow_registration); setResetAvailable(!!c.password_reset); }).catch(() => {});
   }, []);
 
   async function submit(e) {
     e.preventDefault();
     setError("");
     setBusy(true);
+    setInfo("");
     try {
+      if (mode === "forgot") {
+        const r = await api.post("/auth/forgot", { email });
+        setInfo(r.message);
+        return;
+      }
+      if (mode === "reset") {
+        await api.post("/auth/reset", { token: resetToken, password });
+        window.history.replaceState(null, "", "/login");
+        setMode("login");
+        setPassword("");
+        setInfo("Dein Passwort ist geändert. Melde dich jetzt an.");
+        return;
+      }
       const path = mode === "login" ? "/auth/login" : "/auth/register";
       const { access_token } = await api.post(path, mode === "login" ? { email, password } : { email, password, invite: invite.trim() || null });
       setToken(access_token);
@@ -43,22 +61,29 @@ export default function Login({ onLoggedIn }) {
         <p>Kilometer, Verschleiß und Wartung für jedes Rad in deiner Garage.</p>
       </div>
       <form className="login-form" onSubmit={submit}>
-        <h1>{mode === "login" ? "Anmelden" : "Konto anlegen"}</h1>
-        <label>
-          E-Mail
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        </label>
-        <label>
-          Passwort
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={mode === "register" ? 8 : undefined}
-            required
-          />
-          {mode === "register" && <span className="hint">Mindestens 8 Zeichen.</span>}
-        </label>
+        <h1>{{ login: "Anmelden", register: "Konto anlegen", forgot: "Passwort vergessen", reset: "Neues Passwort" }[mode]}</h1>
+        {mode !== "reset" && (
+          <label>
+            E-Mail
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
+          </label>
+        )}
+        {mode === "forgot" && <p className="muted small">Wir schicken dir einen Link, mit dem du ein neues Passwort vergibst. Er gilt eine Stunde.</p>}
+        {mode !== "forgot" && (
+          <label>
+            {mode === "reset" ? "Neues Passwort" : "Passwort"}
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={mode === "register" || mode === "reset" ? 8 : undefined}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoFocus={mode === "reset"}
+              required
+            />
+            {(mode === "register" || mode === "reset") && <span className="hint">Mindestens 8 Zeichen.</span>}
+          </label>
+        )}
         {mode === "register" && !allowRegistration && (
           <label>
             Einladungscode
@@ -66,17 +91,23 @@ export default function Login({ onLoggedIn }) {
             <span className="hint">Die Registrierung ist geschlossen. Den Code bekommst du vom Administrator.</span>
           </label>
         )}
+        {info && <p className="ok" role="status">{info}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn primary" disabled={busy}>
-          {mode === "login" ? "Anmelden" : "Konto anlegen"}
+          {{ login: "Anmelden", register: "Konto anlegen", forgot: "Link senden", reset: "Passwort speichern" }[mode]}
         </button>
+        {mode === "login" && resetAvailable && (
+          <button type="button" className="link" onClick={() => { setMode("forgot"); setError(""); setInfo(""); }}>Passwort vergessen?</button>
+        )}
+        {mode !== "reset" && (
           <button
             type="button"
             className="link"
-            onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+            onClick={() => { setMode(mode === "register" ? "login" : mode === "forgot" ? "login" : "register"); setError(""); setInfo(""); }}
           >
-            {mode === "login" ? "Noch kein Konto? Konto anlegen" : "Schon ein Konto? Anmelden"}
+            {mode === "login" ? "Noch kein Konto? Konto anlegen" : mode === "forgot" ? "Zurück zur Anmeldung" : "Schon ein Konto? Anmelden"}
           </button>
+        )}
       </form>
     </div>
   );

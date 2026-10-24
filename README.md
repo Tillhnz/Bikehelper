@@ -118,7 +118,11 @@ Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RA
 
 ## Startseite, Inventar, Anleitungen und Orte
 
-- **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche, die wichtigsten Wartungen, deine Räder mit Kilometerstand und Wochenkilometern, Jahresstand mit Ziel und die letzten Fahrten.
+- **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche (mit „‹ Zurück“ blätterst du durch frühere Wochen, ein Tipp auf einen Tag öffnet dessen Fahrten), die wichtigsten Wartungen mit Knopf „Erledigt“, deine Räder, deine Jahresziele mit nötigem Pensum pro Woche und die letzten Fahrten. Auf der Seite einer Fahrt steht, was am Rad zu tun ist, und lässt sich direkt abhaken.
+- **Suche:** Der Knopf „Suche“ oder die Taste `/` durchsucht Fahrten, Räder, Teile und Lager.
+- **Einkaufsliste** (Garage): Was bald oder jetzt gewechselt werden muss, abgeglichen mit dem Lager, zum Kopieren oder Drucken.
+- **Darstellung** (Einstellungen): Automatisch, Hell oder Dunkel. **Meine Daten:** Export aller eigenen Daten als JSON.
+- **Passwort vergessen:** Ist der E-Mail-Versand eingerichtet, erscheint auf der Anmeldeseite „Passwort vergessen?“. Der Link gilt eine Stunde und nur einmal.
 - **Inventar** (in der Garage über „Inventar“): Ersatzteile mit Anzahl, Warnschwelle, Preis, Lagerort und passendem Rad. „Einbauen“ legt das Teil als Komponente am Rad an, mustert ein Teil derselben Art aus und verringert den Bestand.
 - **Anleitungen:** Bei jeder Wartungsregel öffnet „Anleitung“ geprüfte Links, hauptsächlich die Reparaturanleitungen von Park Tool (Englisch, teils mit Video) und für Wachs die von Silca. Die Links liegen im Katalog (`backend/app/catalog.py`, `GUIDES`) und lassen sich dort ändern.
 - **Orte** (Statistik, Reiter „Orte“): Deine Hauptstadt (die Stadt mit den meisten Fahrtstarts) mit Anteil erkundeter Kacheln, weitere Städte und Länder. Grenzen holt BikeHelper einmalig je Ort von OpenStreetMap (Nominatim, höchstens eine Anfrage pro Sekunde) und speichert sie. Dabei gehen nur die Mittelpunkte einzelner Kacheln hinaus. Der Anteil eines Landes ist geschätzt (erkundete Kacheln geteilt durch Landfläche). Mit `GEO_ENABLED=false` ausschalten oder `NOMINATIM_URL` auf einen eigenen Server setzen.
@@ -249,6 +253,10 @@ BikeHelper erkennt in diesem Fall einen bereits angekommenen Upload und zeigt de
 
 Die Registrierung ist standardmäßig geschlossen, nur das erste Konto ist immer erlaubt. Weitere Nutzer lädst du als Administrator per Link ein (siehe Abschnitt Sicherheit).
 
+## Tests und CI
+
+Bei jedem Push prüft GitHub Actions (`.github/workflows/ci.yml`) das Backend (ruff und pytest), baut das Frontend und prüft `install.sh` und die Compose-Datei. Lokal: `cd backend && pip install -r requirements-dev.txt && python -m pytest`.
+
 ## Entwicklung ohne Docker
 
 ```bash
@@ -267,11 +275,13 @@ npm run dev                     # http://localhost:5173, /api wird ans Backend w
 
 ## Backup
 
-Die Daten liegen im Docker-Volume `db_data`. Sicherung der Datenbank:
+Die Daten liegen im Docker-Volume `db_data`. Sicherungen entstehen so:
 
-```bash
-docker compose exec db pg_dump -U bikehelper bikehelper > backup.sql
-```
+- Im Admin-Bereich unter Übersicht → Sicherungen mit „Jetzt sichern“, und automatisch vor jedem Update. Sie landen im Ordner `backups/` auf dem Server, die letzten 14 bleiben. Sie lassen sich bewusst nicht über die Oberfläche herunterladen, denn sie enthalten die Daten aller Konten.
+- Im Terminal: `./install.sh backup`.
+- Zurückspielen (ersetzt alle aktuellen Daten, mit Rückfrage): `./install.sh restore backups/bikehelper-JJJJMMTT-HHMMSS.sql.gz`.
+
+Updates aus dem Admin-Bereich prüfen nach dem Neustart, ob BikeHelper antwortet. Wenn nicht, gehen sie selbst zur vorherigen Version zurück.
 
 Zusätzlich lohnt sich ein regelmäßiges Proxmox-Backup der VM bzw. des LXC.
 

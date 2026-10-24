@@ -5,6 +5,7 @@ import BikeIllustration from "../components/BikeIllustration.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
 import { EmptyState, StatusPill } from "../components/ui.jsx";
 import { GOAL_META } from "../components/StatsExtra.jsx";
+import QuickDone from "../components/QuickDone.jsx";
 import { Loading } from "../components/feedback.jsx";
 
 function greeting() {
@@ -16,16 +17,23 @@ function greeting() {
 function WeekBars({ days }) {
   const max = Math.max(20, ...days.map((d) => d.km));
   return (
-    <div className="week-bars" role="img" aria-label={`Kilometer pro Tag: ${days.map((d) => `${d.label} ${fmtNum(d.km, 0)}`).join(", ")}`}>
-      {days.map((d, i) => (
-        <div key={d.date} className={`week-day ${d.today ? "today" : ""} ${d.future ? "future" : ""}`}>
-          <span className="week-km">{d.km > 0 ? fmtNum(d.km, 0) : ""}</span>
-          <div className="week-track">
-            <span className="week-fill" style={{ height: `${(d.km / max) * 100}%`, "--i": i }} />
-          </div>
-          <span className="week-label">{d.label}</span>
-        </div>
-      ))}
+    <div className="week-bars" aria-label={`Kilometer pro Tag: ${days.map((d) => `${d.label} ${fmtNum(d.km, 0)}`).join(", ")}`}>
+      {days.map((d, i) => {
+        const inner = (
+          <>
+            <span className="week-km">{d.km > 0 ? fmtNum(d.km, 0) : ""}</span>
+            <div className="week-track">
+              <span className="week-fill" style={{ height: `${(d.km / max) * 100}%`, "--i": i }} />
+            </div>
+            <span className="week-label">{d.label}</span>
+          </>
+        );
+        const cls = `week-day ${d.today ? "today" : ""} ${d.future ? "future" : ""}`;
+        // Ein Tipp auf einen Tag mit Fahrten öffnet genau diese Fahrten
+        return d.rides > 0
+          ? <Link key={d.date} to={`/rides?day=${d.date}`} className={`${cls} has-rides`} aria-label={`${d.label}: ${fmtNum(d.km, 0)} km, Fahrten ansehen`}>{inner}</Link>
+          : <div key={d.date} className={cls}>{inner}</div>;
+      })}
     </div>
   );
 }
@@ -63,7 +71,8 @@ export default function Home() {
   const [past, setPast] = useState(null); // Daten einer früheren Woche
   const [weekError, setWeekError] = useState("");
 
-  useEffect(() => { api.get("/home").then(setD).catch((e) => setError(e.message)); }, []);
+  const reload = () => api.get("/home").then(setD).catch((e) => setError(e.message));
+  useEffect(() => { reload(); }, []);
 
   useEffect(() => {
     if (offset === 0) { setPast(null); return undefined; }
@@ -129,7 +138,10 @@ export default function Home() {
                         <Link to={`/bikes/${i.bike_id}`}>{i.rule}</Link>
                         <span className="muted small">{i.bike ? `${i.bike}: ` : ""}{i.component}</span>
                       </div>
-                      <StatusPill status={i.status} />
+                      <span className="maint-actions">
+                        <StatusPill status={i.status} />
+                        <QuickDone item={i} onDone={reload} />
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -169,6 +181,13 @@ export default function Home() {
                           <span style={{ width: `${Math.min(100, g.percent)}%` }} />
                           <i style={{ left: `${Math.min(100, (g.plan / g.target) * 100)}%` }} title="Plan bei gleichmäßigem Tempo" />
                         </div>
+                        {g.metric === "km" && !g.reached_on && g.per_week_needed != null && isCurrent && (
+                          <p className="goal-hint small">
+                            {t.km >= g.per_week_needed
+                              ? `Diese Woche hast du dein Pensum von ${fmtKm(g.per_week_needed)} km schon erreicht.`
+                              : `Diese Woche noch ${fmtKm(g.per_week_needed - t.km)} km, dann bist du auf Kurs.`}
+                          </p>
+                        )}
                         <p className="small">
                           {g.reached_on ? `Geschafft am ${fmtDate(g.reached_on)}.` : (
                             <>

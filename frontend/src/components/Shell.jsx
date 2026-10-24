@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import Search from "./Search.jsx";
 import UploadBanner from "./UploadBanner.jsx";
 
 const NAV = [
@@ -14,13 +16,20 @@ const NAV = [
 /** Rahmen der App: Seitenleiste am Computer, schmale Kopfzeile und Tabs am unteren Rand auf dem Handy. */
 export default function Shell({ user, onLogout, children }) {
   const { pathname } = useLocation();
+  // Seitentitel für Browser-Tab und Screenreader; Fokus springt beim Seitenwechsel zum Inhalt
+  useEffect(() => {
+    const hit = [...NAV].reverse().find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)));
+    document.title = pathname.startsWith("/admin") ? "Administration · BikeHelper" : hit ? `${hit.label} · BikeHelper` : "BikeHelper";
+  }, [pathname]);
   return (
     <div className="shell">
+      <a className="skip-link" href="#inhalt">Zum Inhalt springen</a>
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />
           BikeHelper
         </div>
+        <Search />
         <nav aria-label="Hauptmenü">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}>
@@ -36,7 +45,7 @@ export default function Shell({ user, onLogout, children }) {
           <button className="link" onClick={onLogout}>Abmelden</button>
         </div>
       </aside>
-      <main className="main">
+      <main className="main" id="inhalt" tabIndex={-1}>
         <UploadBanner />
         <div className="page" key={pathname}>{children}</div>
       </main>

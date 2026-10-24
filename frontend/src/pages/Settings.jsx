@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, clearToken, fmtDateTime, setToken } from "../api.js";
+import { api, clearToken, download, fmtDateTime, setToken } from "../api.js";
 import { loadMapConfig, resetMapConfig } from "../geo.js";
-import { Loading } from "../components/feedback.jsx";
+import { Loading, toast } from "../components/feedback.jsx";
+import { getTheme, setTheme } from "../theme.js";
 
 const PROVIDER_TEXT = {
   carto: "Dunkle CARTO-Karte (mit Schlüssel)",
@@ -420,6 +421,44 @@ function SecuritySettings({ user }) {
   );
 }
 
+function AppearanceSettings() {
+  const [mode, setMode] = useState(getTheme());
+  function pick(m) { setMode(m); setTheme(m); }
+  return (
+    <section className="panel">
+      <h2>Darstellung</h2>
+      <div className="seg" role="radiogroup" aria-label="Farbschema">
+        {[["auto", "Automatisch"], ["light", "Hell"], ["dark", "Dunkel"]].map(([k, label]) => (
+          <button key={k} type="button" role="radio" aria-checked={mode === k} className={`btn ${mode === k ? "primary" : ""}`} onClick={() => pick(k)}>{label}</button>
+        ))}
+      </div>
+      <p className="muted small">Automatisch folgt der Einstellung deines Geräts. Die Wahl gilt nur für diesen Browser.</p>
+    </section>
+  );
+}
+
+function DataSettings() {
+  const [busy, setBusy] = useState(false);
+  async function exportAll() {
+    setBusy(true);
+    try {
+      await download("/me/export", "bikehelper-export.json");
+      toast("Export heruntergeladen.");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Meine Daten</h2>
+      <p className="muted">Lade alles herunter, was zu deinem Konto gehört: Räder, Teile, Wartungen, Reifen, Fahrten mit Strecke, Lager und Ziele. Passwörter und Zugangsschlüssel sind nicht enthalten.</p>
+      <div className="actions"><button className="btn" onClick={exportAll} disabled={busy}>{busy ? "Bereite vor …" : "Alle Daten herunterladen"}</button></div>
+    </section>
+  );
+}
+
 export default function Settings({ user, onChange }) {
   return (
     <>
@@ -434,6 +473,8 @@ export default function Settings({ user, onChange }) {
 
       <ProfileSettings user={user} onChange={onChange} />
 
+      <AppearanceSettings />
+
       <NotifySettings />
 
       <InstallSettings />
@@ -441,6 +482,8 @@ export default function Settings({ user, onChange }) {
       <WahooSettings />
 
       <MapSettings />
+
+      <DataSettings />
 
       <SecuritySettings user={user} />
 

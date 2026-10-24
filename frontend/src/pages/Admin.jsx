@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, fmtDate } from "../api.js";
-import { confirmDialog, toast } from "../components/feedback.jsx";
+import { useSearchParams } from "react-router-dom";
+import { api, fmtDate, fmtDateTime } from "../api.js";
+import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
 
 const ROLE_TEXT = { admin: "Administrator", user: "Nutzer" };
 
@@ -9,7 +10,6 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
   const initial = () =>
     Object.fromEntries(spec.map((f) => [f.key, f.secret ? "" : defs[f.key]?.value ?? (f.type === "bool" ? false : "")]));
   const [form, setForm] = useState(initial);
-  const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +18,6 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
   async function save(e) {
     e.preventDefault();
     setBusy(true);
-    setMsg("");
     setError("");
     try {
       const values = {};
@@ -30,7 +29,7 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
         }
       }
       await onSaved(values);
-      setMsg("Gespeichert. Die Änderung gilt sofort.");
+      toast("Gespeichert. Die Änderung gilt sofort.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -67,7 +66,7 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
               />
               {f.hint && <span className="hint">{f.hint}</span>}
               {f.secret && def?.set && (
-                <button type="button" className="link small" onClick={() => onSaved({ [f.key]: "" }).then(() => setMsg(`${f.label} gelöscht.`)).catch((er) => setError(er.message))}>
+                <button type="button" className="link small" onClick={() => onSaved({ [f.key]: "" }).then(() => toast(`${f.label} gelöscht.`)).catch((er) => setError(er.message))}>
                   gespeicherten Wert löschen
                 </button>
               )}
@@ -79,7 +78,6 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
           {extra}
         </div>
       </form>
-      {msg && <p className="ok" role="status">{msg}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );
@@ -88,14 +86,12 @@ function SettingsBlock({ title, intro, fields, defs, spec, onSaved, extra }) {
 function Accounts({ me }) {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
   const load = useCallback(() => api.get("/admin/users").then(setUsers).catch((e) => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
 
   const run = async (fn, done) => {
     setError("");
-    setMsg("");
-    try { await fn(); if (done) setMsg(done); await load(); } catch (err) { setError(err.message); }
+    try { await fn(); if (done) toast(done); await load(); } catch (err) { setError(err.message); }
   };
 
   return (
@@ -136,7 +132,6 @@ function Accounts({ me }) {
           </li>
         ))}
       </ul>
-      {msg && <p className="ok" role="status">{msg}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );
@@ -145,13 +140,11 @@ function Accounts({ me }) {
 function Invites() {
   const [invites, setInvites] = useState(null);
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
   const load = useCallback(() => api.get("/admin/invites").then(setInvites).catch((e) => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
   const run = async (fn, done) => {
     setError("");
-    setMsg("");
-    try { await fn(); if (done) setMsg(done); await load(); } catch (err) { setError(err.message); }
+    try { await fn(); if (done) toast(done); await load(); } catch (err) { setError(err.message); }
   };
   const link = (code) => `${window.location.origin}/login?invite=${code}`;
 
@@ -180,7 +173,6 @@ function Invites() {
           ))}
         </ul>
       )}
-      {msg && <p className="ok" role="status">{msg}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );
@@ -265,7 +257,7 @@ function Updates() {
         <button className="btn" onClick={check} disabled={busy || checking}>{checking ? "Prüfe …" : "Nach Updates suchen"}</button>
         <button className="btn primary" onClick={start} disabled={busy || st?.behind === 0 || !st}>Jetzt aktualisieren</button>
       </div>
-      <p className="muted small">Das Update holt die neue Version von GitHub und baut sie neu. Der Update-Dienst darf dafür Docker auf dem Server steuern, ist aber nur über diesen Bereich erreichbar.</p>
+      <p className="muted small">Das Update sichert zuerst die Datenbank, holt die neue Version von GitHub und baut sie neu. Springt die neue Version nicht an, geht BikeHelper automatisch zur vorherigen zurück. Der Update-Dienst darf dafür Docker auf dem Server steuern, ist aber nur über diesen Bereich erreichbar.</p>
     </section>
   );
 }
@@ -302,7 +294,107 @@ const MAPS = [
   { key: "map_tile_dark", type: "bool", label: "Eigene Kacheln sind dunkel" },
 ];
 
+function Health() {
+  const [h, setH] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { api.get("/admin/health").then(setH).catch((e) => setError(e.message)); }, []);
+  if (error) return <section className="panel"><h2>Zustand</h2><p className="error" role="alert">{error}</p></section>;
+  if (!h) return <Loading rows={1} />;
+  const up = h.uptime_s;
+  return (
+    <section className="panel">
+      <h2>Zustand</h2>
+      <ul className="log-list">
+        {h.checks.map((c) => (
+          <li key={c.key}>
+            <span>{c.label}</span>
+            <span><span className={`pill ${c.ok ? "pill-ok" : "pill-due"}`}>{c.ok ? "In Ordnung" : "Prüfen"}</span> <span className="muted small">{c.text}</span></span>
+          </li>
+        ))}
+        <li><span>Konten</span><span className="muted small">{h.users}</span></li>
+        {h.db_bytes != null && <li><span>Größe der Datenbank</span><span className="muted small">{(h.db_bytes / 1e6).toFixed(1)} MB</span></li>}
+        <li><span>Läuft seit</span><span className="muted small">{up >= 86400 ? `${Math.floor(up / 86400)} Tagen` : up >= 3600 ? `${Math.floor(up / 3600)} Stunden` : `${Math.max(1, Math.floor(up / 60))} Minuten`}</span></li>
+      </ul>
+    </section>
+  );
+}
+
+function Backups() {
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => api.get("/admin/backups").then((r) => { setItems(r.items); setError(""); }).catch((e) => setError(e.message)), []);
+  useEffect(() => { load(); }, [load]);
+  async function create() {
+    setBusy(true);
+    try {
+      const r = await api.post("/admin/backups", {});
+      toast(`Gesichert: ${r.name}`);
+      await load();
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Sicherungen</h2>
+      <p className="muted small">
+        Eine Sicherung enthält die Daten aller Konten. Sie liegt deshalb nur im Ordner <code>backups</code> auf dem Server und lässt sich hier nicht herunterladen.
+        Vor jedem Update entsteht automatisch eine. Die letzten 14 bleiben erhalten. Zurückspielen: <code>./install.sh restore backups/DATEI</code>.
+      </p>
+      <div className="actions"><button className="btn" onClick={create} disabled={busy}>{busy ? "Sichere …" : "Jetzt sichern"}</button></div>
+      {error && <p className="error" role="alert">{error}</p>}
+      {items?.length === 0 && <p className="muted small">Noch keine Sicherung.</p>}
+      {items?.length > 0 && (
+        <ul className="log-list">
+          {items.slice(0, 8).map((b) => (
+            <li key={b.name}><span>{fmtDateTime(b.at)}</span><span className="muted small">{(b.bytes / 1e6).toFixed(1)} MB, {b.name}</span></li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const ACTION_TEXT = {
+  "invite.create": "Einladung erstellt", "invite.delete": "Einladung gelöscht", "user.role": "Rolle geändert",
+  "user.lock": "Konto gesperrt", "user.unlock": "Konto entsperrt", "user.delete": "Konto gelöscht",
+  "user.register": "Konto angelegt", "settings.save": "Einstellungen gespeichert", "update.start": "Update gestartet",
+  "backup.create": "Sicherung erstellt", "password.reset": "Passwort zurückgesetzt",
+};
+
+function AuditLog() {
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { api.get("/admin/audit?limit=200").then(setRows).catch((e) => setError(e.message)); }, []);
+  return (
+    <section className="panel">
+      <h2>Protokoll</h2>
+      <p className="muted small">Verwaltungsvorgänge der letzten Zeit. Es enthält keine Fahrten, Räder oder Passwörter.</p>
+      {error && <p className="error" role="alert">{error}</p>}
+      {!rows && !error && <Loading rows={2} />}
+      {rows?.length === 0 && <p className="muted small">Noch nichts protokolliert.</p>}
+      {rows?.length > 0 && (
+        <ul className="log-list">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <span><strong>{ACTION_TEXT[r.action] || r.action}</strong>{r.detail && <span className="muted small"> {r.detail}</span>}</span>
+              <span className="muted small">{fmtDateTime(r.at)}, {r.actor}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const TABS = [["overview", "Übersicht"], ["accounts", "Konten"], ["server", "Server"], ["log", "Protokoll"]];
+
 export default function Admin({ user }) {
+  const [params, setParams] = useSearchParams();
+  const tab = TABS.some(([k]) => k === params.get("tab")) ? params.get("tab") : "overview";
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [testMsg, setTestMsg] = useState("");
@@ -338,10 +430,15 @@ export default function Admin({ user }) {
       <p className="muted lead">Alles, was früher in Dateien auf dem Server stand, stellst du hier ein. Persönliche Daten anderer Nutzer sind für dich nicht einsehbar.</p>
       {error && <p className="error" role="alert">{error}</p>}
 
-      <Updates />
-      <Accounts me={user} />
-      <Invites />
-      {!defs ? <Loading /> : (
+      <div className="tabs" role="tablist" aria-label="Bereiche der Administration">
+        {TABS.map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={`tab ${tab === k ? "on" : ""}`} onClick={() => setParams(k === "overview" ? {} : { tab: k })}>{label}</button>
+        ))}
+      </div>
+      {tab === "overview" && <><Health /><Updates /><Backups /></>}
+      {tab === "accounts" && <><Accounts me={user} /><Invites /></>}
+      {tab === "log" && <AuditLog />}
+      {tab === "server" && (!defs ? <Loading /> : (
         <>
           {block({ title: "Zugang", intro: "Wer sich anmelden darf und wie lange Anmeldungen gelten.", spec: ACCESS })}
           {block({ title: "Adresse und Zeit", spec: GENERAL })}
@@ -364,7 +461,7 @@ export default function Admin({ user }) {
           {block({ title: "Funktionen", intro: "Diese Dienste verbinden sich mit externen Anbietern. Schalte aus, was du nicht nutzen willst.", spec: FEATURES })}
           {block({ title: "Karten", spec: MAPS })}
         </>
-      )}
+      ))}
     </>
   );
 }

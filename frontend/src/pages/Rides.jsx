@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
+import { Link, useSearchParams } from "react-router-dom";
+import { WEATHER_TEXT, api, fmtDate, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 import { dismiss, isBusy, startFileImport, startStravaImport, useUploads } from "../uploads.js";
 import { confirmDialog } from "../components/feedback.jsx";
@@ -322,6 +322,8 @@ function WeatherPanel({ refreshKey }) {
 const PAGE = 50;
 
 function ActivityList({ bikes, refreshKey, onChanged }) {
+  const [params, setParams] = useSearchParams();
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(params.get("day") || "") ? params.get("day") : "";
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -342,6 +344,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
       const params = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
       if (unassigned) params.set("unassigned", "true");
       if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
+      if (day) params.set("day", day);
       const page = await api.get(`/activities?${params}`);
       setTotal(page.total);
       setItems((prev) => (offset === 0 ? page.items : [...prev, ...page.items]));
@@ -350,7 +353,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     } finally {
       setLoading(false);
     }
-  }, [unassigned, debouncedQ]);
+  }, [unassigned, debouncedQ, day]);
 
   useEffect(() => { load(0); }, [load, refreshKey]);
 
@@ -388,13 +391,19 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
           </label>
         </div>
       </header>
+      {day && (
+        <p className="filter-chip">
+          Nur Fahrten vom <strong>{fmtDate(day)}</strong>
+          <button className="link small" onClick={() => setParams({})}>Filter aufheben</button>
+        </p>
+      )}
 
       {error && <p className="error" role="alert">{error}</p>}
 
       {!loading && items.length === 0 ? (
         <EmptyState
-          title={unassigned || debouncedQ ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
-          text={unassigned || debouncedQ ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
+          title={unassigned || debouncedQ || day ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
+          text={unassigned || debouncedQ || day ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
         />
       ) : (
         <div className="table-wrap rides-wrap">

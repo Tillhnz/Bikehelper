@@ -37,6 +37,22 @@ async function request(method, path, body) {
   return res.status === 204 ? null : res.json();
 }
 
+/** Lädt eine Datei vom Server (mit Anmeldung) und startet den Download im Browser. */
+export async function download(path, fallbackName) {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`Fehler ${res.status}`);
+  const m = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = m ? m[1] : fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 /** Upload mit Fortschrittsanzeige (fetch kann das nicht). */
 export function upload(path, formData, onProgress) {
   return new Promise((resolve, reject) => {
