@@ -243,6 +243,7 @@ class TireSetIn(BaseModel):
     watts: float | None = Field(default=None, ge=0.5, le=100)
     watts_note: str | None = Field(default=None, max_length=200)
     source_url: str | None = Field(default=None, max_length=255, pattern=r"^https?://")
+    casing: Literal["supple", "standard", "stiff"] | None = None  # Karkasse, wird vom Ratgeber genutzt
 
 
 class TireSetCreate(TireSetIn):

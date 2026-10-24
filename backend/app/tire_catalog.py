@@ -2,7 +2,7 @@
 
 Die mitgelieferte Liste enthält nur Herstellerangaben mit Quelle (Breite, Gewicht, Einsatzbereich). Rollwiderstandswerte
 (Watt) sind optional und stammen aus den Quellen, die in `source_url` stehen, oder aus dem eigenen Import des Nutzers.
-Spalten: brand, model, category, width_mm, tubeless, weight_g, watts, watts_note, source_url
+Spalten: brand, model, category, width_mm, tubeless, weight_g, watts, watts_note, source_url, casing
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from pathlib import Path
 
 CATEGORIES = ("road", "gravel", "mtb", "trekking", "city", "tt", "other")
 TUBELESS = ("tubeless", "clincher", "tubular", "both")
+CASINGS = ("supple", "standard", "stiff")
 CATEGORY_LABEL = {
     "road": "Rennrad", "gravel": "Gravel/CX", "mtb": "Mountainbike", "trekking": "Trekking",
     "city": "Stadt/Alltag", "tt": "Zeitfahren/Triathlon", "other": "Sonstige",
@@ -37,6 +38,7 @@ class TireEntry:
     watts: float | None = None
     watts_note: str | None = None
     source_url: str | None = None
+    casing: str | None = None
     own: bool = False
 
     @property
@@ -86,12 +88,15 @@ def parse_row(row: dict, key_prefix: str, own: bool) -> TireEntry:
     tubeless = row.get("tubeless", "").lower() or None
     if tubeless and tubeless not in TUBELESS:
         raise ValueError(f"tubeless „{tubeless}“ unbekannt (erlaubt: {', '.join(TUBELESS)})")
+    casing = row.get("casing", "").lower() or None
+    if casing and casing not in CASINGS:
+        raise ValueError(f"casing „{casing}“ unbekannt (erlaubt: {', '.join(CASINGS)})")
     width = _num(row.get("width_mm"), 18, 85)
     return TireEntry(
         key=f"{key_prefix}{slug(brand, model, f'{width:g}' if width else None)}", brand=brand[:120], model=model[:160], category=category,
         width_mm=width, tubeless=tubeless, weight_g=_num(row.get("weight_g"), 50, 3000),
         watts=_num(row.get("watts"), 0.5, 100), watts_note=(row.get("watts_note") or None) and row["watts_note"][:200],
-        source_url=_url(row.get("source_url")), own=own,
+        source_url=_url(row.get("source_url")), casing=casing, own=own,
     )
 
 

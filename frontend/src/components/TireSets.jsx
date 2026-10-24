@@ -3,7 +3,7 @@ import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import { Gauge } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
 
-const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
+const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
 
 const num = (v) => (v === "" || v == null ? null : Number(v));
 
@@ -23,9 +23,11 @@ function setPayload(f) {
     watts: num(f.watts),
     watts_note: f.watts_note || null,
     source_url: f.source_url || null,
+    casing: f.casing || null,
   };
 }
 
+const CASING_TEXT = { supple: "dünn, geschmeidig", standard: "normal", stiff: "Pannenschutz" };
 const TUBELESS_TEXT = { tubeless: "tubeless", clincher: "Drahtreifen", tubular: "Schlauchreifen", both: "tubeless oder Schlauch" };
 
 /** Suchfeld für den Reifenkatalog: tippen, Treffer anklicken, Felder werden gefüllt. Eigene Reifen bleiben frei eintragbar. */
@@ -34,6 +36,22 @@ function CatalogPicker({ onPick, category }) {
   const [res, setRes] = useState(null);
   const [open, setOpen] = useState(false);
   const timer = useRef(null);
+  const box = useRef(null);
+
+  // Liste schließen: Klick oder Fokus außerhalb, Escape
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("focusin", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("focusin", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
 
   useEffect(() => {
     clearTimeout(timer.current);
@@ -47,7 +65,7 @@ function CatalogPicker({ onPick, category }) {
 
   const total = res ? res.bundled + res.own : 0;
   return (
-    <div className="span-all catalog-picker">
+    <div className="span-all catalog-picker" ref={box}>
       <label>
         Reifen aus dem Katalog suchen
         <input
@@ -96,7 +114,7 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
             ...f, name: `${it.model}`, brand: it.brand, width_mm: it.width_mm ?? f.width_mm,
             tubeless: it.tubeless ? it.tubeless !== "clincher" : f.tubeless, category: it.category ?? "",
             weight_g: it.weight_g ?? "", watts: it.watts ?? "", watts_note: it.watts_note ?? "",
-            source_url: it.source_url ?? "", model_key: it.key,
+            source_url: it.source_url ?? "", model_key: it.key, casing: it.casing ?? f.casing,
           })}
         />
       )}
@@ -125,6 +143,15 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
       <label>
         Notiz
         <input value={f.notes ?? ""} onChange={set("notes")} />
+      </label>
+      <label>
+        Karkasse
+        <select value={f.casing ?? ""} onChange={set("casing")}>
+          <option value="">Normal / nicht angegeben</option>
+          <option value="supple">Dünn, geschmeidig (Rennreifen, hohe Fadenzahl)</option>
+          <option value="stiff">Pannenschutz, steif (Touren-, Alltagsreifen)</option>
+        </select>
+        <span className="hint">Die Karkasse ist das Gewebe unter dem Profil. Der Ratgeber nutzt sie für den Reifendruck: dünne Karkassen etwas weniger, Pannenschutz etwas mehr.</span>
       </label>
       <label>
         Gewicht je Reifen (g)
@@ -223,8 +250,9 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           <p className="muted small">{fmtKm(ts.km)} von {fmtKm(ts.max_km)} km erwartet</p>
         </>
       )}
-      {(ts.weight_g || ts.watts) && (
+      {(ts.weight_g || ts.watts || ts.casing) && (
         <p className="tire-facts small">
+          {ts.casing && <span>Karkasse: {CASING_TEXT[ts.casing]}</span>}
           {ts.weight_g && <span>{fmtNum(ts.weight_g, 0)} g je Reifen</span>}
           {ts.watts && (
             <span>
@@ -326,14 +354,14 @@ function CatalogManager() {
     }
   }
 
-  const template = "brand,model,category,width_mm,tubeless,weight_g,watts,watts_note,source_url\nContinental,Beispiel-Reifen,road,28,tubeless,300,9.5,Prüfstand 29 km/h,https://example.org/test\n";
+  const template = "brand,model,category,width_mm,tubeless,weight_g,watts,watts_note,source_url,casing\nContinental,Beispiel-Reifen,road,28,tubeless,300,9.5,Prüfstand 29 km/h,https://example.org/test,supple\n";
   return (
     <details className="howto catalog-manager">
       <summary>Reifenkatalog erweitern ({info ? `${info.bundled} mitgeliefert, ${info.own} eigene` : "…"})</summary>
       <p className="muted small">
         Die mitgelieferte Liste enthält Herstellerangaben mit Quelle (Gewichte laut Händlerseite, ungefähr ±5 bis 10 %). Messwerte (Watt) kannst du als CSV selbst einlesen,
         etwa aus eigenen Notizen oder Tests, die du nutzen darfst. Spalten: brand, model, category (road, gravel, mtb, trekking, city, tt, other),
-        width_mm, tubeless (tubeless, clincher, tubular, both), weight_g, watts, watts_note, source_url. Brand und model sind Pflicht.
+        width_mm, tubeless (tubeless, clincher, tubular, both), weight_g, watts, watts_note, source_url, casing (supple, standard, stiff). Brand und model sind Pflicht.
       </p>
       <form onSubmit={send} className="form-grid">
         <label className="span-all">CSV-Datei<input type="file" accept=".csv,text/csv,text/plain" onChange={readFile} /></label>

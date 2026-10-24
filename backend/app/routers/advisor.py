@@ -47,7 +47,7 @@ def defaults(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "bikes": [
             {
                 "id": b.id, "name": b.name, "type": b.type, "tire_width_mm": b.tire_width_mm,
-                "tire_set": ({"name": ts.name, "width_mm": ts.width_mm} if (ts := current_tire_set(db, b.id)) else None),
+                "tire_set": ({"name": ts.name, "width_mm": ts.width_mm, "casing": ts.casing} if (ts := current_tire_set(db, b.id)) else None),
                 "rim_inner_mm": b.rim_inner_mm, "bike_weight_kg": b.bike_weight_kg,
                 "tubeless": True if b.tubeless is None else b.tubeless, "hookless": bool(b.hookless),
             }
@@ -98,7 +98,7 @@ class PlanIn(BaseModel):
     measured_width_mm: float | None = Field(default=None, ge=18, le=85)
     tubeless: bool | None = None
     hookless: bool | None = None
-    casing: Literal["supple", "standard", "stiff"] = "standard"
+    casing: Literal["supple", "standard", "stiff"] | None = None  # leer: Karkasse des montierten Reifensatzes, sonst normal
     surface: Literal["asphalt", "rough", "hardpack", "gravel", "chunky"] = "asphalt"
     wetness: Literal["auto", "dry", "damp", "wet"] = "auto"
 
@@ -171,13 +171,15 @@ def plan(data: PlanIn, user: User = Depends(current_user), db: Session = Depends
     tubeless = data.tubeless if data.tubeless is not None else (True if not bike or bike.tubeless is None else bike.tubeless)
     hookless = data.hookless if data.hookless is not None else bool(bike and bike.hookless)
     wetness = _wetness(rw, data.duration_min) if data.wetness == "auto" else data.wetness
+    garage_set = current_tire_set(db, bike.id) if bike else None
+    casing = data.casing or (garage_set.casing if garage_set else None) or "standard"
     missing = [name for name, v in (("Körpergewicht", rider), ("Reifenbreite", width)) if not v]
     tire_out = None
     if not missing:
         r = tires.recommend(
             rider_kg=rider, bike_kg=bike_kg, luggage_kg=data.luggage_kg, tire_width_mm=width, bike_type=bike_type,
             rim_inner_mm=rim, measured_width_mm=data.measured_width_mm, surface=data.surface, wetness=wetness,
-            tubeless=tubeless, casing=data.casing, hookless=hookless,
+            tubeless=tubeless, casing=casing, hookless=hookless,
         )
         tire_out = asdict(r)
         tire_out["wetness"] = wetness

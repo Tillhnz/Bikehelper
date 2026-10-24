@@ -21,7 +21,7 @@ def _mine(db: Session, user: User) -> list[cat.TireEntry]:
     return [
         cat.TireEntry(
             key=f"u:{r.id}", brand=r.brand, model=r.model, category=r.category, width_mm=r.width_mm, tubeless=r.tubeless,
-            weight_g=r.weight_g, watts=r.watts, watts_note=r.watts_note, source_url=r.source_url, own=True,
+            weight_g=r.weight_g, watts=r.watts, watts_note=r.watts_note, source_url=r.source_url, casing=r.casing, own=True,
         )
         for r in rows
     ]
@@ -57,7 +57,7 @@ def import_csv(data: ImportIn, user: User = Depends(current_user), db: Session =
     for e in entries:
         values = dict(
             brand=e.brand, model=e.model, category=e.category, width_mm=e.width_mm, tubeless=e.tubeless,
-            weight_g=e.weight_g, watts=e.watts, watts_note=e.watts_note, source_url=e.source_url,
+            weight_g=e.weight_g, watts=e.watts, watts_note=e.watts_note, source_url=e.source_url, casing=e.casing,
         )
         row = existing.get(e.key) if not data.replace else None
         if row:

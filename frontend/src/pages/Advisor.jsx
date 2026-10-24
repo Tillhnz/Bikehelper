@@ -254,6 +254,8 @@ function PickCard({ type, title, sub, selected, onClick, tireMm }) {
 /** Angaben, die vom gewählten Rad aus der Garage kommen. */
 const TYPICAL_BIKE_KG = { road: 8, gravel: 10, mtb: 13, other: 11 };
 
+const CASING_NAME = { supple: "dünn, geschmeidig", standard: "normal", stiff: "Pannenschutz" };
+
 function GarageFacts({ bike }) {
   const set = bike.tire_set;
   const width = set?.width_mm ?? bike.tire_width_mm;
@@ -262,6 +264,11 @@ function GarageFacts({ bike }) {
       label: "Reifen",
       value: set ? `${set.name}${set.width_mm ? `, ${fmtNum(set.width_mm, 0)} mm` : ""}${bike.tubeless === false ? ", mit Schlauch" : ", tubeless"}` : width ? `${fmtNum(width, 0)} mm` : null,
       missing: "Kein Reifensatz montiert",
+    },
+    {
+      label: "Karkasse",
+      value: set?.casing ? CASING_NAME[set.casing] : null,
+      missing: set ? "nicht eingetragen, gerechnet wird mit normal" : "kein Reifensatz montiert",
     },
     {
       label: "Gewicht des Rads",
@@ -349,6 +356,7 @@ export default function Advisor() {
       bike_kg: b.bike_weight_kg ?? "",
       tubeless: b.tubeless,
       hookless: b.hookless,
+      casing: b.tire_set?.casing ?? "standard",
       surface: SURFACE_DEFAULT[b.type] ?? "asphalt",
       speed: SPEED_DEFAULT[b.type] ?? 25,
     });
@@ -379,6 +387,8 @@ export default function Advisor() {
   }, [defs]);
 
   const num = (v) => (v === "" || v == null ? null : Number(v));
+  const garageBike = defs?.bikes?.find((x) => String(x.id) === String(form.bike_id));
+  const garageCasing = garageBike?.tire_set?.casing ?? null;
 
   // Anfrage aus dem Formular; fehlt noch der Ort, gibt es keine
   const request = useMemo(() => {
@@ -398,7 +408,7 @@ export default function Advisor() {
       rim_inner_mm: num(form.rim_inner_mm),
       tubeless: form.tubeless,
       hookless: form.hookless,
-      casing: form.casing,
+      casing: garageCasing ? null : form.casing, // aus der Garage, sonst die Auswahl hier
       surface: form.surface,
       wetness: form.wetness,
     };
@@ -411,7 +421,7 @@ export default function Advisor() {
       return null;
     }
     return body;
-  }, [form, manual, manualWx, place]);
+  }, [form, manual, manualWx, place, garageCasing]);
 
   const requestKey = JSON.stringify(request);
 
@@ -608,12 +618,20 @@ export default function Advisor() {
                 </>
               )}
             </div>
-            <Segmented
-              label="Reifenkarkasse"
-              value={form.casing}
-              onChange={(v) => patch({ casing: v })}
-              options={[{ value: "supple", label: "Dünn, geschmeidig" }, { value: "standard", label: "Normal" }, { value: "stiff", label: "Pannenschutz" }]}
-            />
+            {!garageCasing && (
+              <>
+                <Segmented
+                  label="Reifenkarkasse"
+                  value={form.casing}
+                  onChange={(v) => patch({ casing: v })}
+                  options={[{ value: "supple", label: "Dünn, geschmeidig" }, { value: "standard", label: "Normal" }, { value: "stiff", label: "Pannenschutz" }]}
+                />
+                <p className="hint">
+                  Die Karkasse ist das Gewebe unter dem Profil: dünne, geschmeidige brauchen etwas weniger Druck, Pannenschutz-Karkassen etwas mehr.
+                  {bike ? " Trage sie am Reifensatz in der Garage ein, dann gilt sie hier automatisch." : ""}
+                </p>
+              </>
+            )}
             <Segmented
               label="Straße"
               value={form.wetness}

@@ -568,3 +568,16 @@ def test_tire_catalog_import_search_and_tire_set_fields():
         assert c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={"name": "x", "source_url": "javascript:alert(1)"}).status_code == 422
         assert c.delete("/api/tire-catalog/mine", headers=h).status_code == 204
         assert c.get("/api/tire-catalog", headers=h, params={"q": "testmarke"}).json()["items"] == []
+
+
+def test_advisor_uses_casing_from_the_mounted_tire_set():
+    with TestClient(app) as c:
+        h = _user(c, "casing@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False, "tire_width_mm": 28}).json()
+        ts = c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={
+            "name": "Dünn", "width_mm": 28, "casing": "supple", "mount_from": date.today().isoformat(),
+        }).json()
+        assert ts["casing"] == "supple"
+        defs = c.get("/api/advisor/defaults", headers=h).json()
+        assert defs["bikes"][0]["tire_set"]["casing"] == "supple"
+        assert c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={"name": "x", "casing": "kaputt"}).status_code == 422

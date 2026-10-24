@@ -1,29 +1,44 @@
-brand,model,category,width_mm,tubeless,weight_g,watts,watts_note,source_url
-Continental,Grand Prix 5000,road,23,clincher,205,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire
-Continental,Grand Prix 5000,road,25,clincher,220,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire
-Continental,Grand Prix 5000,road,28,clincher,250,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire
-Continental,Grand Prix 5000,road,30,clincher,255,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire
-Continental,Grand Prix 5000,road,32,clincher,295,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire
-Continental,Grand Prix 5000 S TR,road,25,tubeless,250,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire
-Continental,Grand Prix 5000 S TR,road,28,tubeless,280,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire
-Continental,Grand Prix 5000 S TR,road,30,tubeless,300,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire
-Continental,Grand Prix 5000 S TR,road,32,tubeless,330,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire
-Schwalbe,Pro One TLE,road,25,tubeless,265,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493
-Schwalbe,Pro One TLE,road,28,tubeless,280,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493
-Schwalbe,Pro One TLE,road,30,tubeless,305,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493
-Schwalbe,Pro One TLE,road,32,tubeless,325,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493
-Vittoria,Corsa Pro TLR,road,24,tubeless,265,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire
-Vittoria,Corsa Pro TLR,road,26,tubeless,275,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire
-Vittoria,Corsa Pro TLR,road,28,tubeless,295,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire
-Vittoria,Corsa Pro TLR,road,30,tubeless,300,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire
-Vittoria,Corsa Pro TLR,road,32,tubeless,320,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire
-Vittoria,Corsa N.EXT TLR,road,26,tubeless,285,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire
-Vittoria,Corsa N.EXT TLR,road,28,tubeless,300,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire
-Vittoria,Corsa N.EXT TLR,road,30,tubeless,310,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire
-Vittoria,Corsa N.EXT TLR,road,32,tubeless,330,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire
-Vittoria,Corsa N.EXT TLR,road,34,tubeless,340,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire
-Pirelli,P Zero Race TLR,road,28,tubeless,295,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire
-Pirelli,P Zero Race TLR,road,30,tubeless,315,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire
-Pirelli,P Zero Race TLR,road,35,tubeless,400,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire
-Pirelli,P Zero Race TLR,road,40,tubeless,460,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire
-Schwalbe,G-One Ultrabite,gravel,50,tubeless,665,,,https://www.biketiresdirect.com/product/schwalbe-g-one-ultrabite-700c-gravel-tire
+brand,model,category,width_mm,tubeless,weight_g,watts,watts_note,source_url,casing
+Continental,Grand Prix 5000,road,23,clincher,205,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire,
+Continental,Grand Prix 5000,road,25,clincher,220,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire,
+Continental,Grand Prix 5000,road,28,clincher,250,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire,
+Continental,Grand Prix 5000,road,30,clincher,255,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire,
+Continental,Grand Prix 5000,road,32,clincher,295,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-road-tire,
+Continental,Grand Prix 5000 S TR,road,25,tubeless,250,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire,
+Continental,Grand Prix 5000 S TR,road,28,tubeless,280,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire,
+Continental,Grand Prix 5000 S TR,road,30,tubeless,300,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire,
+Continental,Grand Prix 5000 S TR,road,32,tubeless,330,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-s-tr-road-tire,
+Schwalbe,Pro One TLE,road,25,tubeless,265,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493,
+Schwalbe,Pro One TLE,road,28,tubeless,280,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493,
+Schwalbe,Pro One TLE,road,30,tubeless,305,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493,
+Schwalbe,Pro One TLE,road,32,tubeless,325,,,https://www.biketiresdirect.com/product/schwalbe-pro-one-tle-700c-road-tire-hs493,
+Vittoria,Corsa Pro TLR,road,24,tubeless,265,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire,
+Vittoria,Corsa Pro TLR,road,26,tubeless,275,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire,
+Vittoria,Corsa Pro TLR,road,28,tubeless,295,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire,
+Vittoria,Corsa Pro TLR,road,30,tubeless,300,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire,
+Vittoria,Corsa Pro TLR,road,32,tubeless,320,,,https://www.biketiresdirect.com/product/vittoria-corsa-pro-tlr-road-tire,
+Vittoria,Corsa N.EXT TLR,road,26,tubeless,285,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire,
+Vittoria,Corsa N.EXT TLR,road,28,tubeless,300,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire,
+Vittoria,Corsa N.EXT TLR,road,30,tubeless,310,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire,
+Vittoria,Corsa N.EXT TLR,road,32,tubeless,330,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire,
+Vittoria,Corsa N.EXT TLR,road,34,tubeless,340,,,https://www.biketiresdirect.com/product/vittoria-corsa-next-tlr-road-tire,
+Pirelli,P Zero Race TLR,road,28,tubeless,295,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire,
+Pirelli,P Zero Race TLR,road,30,tubeless,315,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire,
+Pirelli,P Zero Race TLR,road,35,tubeless,400,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire,
+Pirelli,P Zero Race TLR,road,40,tubeless,460,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-road-tire,
+Schwalbe,G-One Ultrabite,gravel,50,tubeless,665,,,https://www.biketiresdirect.com/product/schwalbe-g-one-ultrabite-700c-gravel-tire,
+Continental,Grand Prix 5000 AS TR,road,25,tubeless,300,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-as-tr-road-tire,
+Continental,Grand Prix 5000 AS TR,road,28,tubeless,335,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-as-tr-road-tire,
+Continental,Grand Prix 5000 AS TR,road,32,tubeless,385,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-as-tr-road-tire,
+Continental,Grand Prix 5000 AS TR,road,35,tubeless,425,,,https://www.biketiresdirect.com/product/continental-grand-prix-5000-as-tr-road-tire,
+Continental,Grand Prix 4-Season,road,23,clincher,220,,,https://www.biketiresdirect.com/product/continental-grand-prix-4-season-road-tire,
+Continental,Grand Prix 4-Season,road,25,clincher,230,,,https://www.biketiresdirect.com/product/continental-grand-prix-4-season-road-tire,
+Continental,Grand Prix 4-Season,road,28,clincher,250,,,https://www.biketiresdirect.com/product/continental-grand-prix-4-season-road-tire,
+Pirelli,P Zero Race TLR RS,road,26,tubeless,270,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-rs-road-tire,
+Pirelli,P Zero Race TLR RS,road,28,tubeless,290,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-rs-road-tire,
+Pirelli,P Zero Race TLR RS,road,30,tubeless,310,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-rs-road-tire,
+Pirelli,P Zero Race TLR RS,road,32,tubeless,330,,,https://www.biketiresdirect.com/product/pirelli-p-zero-race-tlr-rs-road-tire,
+Maxxis,Rekon Race WT EXO/TR 29 x 2.4,mtb,61,tubeless,759,,,https://www.biketiresdirect.com/product/maxxis-rekon-race-wt-exo-tr-29-inch-mtb-tire,
+Maxxis,Minion DHF Wide Trail 3C EXO/TR 29 x 2.5,mtb,63,tubeless,1030,,,https://www.biketiresdirect.com/product/maxxis-minion-dhf-wide-trail-3c-exo-tr-29-mtb-tire,
+WTB,Raddler TCS,gravel,40,tubeless,540,,,https://www.biketiresdirect.com/product/wtb-raddler-700c-gravel-tire,
+WTB,Raddler TCS,gravel,45,tubeless,590,,,https://www.biketiresdirect.com/product/wtb-raddler-700c-gravel-tire,

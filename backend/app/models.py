@@ -98,6 +98,8 @@ class TireSet(Base):
     watts: Mapped[float | None] = mapped_column(Float, nullable=True)  # Rollwiderstand je Reifen in Watt (Prüfstand)
     watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    casing: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    casing: Mapped[str | None] = mapped_column(String(10), nullable=True)  # supple | standard | stiff (Ratgeber)
 
     bike: Mapped[Bike] = relationship(back_populates="tire_sets")
     mounts: Mapped[list["TireMount"]] = relationship(back_populates="tire_set", cascade="all, delete-orphan")
@@ -331,3 +333,4 @@ class UserTire(Base):
     watts: Mapped[float | None] = mapped_column(Float, nullable=True)
     watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    casing: Mapped[str | None] = mapped_column(String(10), nullable=True)
