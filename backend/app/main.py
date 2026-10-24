@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
-from . import notify
+from . import audit, notify
 from .database import Base, SessionLocal, ensure_columns, engine
 from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
 from . import server_settings
@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
         migrate_legacy_lube(db)
         bootstrap_roles(db)
         server_settings.apply_overrides(db)
+    audit.event("System", "server.start", "BikeHelper gestartet")
     weather_service.start_background()
     notify.start_background()
     geo_service.start_background()
@@ -52,6 +53,46 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="BikeHelper", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+# Grobe Bereiche für das Ereignisprotokoll. Es wird nie ein Name, eine Zahl oder eine ID gespeichert.
+_AREAS = (
+    ("/api/bikes", "Garage"), ("/api/components", "Wartung"), ("/api/rules", "Wartung"), ("/api/logs", "Wartung"),
+    ("/api/measurements", "Wartung"), ("/api/tire-sets", "Reifen"), ("/api/tire-mounts", "Reifen"),
+    ("/api/tire-catalog", "Reifenkatalog"), ("/api/inventory", "Lager"), ("/api/activities", "Fahrten"),
+    ("/api/imports", "Fahrten"), ("/api/stats/goals", "Ziele"), ("/api/settings", "Einstellungen"),
+    ("/api/notifications", "Erinnerungen"), ("/api/wahoo", "Wahoo"), ("/api/places", "Orte"), ("/api/advisor", "Ratgeber"),
+)
+_SPECIAL = {
+    "/api/auth/password": ("password", "Passwort geändert"), "/api/auth/logout-all": ("logout.all", "Überall abgemeldet"),
+    "/api/me/delete": ("account.delete", "Konto selbst gelöscht"), "/api/me/export": ("export", "Datenexport"),
+}
+_VERB = {"POST": "neu oder ausgeführt", "PUT": "geändert", "PATCH": "geändert", "DELETE": "gelöscht"}
+
+
+@app.middleware("http")
+async def event_log(request, call_next):
+    """Schreibt Aktionen und Serverfehler ins Ereignisprotokoll. Nur Bereich und Art, keine Inhalte."""
+    response = await call_next(request)
+    path = request.url.path
+    if not path.startswith("/api/") or path.startswith(("/api/admin", "/api/health")):
+        return response
+    try:
+        actor = getattr(request.state, "actor", None)
+        route = request.scope.get("route")
+        template = getattr(route, "path", path)
+        if response.status_code >= 500:
+            audit.event(actor or "System", "error", f"{request.method} {template} -> {response.status_code}")
+        elif actor and request.method in _VERB and response.status_code < 400:
+            if path in _SPECIAL:
+                action, text = _SPECIAL[path]
+                audit.event(actor, action, text if action != "export" else "")
+            else:
+                area = next((label for prefix, label in _AREAS if path.startswith(prefix)), None)
+                if area:
+                    audit.event(actor, "act", f"{area}: {_VERB[request.method]}")
+    except Exception:
+        logging.getLogger("bikehelper").exception("Ereignisprotokoll")
+    return response
 
 
 @app.middleware("http")

@@ -70,10 +70,13 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     ok = verify_password(data.password, user.password_hash if user else _DUMMY_HASH)
     if not user or not ok:
         ratelimit.record_failure(email, ip)
+        audit.event(email, "login.fail", "E-Mail oder Passwort falsch" if user else "unbekanntes Konto")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-Mail oder Passwort falsch")
     ratelimit.record_success(email)
     if user.active is False:
+        audit.event(email, "login.blocked", "Konto gesperrt")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Dieses Konto ist gesperrt. Bitte wende dich an den Administrator.")
+    audit.event(email, "login")
     return TokenOut(access_token=create_token(user))
 
 

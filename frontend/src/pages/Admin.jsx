@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, fmtDate, fmtDateTime } from "../api.js";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
@@ -359,38 +359,110 @@ function Backups() {
 }
 
 const ACTION_TEXT = {
+  login: "Angemeldet", "login.fail": "Anmeldung fehlgeschlagen", "login.blocked": "Anmeldung abgelehnt",
+  act: "Aktion", error: "Serverfehler", "server.start": "Server gestartet",
+  password: "Passwort geändert", "logout.all": "Überall abgemeldet", "account.delete": "Konto selbst gelöscht", export: "Datenexport",
   "invite.create": "Einladung erstellt", "invite.delete": "Einladung gelöscht", "user.role": "Rolle geändert",
   "user.lock": "Konto gesperrt", "user.unlock": "Konto entsperrt", "user.delete": "Konto gelöscht",
   "user.register": "Konto angelegt", "settings.save": "Einstellungen gespeichert", "update.start": "Update gestartet",
   "backup.create": "Sicherung erstellt", "password.reset": "Passwort zurückgesetzt",
 };
 
+// Gruppen für den Filter: Anmeldungen, Aktionen der Nutzer, Verwaltung durch Admins, Fehler und Systemereignisse
+function kindOf(action) {
+  if (action.startsWith("login")) return "login";
+  if (action === "error") return "error";
+  if (action === "server.start") return "system";
+  if (["act", "password", "logout.all", "account.delete", "export"].includes(action)) return "action";
+  return "admin";
+}
+const KIND_TEXT = { login: "Anmeldungen", action: "Aktionen", admin: "Verwaltung", error: "Fehler", system: "System" };
+const KIND_PILL = { login: "pill-ok", action: "pill-muted", admin: "pill-soon", error: "pill-due", system: "pill-muted" };
+
+function timeText(iso) {
+  const d = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + "Z");
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay ? d.toLocaleTimeString("de-DE") : d.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "medium" });
+}
+
 function AuditLog() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
-  useEffect(() => { api.get("/admin/audit?limit=200").then(setRows).catch((e) => setError(e.message)); }, []);
+  const [live, setLive] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [fresh, setFresh] = useState(new Set());
+  const top = useRef(0);
+
+  useEffect(() => {
+    let stop = false;
+    async function tick() {
+      try {
+        const after = top.current;
+        const r = await api.get(`/admin/audit?limit=${after ? 100 : 300}&after=${after}`);
+        if (stop) return;
+        setError("");
+        if (r.length) {
+          top.current = Math.max(top.current, ...r.map((x) => x.id));
+          setRows((prev) => [...r, ...(prev || [])].slice(0, 500));
+          if (after) {
+            setFresh(new Set(r.map((x) => x.id)));
+            setTimeout(() => setFresh(new Set()), 2500);
+          }
+        } else if (!after) {
+          setRows([]);
+        }
+      } catch (e) {
+        if (!stop) setError(e.message);
+      }
+    }
+    tick();
+    const id = live ? setInterval(tick, 4000) : null;
+    return () => { stop = true; if (id) clearInterval(id); };
+  }, [live]);
+
+  const shown = rows?.filter((r) => filter === "all" || kindOf(r.action) === filter);
+
   return (
     <section className="panel">
-      <h2>Protokoll</h2>
-      <p className="muted small">Verwaltungsvorgänge der letzten Zeit. Es enthält keine Fahrten, Räder oder Passwörter.</p>
+      <div className="log-head">
+        <h2>Ereignisprotokoll</h2>
+        <label className="check live-switch">
+          <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
+          <span>{live ? <><span className="live-dot" aria-hidden="true" /> Live</> : "Live aus"}</span>
+        </label>
+      </div>
+      <p className="muted small">
+        Wer sich wann angemeldet hat, was grob getan wurde und was auf dem Server passiert. Aus Datenschutzgründen steht hier nur, <em>in welchem Bereich</em> etwas passiert ist
+        (zum Beispiel „Lager: gelöscht“), nie ein Name, eine Zahl, ein Passwort oder eine IP-Adresse. Einträge bleiben 30 Tage.
+      </p>
+      <div className="seg" role="group" aria-label="Filter">
+        {[["all", "Alle"], ...Object.entries(KIND_TEXT)].map(([k, label]) => (
+          <button key={k} type="button" className={`btn small ${filter === k ? "primary" : ""}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{label}</button>
+        ))}
+      </div>
       {error && <p className="error" role="alert">{error}</p>}
       {!rows && !error && <Loading rows={2} />}
-      {rows?.length === 0 && <p className="muted small">Noch nichts protokolliert.</p>}
-      {rows?.length > 0 && (
-        <ul className="log-list">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <span><strong>{ACTION_TEXT[r.action] || r.action}</strong>{r.detail && <span className="muted small"> {r.detail}</span>}</span>
-              <span className="muted small">{fmtDateTime(r.at)}, {r.actor}</span>
-            </li>
-          ))}
+      {shown?.length === 0 && <p className="muted small">Keine Einträge in dieser Ansicht.</p>}
+      {shown?.length > 0 && (
+        <ul className="event-list" aria-live={live ? "polite" : "off"}>
+          {shown.map((r) => {
+            const kind = kindOf(r.action);
+            return (
+              <li key={r.id} className={fresh.has(r.id) ? "fresh" : ""}>
+                <span className="muted small ev-time">{timeText(r.at)}</span>
+                <span className={`pill ${KIND_PILL[kind]}`}>{ACTION_TEXT[r.action] || r.action}</span>
+                <span className="ev-who">{r.actor}</span>
+                {r.detail && <span className="muted small">{r.detail}</span>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
   );
 }
 
-const TABS = [["overview", "Übersicht"], ["accounts", "Konten"], ["server", "Server"], ["log", "Protokoll"]];
+const TABS = [["overview", "Übersicht"], ["accounts", "Konten"], ["server", "Server"], ["log", "Live-Protokoll"]];
 
 export default function Admin({ user }) {
   const [params, setParams] = useSearchParams();

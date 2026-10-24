@@ -753,3 +753,27 @@ def test_rides_day_filter():
             db.commit()
         r = c.get("/api/activities", headers=h, params={"day": "2026-05-03"}).json()
         assert [a["name"] for a in r["items"]] == ["Morgens"]
+
+
+def test_event_log_records_logins_and_coarse_actions_without_content():
+    with TestClient(app) as c:
+        h = _user(c, "live-user@example.com")
+        admin = _admin_headers()
+        assert c.post("/api/auth/login", json={"email": "live-user@example.com", "password": "falsch-falsch"}).status_code == 401
+        c.post("/api/bikes", headers=h, json={"name": "Geheimrad Quokka", "type": "road"})
+        c.post("/api/inventory", headers=h, json={"category": "other", "name": "Geheimteil Okapi", "quantity": 1})
+        rows = c.get("/api/admin/audit", headers=admin, params={"limit": 200}).json()
+        mine = [r for r in rows if r["actor"] == "live-user@example.com"]
+        actions = {r["action"] for r in mine}
+        assert {"login", "login.fail", "act"} <= actions
+        details = " ".join((r["detail"] or "") for r in mine)
+        assert "Garage: neu oder ausgeführt" in details and "Lager: neu oder ausgeführt" in details
+        # Keine Inhalte im Protokoll
+        everything = str(rows)
+        assert "Quokka" not in everything and "Okapi" not in everything
+        # Live-Abfrage liefert nur Neueres
+        newest = rows[0]["id"]
+        assert c.get("/api/admin/audit", headers=admin, params={"after": newest}).json() == []
+        c.delete(f"/api/inventory/{c.get('/api/inventory', headers=h).json()['items'][0]['id']}", headers=h)
+        newer = c.get("/api/admin/audit", headers=admin, params={"after": newest}).json()
+        assert any("Lager: gelöscht" in (r["detail"] or "") for r in newer)

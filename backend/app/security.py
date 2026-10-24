@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ def create_token(user: User) -> str:
 
 
 def current_user(
+    request: Request,
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
@@ -44,6 +45,7 @@ def current_user(
         raise unauthorized
     if user is None or payload.get("tv", 0) != (user.token_version or 0) or user.active is False:
         raise unauthorized  # abgemeldet (Überall abmelden / Passwort geändert), gesperrt oder Konto gelöscht
+    request.state.actor = user.email  # für das Ereignisprotokoll
     return user
 
 
