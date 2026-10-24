@@ -110,6 +110,23 @@ def import_status(job_id: str, user: User = Depends(current_user)):
 
 # ---------- Fahrten ansehen und zuordnen ----------
 
+def _conditions(user: User, unassigned: bool = False, bike_id: int | None = None, q: str | None = None,
+                day: date | None = None) -> list:
+    """Filter der Fahrtenliste; immer nur die eigenen Fahrten."""
+    cond = [Activity.user_id == user.id]
+    if unassigned:
+        cond.append(Activity.bike_id.is_(None))
+    if bike_id is not None:
+        cond.append(Activity.bike_id == bike_id)
+    if day is not None:  # Kalendertag in der Zeitzone des Servers
+        tz = get_tz(settings.timezone)
+        start = datetime.combine(day, datetime.min.time()).replace(tzinfo=tz).astimezone(timezone.utc).replace(tzinfo=None)
+        cond += [Activity.start_date >= start, Activity.start_date < start + timedelta(days=1)]
+    if q and q.strip():
+        cond.append(Activity.name.ilike(f"%{q.strip()}%"))
+    return cond
+
+
 @router.get("/activities", response_model=ActivityPage)
 def list_activities(
     limit: int = Query(50, ge=1, le=200),
@@ -121,17 +138,7 @@ def list_activities(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    cond = [Activity.user_id == user.id]
-    if unassigned:
-        cond.append(Activity.bike_id.is_(None))
-    if bike_id is not None:
-        cond.append(Activity.bike_id == bike_id)
-    if day is not None:  # Kalendertag in der Zeitzone des Servers
-        tz = get_tz(settings.timezone)
-        start = datetime.combine(day, datetime.min.time()).replace(tzinfo=tz).astimezone(timezone.utc).replace(tzinfo=None)
-        cond += [Activity.start_date >= start, Activity.start_date < start + timedelta(days=1)]
-    if q:
-        cond.append(Activity.name.ilike(f"%{q.strip()}%"))
+    cond = _conditions(user, unassigned, bike_id, q, day)
     total = db.scalar(select(func.count()).select_from(Activity).where(*cond)) or 0
     rows = db.execute(
         select(Activity, Activity.polyline.is_not(None).label("has_track"))
@@ -168,10 +175,13 @@ def assign_activities(data: AssignIn, user: User = Depends(current_user), db: Se
     stmt = update(Activity).where(Activity.user_id == user.id)
     if data.activity_ids is not None:
         stmt = stmt.where(Activity.id.in_(data.activity_ids))
+    elif data.match is not None:  # alle Fahrten, die zu Suche und Filter der Liste passen
+        m = data.match
+        stmt = stmt.where(*_conditions(user, m.unassigned, None, m.q, m.day))
     elif data.gear_name is not None:
         stmt = stmt.where(Activity.gear_name == data.gear_name)
     else:
-        raise HTTPException(422, "Bitte activity_ids oder gear_name angeben.")
+        raise HTTPException(422, "Bitte activity_ids, match oder gear_name angeben.")
     if data.only_unassigned:
         stmt = stmt.where(Activity.bike_id.is_(None))
     result = db.execute(stmt.values(bike_id=data.bike_id))

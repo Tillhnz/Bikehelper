@@ -236,10 +236,17 @@ class ActivityUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
 
 
+class AssignMatch(BaseModel):
+    unassigned: bool = False
+    q: str | None = Field(default=None, max_length=200)
+    day: date | None = None
+
+
 class AssignIn(BaseModel):
     bike_id: int | None
     gear_name: str | None = None
-    activity_ids: list[int] | None = None
+    activity_ids: list[int] | None = Field(default=None, max_length=5000)
+    match: AssignMatch | None = None
     only_unassigned: bool = True
 
 

@@ -63,6 +63,17 @@ def test_upload_assign_and_strava_zip():
                      json={"bike_id": bike["id"], "activity_ids": [page["items"][0]["id"]]}).json()
         assert res["updated"] == 1
 
+        # Auswahl wieder lösen, dann alle Treffer eines Filters auf einmal zuordnen (auch bereits zugeordnete)
+        none = c.post("/api/activities/assign", headers=h, json={"bike_id": None, "only_unassigned": False, "match": {}}).json()
+        assert none["updated"] >= 1
+        assert c.get("/api/activities?unassigned=true", headers=h).json()["total"] >= 1
+        res = c.post("/api/activities/assign", headers=h,
+                     json={"bike_id": bike["id"], "only_unassigned": False, "match": {"unassigned": True}}).json()
+        assert res["updated"] >= 1
+        assert c.get("/api/activities?unassigned=true", headers=h).json()["total"] == 0
+        # fremdes Rad ist tabu
+        assert c.post("/api/activities/assign", headers=h, json={"bike_id": 99999, "match": {}}).status_code == 404
+
         # Strava-Export: ein bekanntes Rad, ein neues Rad, eine Laufaktivität
         csv_text = "\n".join([
             CSV_HEADER,

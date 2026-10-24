@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { WEATHER_TEXT, api, fmtDate, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 import { dismiss, isBusy, startFileImport, startStravaImport, useUploads } from "../uploads.js";
-import { confirmDialog } from "../components/feedback.jsx";
+import { confirmDialog, toast } from "../components/feedback.jsx";
 
 // ---------- Hilfsbausteine ----------
 
@@ -331,6 +331,13 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [error, setError] = useState("");
+  const [picked, setPicked] = useState(() => new Set()); // ausgewählte Fahrten
+  const [allMatching, setAllMatching] = useState(false); // alle Treffer des Filters, auch auf noch nicht geladenen Seiten
+  const [target, setTarget] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  // Bei neuem Filter oder neuer Suche beginnt die Auswahl von vorn
+  useEffect(() => { setPicked(new Set()); setAllMatching(false); }, [unassigned, debouncedQ, day]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
@@ -369,6 +376,49 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     }
   }
 
+  const allLoadedPicked = items.length > 0 && items.every((a) => picked.has(a.id));
+  const count = allMatching ? total : picked.size;
+
+  function togglePick(id) {
+    setAllMatching(false);
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllLoaded() {
+    setAllMatching(false);
+    setPicked(allLoadedPicked ? new Set() : new Set(items.map((a) => a.id)));
+  }
+
+  function clearPick() { setPicked(new Set()); setAllMatching(false); }
+
+  async function assignPicked() {
+    if (!target || count === 0) return;
+    const bikeId = target === "none" ? null : Number(target);
+    const name = bikeId == null ? "kein Rad" : bikes.find((b) => b.id === bikeId)?.name ?? "dem Rad";
+    if (!await confirmDialog(`${count} ${count === 1 ? "Fahrt" : "Fahrten"} „${name}“ zuordnen? Bisherige Zuordnungen werden ersetzt.`)) return;
+    setAssigning(true);
+    setError("");
+    try {
+      const body = allMatching
+        ? { bike_id: bikeId, only_unassigned: false, match: { unassigned, q: debouncedQ.trim() || null, day: day || null } }
+        : { bike_id: bikeId, only_unassigned: false, activity_ids: [...picked] };
+      const res = await api.post("/activities/assign", body);
+      toast(`${res.updated} ${res.updated === 1 ? "Fahrt" : "Fahrten"} zugeordnet.`);
+      clearPick();
+      setTarget("");
+      await load(0);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   async function remove(a) {
     if (!await confirmDialog(`„${a.name}“ wirklich löschen?`)) return;
     try {
@@ -400,16 +450,37 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
 
       {error && <p className="error" role="alert">{error}</p>}
 
+      {count > 0 && (
+        <div className="select-bar" role="region" aria-label="Auswahl">
+          <strong>{count} {count === 1 ? "Fahrt" : "Fahrten"} ausgewählt</strong>
+          {!allMatching && total > items.length && allLoadedPicked && (
+            <button className="link small" onClick={() => setAllMatching(true)}>Alle {total} passenden Fahrten auswählen</button>
+          )}
+          <select aria-label="Rad für die Auswahl" value={target} onChange={(e) => setTarget(e.target.value)}>
+            <option value="">Rad wählen …</option>
+            {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            <option value="none">Kein Rad</option>
+          </select>
+          <button className="btn primary small" disabled={!target || assigning} onClick={assignPicked}>{assigning ? "Ordne zu …" : "Zuordnen"}</button>
+          <button className="link small" onClick={clearPick}>Auswahl aufheben</button>
+        </div>
+      )}
+
       {!loading && items.length === 0 ? (
         <EmptyState
           title={unassigned || debouncedQ || day ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
           text={unassigned || debouncedQ || day ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
         />
       ) : (
+        <>
+        <label className="check pick-all-mobile">
+          <input type="checkbox" checked={allLoadedPicked || allMatching} onChange={toggleAllLoaded} /> Alle geladenen Fahrten auswählen
+        </label>
         <div className="table-wrap rides-wrap">
           <table className="rides">
             <thead>
               <tr>
+                <th className="cell-pick"><input type="checkbox" aria-label="Alle geladenen Fahrten auswählen" checked={allLoadedPicked || allMatching} onChange={toggleAllLoaded} /></th>
                 <th>Datum</th>
                 <th>Name</th>
                 <th className="num">Strecke</th>
@@ -422,7 +493,8 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
             </thead>
             <tbody>
               {items.map((a) => (
-                <tr key={a.id}>
+                <tr key={a.id} className={picked.has(a.id) || allMatching ? "picked" : ""}>
+                  <td className="cell-pick"><input type="checkbox" aria-label={`${a.name} auswählen`} checked={picked.has(a.id) || allMatching} onChange={() => togglePick(a.id)} /></td>
                   <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
                   <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link></td>
                   <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
@@ -441,6 +513,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {items.length < total && (

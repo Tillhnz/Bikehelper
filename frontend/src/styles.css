@@ -718,6 +718,8 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
   .rides .cell-name { grid-column: 1 / -1; order: -2; font-size: 1.05rem; }
   .rides .cell-date { grid-column: 1 / -1; order: -1; color: var(--mute); font-size: 0.85rem; }
   .rides .cell-wide { grid-column: 1 / -1; }
+  .rides .cell-pick { grid-column: 1 / -1; order: -3; width: auto; }
+  .pick-all-mobile { display: flex; }
   .rides select { width: 100%; }
 
   /* Karten und Verlaufsdiagramme */
@@ -1036,3 +1038,9 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .mech-requests{display:grid;gap:.7rem;margin-bottom:1.1rem}
 .notice-card{display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-left:4px solid #e0a030;border-radius:var(--r-panel);padding:1rem 1.2rem}
 .notice-card p{margin:.25rem 0 0}
+
+/* Fahrten auswählen und zuordnen */
+.select-bar{position:sticky;top:.5rem;z-index:20;display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid #4f8cff;border-radius:var(--r-panel);padding:.7rem 1rem;margin:0 0 1rem;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.rides .cell-pick{width:2.2rem;padding-right:0}
+.rides tr.picked td{background:rgba(79,140,255,.10)}
+.pick-all-mobile{display:none;margin:0 0 .6rem}
