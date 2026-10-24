@@ -146,14 +146,12 @@ def run_once(db: Session | None = None, force: bool = False) -> int:
 
 
 def start_background() -> None:
-    if not settings.reminders_enabled:
-        return
-
     def loop() -> None:
         time.sleep(120)
         while True:
             try:
-                run_once()
+                if settings.reminders_enabled:
+                    run_once()
             except Exception:
                 log.exception("Erinnerungslauf fehlgeschlagen")
             time.sleep(CHECK_INTERVAL_S)

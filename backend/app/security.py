@@ -42,15 +42,13 @@ def current_user(
         user = db.get(User, int(payload["sub"]))
     except (jwt.PyJWTError, KeyError, ValueError):
         raise unauthorized
-    if user is None or payload.get("tv", 0) != (user.token_version or 0):
-        raise unauthorized  # abgemeldet (Überall abmelden / Passwort geändert) oder Konto gelöscht
+    if user is None or payload.get("tv", 0) != (user.token_version or 0) or user.active is False:
+        raise unauthorized  # abgemeldet (Überall abmelden / Passwort geändert), gesperrt oder Konto gelöscht
     return user
 
 
 def is_admin(db: Session, user: User) -> bool:
-    """Admin ist der erste angelegte Nutzer."""
-    from sqlalchemy import select
-    return db.scalar(select(User.id).order_by(User.id).limit(1)) == user.id
+    return user.role == "admin"
 
 
 def require_admin(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:

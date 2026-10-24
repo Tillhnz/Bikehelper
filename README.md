@@ -154,18 +154,18 @@ Die Heatmap zoomt beim Öffnen auf dein Heimatgebiet und hat einen **Zeitverlauf
 
 **Kettenlehre.** In der Kettenkarte trägst du über „Messwert eintragen“ die gemessene Längung in Prozent ein (Grenzwert 0,5 % bei 10-fach und mehr, 0,75 % bei 9-fach und weniger). Ab dann rechnet die Regel „Kette wechseln“ mit dem gemessenen Zustand statt nur mit Kilometern: Aus Messwert und gefahrenen Kilometern wird die Längung bis heute fortgeschrieben und die Restkilometer bis zum Grenzwert angezeigt. Nach einem Kettenwechsel zählen alte Messwerte nicht mehr.
 
-**Erinnerungen.** Unter Einstellungen wählst du E-Mail und/oder Push per ntfy. BikeHelper meldet jede Wartung einmal, wenn sie „bald“ und einmal, wenn sie „fällig“ wird, nur zwischen 8 und 21 Uhr. Für ntfy installierst du die App ntfy aufs Handy und abonnierst dasselbe Thema (am besten zufällig, das Thema ist wie ein Passwort). Für E-Mail trägst du in der `.env` einen SMTP-Server ein (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`). Mit „Testnachricht senden“ prüfst du beides.
+**Erinnerungen.** Unter Einstellungen wählst du E-Mail und/oder Push per ntfy. BikeHelper meldet jede Wartung einmal, wenn sie „bald“ und einmal, wenn sie „fällig“ wird, nur zwischen 8 und 21 Uhr. Für ntfy installierst du die App ntfy aufs Handy und abonnierst dasselbe Thema (am besten zufällig, das Thema ist wie ein Passwort). Für E-Mail richtet der Administrator unter Administration → E-Mail-Versand einen SMTP-Server ein. Mit „Testnachricht senden“ prüfst du beides.
 
-**E-Mail einrichten, Schritt für Schritt.** Trage in der `.env` im Projektordner ein, und starte dann mit `docker compose up -d` neu (die Werte werden nur beim Start gelesen):
+**E-Mail einrichten, Schritt für Schritt.** Melde dich als Administrator an, öffne Administration → E-Mail-Versand und trage ein, was dein Anbieter verlangt. Nach „Speichern“ gilt es sofort, ein Neustart ist nicht nötig:
 
-| Anbieter | `SMTP_HOST` | `SMTP_PORT` | `SMTP_USER` / `SMTP_FROM` | `SMTP_PASSWORD` |
+| Anbieter | SMTP-Server | Port | Benutzername / Absender | Passwort |
 |---|---|---|---|---|
 | Gmail | `smtp.gmail.com` | `587` | deine Gmail-Adresse | App-Passwort (Google-Konto → Sicherheit → Bestätigung in zwei Schritten → App-Passwörter), nicht dein Login-Passwort |
 | GMX | `mail.gmx.net` | `587` | deine GMX-Adresse | dein Passwort, SMTP-Versand muss in den GMX-Einstellungen erlaubt sein |
 | web.de | `smtp.web.de` | `587` | deine web.de-Adresse | dein Passwort, SMTP muss freigeschaltet sein |
 | Eigener Mailserver | dein Server | `587` oder `465` | Konto auf dem Server | dessen Passwort |
 
-Danach unter Einstellungen → Erinnerungen „E-Mail“ einschalten und „Testnachricht senden“ klicken. Die Mail geht an die E-Mail-Adresse deines BikeHelper-Kontos. Kommt ein Fehler, steht der Grund in der Meldung, bei Gmail meist ein falsches Passwort (das App-Passwort ohne Leerzeichen eintragen). Schau sonst in `docker compose logs backend`. Das Passwort steht nur in der `.env` auf deinem Server.
+Klicke dann „Testmail an mich senden“. Danach können Nutzer unter Einstellungen → Erinnerungen „E-Mail“ einschalten. Die Mail geht an die Adresse des jeweiligen Kontos. Kommt ein Fehler, steht der Grund in der Meldung, bei Gmail meist ein falsches Passwort (das App-Passwort ohne Leerzeichen eintragen). Schau sonst in `docker compose logs backend`. Das Passwort wird nur in der Datenbank deines Servers gespeichert und nie wieder angezeigt.
 
 **Als App installieren.** Über https (also über den Reverse Proxy) bietet der Browser „App installieren“ an, in den Einstellungen gibt es dafür einen Knopf. Die App öffnet ohne Browserleiste; ohne Verbindung erscheint die zuletzt geladene Oberfläche, Daten kommen immer live vom Server.
 
@@ -173,7 +173,7 @@ Danach unter Einstellungen → Erinnerungen „E-Mail“ einschalten und „Test
 
 Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [Open-Meteo](https://open-meteo.com) (Daten unter CC BY 4.0, kostenlos, ohne Schlüssel). Alle sechs Stunden wird nach neuen Fahrten gesucht; Fahrten der letzten Tage werden vorläufig ausgewertet und später aus dem Archiv korrigiert.
 
-**Datenschutz:** Gesendet werden nur gerundete Startkoordinaten (0,1 Grad, rund 10 km) und Zeiträume, keine Namen oder Konten. Wer das nicht möchte, setzt `WEATHER_ENABLED=false` in der `.env`; dann gibt es kein Wetter und keine Nässe-Korrektur.
+**Datenschutz:** Gesendet werden nur gerundete Startkoordinaten (0,1 Grad, rund 10 km) und Zeiträume, keine Namen oder Konten. Wer das nicht möchte, schaltet es unter Administration → Funktionen aus; dann gibt es kein Wetter und keine Nässe-Korrektur.
 
 ## Heatmap und Statistik
 
@@ -189,11 +189,12 @@ Die App ist für den Betrieb hinter dem Nginx Proxy Manager mit HTTPS gedacht. E
 - **Login-Drosselung:** Nach 8 Fehlversuchen pro E-Mail (oder 40 pro Adresse) in 15 Minuten antwortet die App mit „Zu viele Fehlversuche“. Registrierungen sind auf 10 pro Stunde und Adresse begrenzt. Die Zähler liegen im Speicher und sind nach einem Neustart leer. Hinter dem Nginx Proxy Manager zählt die echte Client-Adresse (`TRUSTED_PROXIES=1`); läuft BikeHelper ohne Proxy davor, setze `TRUSTED_PROXIES=0`.
 - **Anmeldung:** Tokens gelten 7 Tage (`TOKEN_EXPIRE_DAYS`). Unter Einstellungen → Sicherheit kannst du das Passwort ändern oder dich überall abmelden. Beides macht alle älteren Tokens ungültig.
 - **Konto löschen:** Einstellungen → Sicherheit entfernt das Konto samt aller Daten vom Server (Passwort nötig).
-- **Einladungen:** Die Registrierung ist standardmäßig geschlossen (`ALLOW_REGISTRATION=false`). Das erste Konto ist immer erlaubt und wird Administrator. Weitere Nutzer brauchen einen Einladungscode: Einstellungen → Einladungen → „Neue Einladung erzeugen“ → „Link kopieren“ und der Person schicken. Der Link öffnet direkt die Registrierung mit eingetragenem Code, und jeder Code gilt einmal. Dort siehst du auch alle Konten (nur Zahl der Räder und Fahrten, keine Inhalte) und kannst Konten samt Daten entfernen. `./install.sh registration true` öffnet die Registrierung für alle, `false` schließt sie wieder.
+- **Einladungen:** Die Registrierung ist standardmäßig geschlossen (`ALLOW_REGISTRATION=false`). Das erste Konto ist immer erlaubt und wird Administrator. Weitere Nutzer brauchen einen Einladungscode: Administration → Einladungen → „Neue Einladung erzeugen“ → „Link kopieren“ und der Person schicken. Der Link öffnet direkt die Registrierung mit eingetragenem Code, und jeder Code gilt einmal. Unter Administration → Konten und Rollen siehst du alle Konten (nur E-Mail, Rolle, Status; keine Räder, Fahrten oder sonstige Inhalte). Du kannst Rollen vergeben (Administrator oder Nutzer), Konten sperren oder samt Daten löschen. Die offene Registrierung schaltest du unter Administration → Zugang ein und aus.
+- **Administration:** Nur Administratoren sehen den Bereich. Dort stellst du alles ein, was früher in der `.env` stand: Registrierung, Anmeldedauer, Proxys, öffentliche Adresse, Zeitzone, E-Mail, ntfy, Wetter, Ortssuche, Wahoo und Karten. Die Werte in der `.env` sind nur Startwerte; was du in der Administration speicherst, hat Vorrang. In der `.env` bleiben nur `SECRET_KEY`, `POSTGRES_PASSWORD`, `WEB_PORT` und die Datenbankadresse.
 - **Header:** Der Webserver setzt Content-Security-Policy, `X-Frame-Options`, `nosniff`, `Referrer-Policy` und `Permissions-Policy`. API-Antworten sind nicht cachebar.
 - **Uploads:** Eine Fahrtdatei darf höchstens 50 MB haben, ein Strava-Export entpackt höchstens 40 GB, die CSV darin höchstens 300 MB. Der Webserver nimmt höchstens 4 GB (Export) bzw. 1 GB (Fahrtdateien) an.
 
-Was du selbst tun musst: HTTPS im Nginx Proxy Manager aktivieren (inklusive „Force SSL“ und HSTS), einen langen `SECRET_KEY` setzen, `ALLOW_REGISTRATION=false` nach dem Anlegen deines Kontos und die Ports von Datenbank und Backend nicht nach außen öffnen. Wer die App mit anderen teilt, sollte regelmäßig ein Backup der Datenbank ziehen (siehe Backup).
+Was du selbst tun musst: HTTPS im Nginx Proxy Manager aktivieren (inklusive „Force SSL“ und HSTS), einen langen `SECRET_KEY` setzen, die Registrierung nach dem Anlegen deines Kontos unter Administration → Zugang geschlossen lassen und die Ports von Datenbank und Backend nicht nach außen öffnen. Wer die App mit anderen teilt, sollte regelmäßig ein Backup der Datenbank ziehen (siehe Backup).
 
 ## Schnellinstallation
 

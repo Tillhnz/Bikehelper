@@ -219,15 +219,12 @@ def start(user_id: int, max_requests: int = 400) -> bool:
 
 
 def start_background() -> None:
-    if not settings.geo_enabled:
-        return
-
     def loop() -> None:
         time.sleep(300)
         while True:
             try:
                 with SessionLocal() as db:
-                    ids = db.scalars(select(User.id)).all()
+                    ids = db.scalars(select(User.id)).all() if settings.geo_enabled else []
                 for uid in ids:
                     with SessionLocal() as db:
                         resolve_user(db, uid, make_reverse(), BACKGROUND_REQUESTS)

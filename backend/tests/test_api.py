@@ -504,8 +504,8 @@ def test_logout_all_password_change_invites_and_account_deletion():
         from app.security import create_token
         with SessionLocal() as db:  # Administrator ist der älteste Nutzer der Datenbank
             admin = {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
-        assert c.get("/api/me", headers=admin).json()["is_admin"] is True
-        assert c.get("/api/me", headers=h3).json()["is_admin"] in (True, False)
+        assert c.get("/api/me", headers=admin).json()["role"] == "admin"
+        assert c.get("/api/me", headers=other).json()["role"] == "user"
         code = c.post("/api/admin/invites", headers=admin).json()["code"]
         from app.config import settings
         old = settings.allow_registration
@@ -603,13 +603,48 @@ def test_admin_user_list_and_removal_and_proxy_ip():
             victim_id = db.scalar(select(User.id).where(User.email == "victim@example.com"))
         assert c.get("/api/admin/users", headers=h).status_code == 403
         users = c.get("/api/admin/users", headers=admin).json()
-        assert users[0]["is_admin"] and any(u["email"] == "victim@example.com" for u in users)
+        assert users[0]["role"] == "admin" and any(u["email"] == "victim@example.com" for u in users)
         assert c.delete(f"/api/admin/users/{users[0]['id']}", headers=admin).status_code == 409  # sich selbst nicht
         assert c.delete(f"/api/admin/users/{victim_id}", headers=h).status_code == 403
         assert c.delete(f"/api/admin/users/{victim_id}", headers=admin).status_code == 204
         assert c.get("/api/me", headers=h).status_code == 401
         # Der Administrator kann sich nicht löschen, solange es andere Konten gibt
         assert c.post("/api/me/delete", headers=admin, json={"password": "irrelevant"}).status_code in (403, 409)
+
+
+def test_roles_lock_settings_and_privacy():
+    with TestClient(app) as c:
+        from sqlalchemy import select
+        from app.config import settings
+        from app.models import User
+        from app.security import create_token
+        h = _user(c, "role-user@example.com")
+        with SessionLocal() as db:
+            admin = {"Authorization": f"Bearer {create_token(db.scalar(select(User).order_by(User.id).limit(1)))}"}
+            uid = db.scalar(select(User.id).where(User.email == "role-user@example.com"))
+        # Nutzer ohne Adminrechte kommen nicht an Einstellungen
+        assert c.get("/api/admin/settings", headers=h).status_code == 403
+        assert c.put("/api/admin/settings", headers=h, json={"values": {"smtp_host": "x"}}).status_code == 403
+        # Die Kontenliste enthält keine persönlichen Inhalte
+        row = next(u for u in c.get("/api/admin/users", headers=admin).json() if u["id"] == uid)
+        assert set(row) == {"id", "email", "role", "active", "created_at", "is_me"}
+        # Passwörter werden nie ausgegeben, null/leer-Semantik
+        r = c.put("/api/admin/settings", headers=admin, json={"values": {"smtp_host": "smtp.test", "smtp_password": "topsecret"}})
+        assert r.status_code == 200, r.text
+        assert "topsecret" not in r.text and r.json()["fields"]["smtp_password"]["set"] is True
+        assert settings.smtp_host == "smtp.test"
+        assert c.put("/api/admin/settings", headers=admin, json={"values": {"smtp_port": 99999}}).status_code == 422
+        assert c.put("/api/admin/settings", headers=admin, json={"values": {"smtp_host": "", "smtp_password": ""}}).status_code == 200
+        assert c.get("/api/admin/settings", headers=admin).json()["fields"]["smtp_password"]["set"] is False
+        # Rolle ändern, sperren, entsperren
+        assert c.put(f"/api/admin/users/{uid}", headers=admin, json={"role": "admin"}).status_code == 200
+        assert c.get("/api/admin/settings", headers=h).status_code == 200
+        assert c.put(f"/api/admin/users/{uid}", headers=admin, json={"role": "user"}).status_code == 200
+        assert c.put(f"/api/admin/users/{uid}", headers=admin, json={"active": False}).status_code == 200
+        assert c.get("/api/me", headers=h).status_code == 401
+        assert c.post("/api/auth/login", json={"email": "role-user@example.com", "password": "geheim1234"}).status_code == 403
+        assert c.put(f"/api/admin/users/{uid}", headers=admin, json={"active": True}).status_code == 200
+        assert c.post("/api/auth/login", json={"email": "role-user@example.com", "password": "geheim1234"}).status_code == 200
 
 
 def test_client_ip_uses_the_entry_added_by_the_trusted_proxy():

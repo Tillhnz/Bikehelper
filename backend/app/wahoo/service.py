@@ -310,15 +310,12 @@ def is_running(user_id: int) -> bool:
 
 
 def start_background() -> None:
-    if not settings.wahoo_enabled:
-        return
-
     def loop() -> None:
         time.sleep(180)
         while True:
             try:
                 with SessionLocal() as db:
-                    ids = db.scalars(select(User.id).where(User.wahoo_refresh_token.is_not(None))).all()
+                    ids = db.scalars(select(User.id).where(User.wahoo_refresh_token.is_not(None))).all() if settings.wahoo_enabled else []
                 for uid in ids:
                     run_in_background(uid)
             except Exception:

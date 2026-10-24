@@ -383,7 +383,7 @@ export function PlacesView() {
 
   if (error) return <p className="error" role="alert">{error}</p>;
   if (!d) return <p className="muted">Lade …</p>;
-  if (!d.enabled) return <EmptyState title="Orte sind ausgeschaltet" text="Der Server hat die Ortssuche abgeschaltet (GEO_ENABLED=false in der .env)." />;
+  if (!d.enabled) return <EmptyState title="Orte sind ausgeschaltet" text="Der Administrator hat die Ortssuche abgeschaltet." />;
 
   async function refresh() {
     setBusy(true);

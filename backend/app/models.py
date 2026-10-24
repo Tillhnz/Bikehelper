@@ -44,6 +44,8 @@ class User(Base):
 
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
     token_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    role: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "admin" | "user"
+    active: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # False = Konto gesperrt (leer = aktiv)
 
     bikes: Mapped[list["Bike"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -334,3 +336,11 @@ class UserTire(Base):
     watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     casing: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+
+class AppSetting(Base):
+    """Servereinstellungen, die der Administrator in der Oberfläche ändert (überschreiben die Umgebungsvariablen)."""
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")

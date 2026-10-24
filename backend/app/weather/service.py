@@ -137,14 +137,12 @@ def trigger(user_id: int | None = None) -> None:
 
 def start_background() -> None:
     """Prüft regelmäßig, ob neue Fahrten Wetterdaten brauchen (auch vorläufige werden später ersetzt)."""
-    if not settings.weather_enabled:
-        return
-
     def loop() -> None:
         time.sleep(60)
         while True:
             try:
-                enrich(None)
+                if settings.weather_enabled:  # kann der Administrator in der Oberfläche ändern
+                    enrich(None)
             except Exception:
                 log.exception("Geplante Wetter-Anreicherung fehlgeschlagen")
             time.sleep(SCHEDULE_INTERVAL_S)

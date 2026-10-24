@@ -42,6 +42,7 @@ class UserOut(BaseModel):
     strava_connected: bool
     weight_kg: float | None = None
     is_admin: bool = False
+    role: str = "user"
 
 
 class StravaSettingsIn(BaseModel):

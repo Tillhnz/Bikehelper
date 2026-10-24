@@ -32,6 +32,7 @@ export default function Shell({ user, onLogout, children }) {
         </nav>
         <div className="sidebar-foot">
           <span className="muted small">{user.email}</span>
+          {user.role === "admin" && <NavLink className="link" to="/admin">Administration</NavLink>}
           <button className="link" onClick={onLogout}>Abmelden</button>
         </div>
       </aside>

@@ -4,6 +4,7 @@ import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
 import Shell from "./components/Shell.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
+import Admin from "./pages/Admin.jsx";
 import Login from "./pages/Login.jsx";
 import Home from "./pages/Home.jsx";
 import Garage from "./pages/Garage.jsx";
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/rides/:id" element={<RideDetail />} />
         <Route path="/heatmap" element={<Heatmap />} />
         <Route path="/stats" element={<Stats />} />
+        {user.role === "admin" && <Route path="/admin" element={<Admin user={user} />} />}
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

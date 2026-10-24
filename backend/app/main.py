@@ -6,11 +6,29 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import notify
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import activities, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
+from .routers import activities, admin as admin_router, advisor, auth, garage, home, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, wahoo as wahoo_router, weather as weather_router
+from . import server_settings
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
 from .wahoo import service as wahoo_service
 from .weather import service as weather_service
+
+
+def bootstrap_roles(db) -> None:
+    """Älteren Konten eine Rolle geben: das älteste Konto wird Administrator, alle anderen Nutzer."""
+    from sqlalchemy import select
+    from .models import User
+    users = db.scalars(select(User).order_by(User.id)).all()
+    if not users:
+        return
+    for u in users:
+        if u.role not in ("admin", "user"):
+            u.role = "user"
+        if u.active is None:
+            u.active = True
+    if not any(u.role == "admin" for u in users):
+        users[0].role = "admin"
+    db.commit()
 
 
 @asynccontextmanager
@@ -23,6 +41,8 @@ async def lifespan(app: FastAPI):
     ensure_columns()
     with SessionLocal() as db:
         migrate_legacy_lube(db)
+        bootstrap_roles(db)
+        server_settings.apply_overrides(db)
     weather_service.start_background()
     notify.start_background()
     geo_service.start_background()
@@ -45,6 +65,7 @@ async def security_headers(request, call_next):
 
 
 app.include_router(auth.router)
+app.include_router(admin_router.router)
 app.include_router(home.router)
 app.include_router(garage.router)
 app.include_router(tires.router)
