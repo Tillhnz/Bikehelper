@@ -119,6 +119,7 @@ Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RA
 ## Startseite, Inventar, Anleitungen und Orte
 
 - **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche (mit „‹ Zurück“ blätterst du durch frühere Wochen, ein Tipp auf einen Tag öffnet dessen Fahrten), die wichtigsten Wartungen mit Knopf „Erledigt“, deine Räder, deine Jahresziele mit nötigem Pensum pro Woche und die letzten Fahrten. Auf der Seite einer Fahrt steht, was am Rad zu tun ist, und lässt sich direkt abhaken.
+- **Nasse Fahrt:** Nach einer Fahrt mit mindestens 5 Minuten Regen oder nasser Straße (laut Wetterdaten) erscheint auf der Startseite ein Hinweis zur Kette. Er verschwindet 4 Stunden nach dem Ende der Fahrt, mit „Verstanden“ oder sobald du die Kette gepflegt einträgst. Bei Öl heißt es abwischen und bei Bedarf neu schmieren, bei Wachs abwischen und trocknen lassen, neu wachsen nur bei Dreck, Rost oder sehr nasser Fahrt. Das Wetter für eine Fahrt kommt erst nach dem Hochladen und kann einen Moment dauern.
 - **Suche:** Der Knopf „Suche“ oder die Taste `/` durchsucht Fahrten, Räder, Teile und Lager.
 - **Einkaufsliste** (Garage): Was bald oder jetzt gewechselt werden muss, abgeglichen mit dem Lager, zum Kopieren oder Drucken.
 - **Darstellung** (Einstellungen): Automatisch, Hell oder Dunkel. **Meine Daten:** Export aller eigenen Daten als JSON.

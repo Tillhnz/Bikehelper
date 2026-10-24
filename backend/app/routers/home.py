@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..models import Activity, Bike, Goal, User
+from ..models import Activity, Bike, Component, Goal, MaintenanceLog, User
 from ..security import current_user
 from ..stats import extra as X
 from ..stats.overview import get_tz, local
@@ -16,6 +16,29 @@ from .stats import _goal_targets, _load
 router = APIRouter(prefix="/api", tags=["home"])
 
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+WET_NOTICE_HOURS = 4   # so lange steht der Hinweis nach dem Ende einer nassen Fahrt
+WET_MIN_MINUTES = 5    # ab so vielen Minuten Regen oder nasser Straße gilt eine Fahrt als nass
+
+
+def build_wet_notices(rides: list[dict], now: datetime, care: dict[int, list[datetime]]) -> list[dict]:
+    """Hinweise zur Kettenpflege nach nassen Fahrten. rides: neueste zuerst, mit start (UTC), moving_time_s, wet_minutes, bike_id.
+    care: je Rad die Zeitpunkte (UTC) bereits eingetragener Kettenpflege. Je Rad zählt nur die jüngste nasse Fahrt.
+    Reiner Rechenkern ohne Datenbank."""
+    out, seen = [], set()
+    for r in rides:
+        bike_id = r["bike_id"]
+        if not bike_id or bike_id in seen or (r["wet_minutes"] or 0) < WET_MIN_MINUTES:
+            continue
+        seen.add(bike_id)
+        ended = r["start"] + timedelta(seconds=r["moving_time_s"] or 0)
+        expires = ended + timedelta(hours=WET_NOTICE_HOURS)
+        if now >= expires or any(t >= ended for t in care.get(bike_id, [])):
+            continue
+        out.append({**{k: r[k] for k in ("activity_id", "name", "bike_id", "bike_name", "lube")},
+                    "wet_minutes": round(r["wet_minutes"]), "ended_at": ended.isoformat() + "Z", "expires_at": expires.isoformat() + "Z"})
+    return out
 
 
 def build_home_week(rows: list[tuple[datetime, float, int, float]], today, weeks: int = 8, offset: int = 0) -> dict:
@@ -67,6 +90,28 @@ def home_week(offset: int = Query(0, ge=-1040, le=0), user: User = Depends(curre
     return out
 
 
+def _wet_notices(db: Session, user: User, acts, bikes: dict, tz) -> list[dict]:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    horizon = now - timedelta(hours=WET_NOTICE_HOURS + 24)  # nur frische Fahrten kommen in Frage
+    recent = [a for a in acts if a.start_date >= horizon and a.bike_id in bikes and (a.wet_minutes or 0) >= WET_MIN_MINUTES]
+    if not recent:
+        return []
+    care: dict[int, list[datetime]] = {}
+    rows = db.execute(
+        select(Component.bike_id, MaintenanceLog.performed_at, MaintenanceLog.performed_time)
+        .join(MaintenanceLog, MaintenanceLog.component_id == Component.id)
+        .where(Component.user_id == user.id, Component.category == "chain", Component.bike_id.in_({a.bike_id for a in recent}),
+               MaintenanceLog.performed_at >= (horizon - timedelta(days=1)).date())
+    ).all()
+    for bike_id, day, at in rows:  # eingetragene Zeiten sind Ortszeit; ohne Uhrzeit zählt das Tagesende
+        local_dt = datetime.combine(day, at or time(23, 59))
+        care.setdefault(bike_id, []).append(local_dt.replace(tzinfo=tz).astimezone(timezone.utc).replace(tzinfo=None))
+    rides = [{"activity_id": a.id, "name": a.name, "bike_id": a.bike_id, "bike_name": bikes[a.bike_id].name,
+              "lube": bikes[a.bike_id].chain_lube or "oil", "start": a.start_date, "moving_time_s": a.moving_time_s,
+              "wet_minutes": a.wet_minutes} for a in sorted(recent, key=lambda x: x.start_date, reverse=True)]
+    return build_wet_notices(rides, now, care)
+
+
 @router.get("/home")
 def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
     tz = get_tz(settings.timezone)
@@ -88,6 +133,7 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
         _, year_rows = _load(db, user, None, today.year, with_tiles=False)
         goals = X.goals_progress([r for _, r in year_rows], tz, today.year, today, targets)
     bikes = db.scalars(select(Bike).where(Bike.user_id == user.id, Bike.retired.is_(False)).order_by(Bike.id)).all()
+    wet_notices = _wet_notices(db, user, acts, {b.id: b for b in bikes}, tz)
     bike_week: dict[int, float] = {}
     monday = today - timedelta(days=today.weekday())
     for (dt, km, _, _), a in zip(rows, acts):
@@ -106,6 +152,7 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
                  "days_left": (date(today.year, 12, 31) - today).days, "goals": goals},
         "maintenance": {"status": maintenance["status"], "items": maintenance["items"][:6], "total": len(maintenance["items"])},
         "bikes": bike_out,
+        "wet_notices": wet_notices,
         "recent": [{"id": a.id, "name": a.name, "date": local(a.start_date, tz).isoformat(), "km": round(a.distance_km, 1),
                     "elev_m": round(a.elevation_m or 0), "time_s": a.moving_time_s} for a in acts[:4]],
         "has_rides": bool(acts),

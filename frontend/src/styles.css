@@ -1025,3 +1025,8 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .ev-who{font-weight:500;overflow-wrap:anywhere}
 @keyframes ev-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.live-dot,.event-list li.fresh{animation:none}}
+
+.wet-notice{display:flex;gap:1rem;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-left:4px solid #4f8cff;border-radius:var(--r-panel);padding:1rem 1.2rem;margin-bottom:1.1rem}
+.wet-notice p{margin:.25rem 0}
+.wet-icon{width:28px;height:28px;color:#4f8cff;flex:none;margin-top:.1rem}
+.wet-body{min-width:0}

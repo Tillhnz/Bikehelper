@@ -64,7 +64,7 @@ CHAIN_LUBES: dict[str, dict] = {
         "lube": RuleTemplate(
             WAX_LUBE_LABEL, interval_km=500, wet_factor=2.5,
             hint="Beim Eintragen wählst du, ob heiß oder flüssig gewachst wurde: Heißwachs 300 bis 600 km, Flüssigwachs 200 bis 400 km. "
-                 "Nach jeder Nassfahrt früher nachwachsen und die Kette trocknen, damit sie nicht rostet. "
+                 "Nach einer Nassfahrt die Kette zuerst abwischen und trocknen lassen, damit sie nicht rostet. Nachwachsen lohnt, wenn sie verschmutzt, rostig oder sehr nass geworden ist (Heißwachsen presst das Wasser auch aus den Gliedern). "
                  "Bei dauerhaft nassem Wetter oder Salz ist Öl besser.",
         ),
         "wear": RuleTemplate(
@@ -156,6 +156,13 @@ CATALOG: dict[str, ComponentTemplate] = {
             hint="Zugwechsel etwa jährlich, nach 6 Monaten auf Rost und Ausfransen prüfen. Hüllen halten etwa 10.000 km, bei zähem Lauf früher.",
         ),
     )),
+    "pulleys": ComponentTemplate("pulleys", "Schaltröllchen", (
+        RuleTemplate(
+            "Schaltröllchen prüfen und wechseln", interval_km=5000, wet_factor=1.5,
+            hint="Richtwert: etwa alle 5.000 bis 7.000 km über einen Wechsel nachdenken, bei Schotter und Matsch früher. "
+                 "Tauschen bei spitzen oder runden Zähnen, seitlichem Spiel, rauem Lauf, Klicken oder ungenauem Schalten.",
+        ),
+    )),
     "bar_tape": ComponentTemplate("bar_tape", "Lenkerband", (
         RuleTemplate(
             "Lenkerband erneuern", interval_months=12,
@@ -194,18 +201,18 @@ CATALOG: dict[str, ComponentTemplate] = {
 
 BIKE_TEMPLATES: dict[str, tuple[str, ...]] = {
     "road": (
-        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
         "cables", "bar_tape", "headset", "bottom_bracket", "hubs",
     ),
     "gravel": (
-        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
         "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs",
     ),
     "mtb": (
-        "chain", "cassette", "chainring", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
         "cables", "sealant", "headset", "bottom_bracket", "hubs",
     ),
-    "other": ("chain", "cassette", "brake_pads", "cables"),
+    "other": ("chain", "cassette", "pulleys", "brake_pads", "cables"),
 }
 
 
@@ -494,6 +501,28 @@ CHECKS: dict[str, Check] = {
             "Die Schaltung ist ungenau, obwohl sie eingestellt ist.",
         ),
         act="Zug und Hülle gemeinsam erneuern, sobald sie rostig, ausgefranst oder zäh sind. Ein gerissener Bremszug ist ein Sicherheitsrisiko: lieber früher wechseln.",
+    ),
+    "pulleys": Check(
+        tools="Lappen, Taschenlampe, Entfetter oder Bürste zum Reinigen",
+        how=(
+            "Schaltwerk und beide Röllchen reinigen, damit du die Zähne siehst.",
+            "Die Zähne mit denen der Kassette vergleichen: Sie sollen ein ähnlich gleichmäßiges Profil haben.",
+            "Jedes Röllchen mit den Fingern seitlich bewegen: Es soll kaum Spiel haben.",
+            "Das Röllchen von Hand drehen: gleichmäßig, leichtgängig, ohne Rauheit oder Klemmen.",
+            "Beim Pedalieren und Schalten auf Klicken, Rattern oder Pfeifen hören.",
+        ),
+        good=(
+            "Zähne sind gleichmäßig, nicht spitz oder rund geschliffen.",
+            "Kaum seitliches Spiel, das Röllchen dreht leicht und leise.",
+            "Die Kette läuft ruhig durch den Käfig.",
+        ),
+        bad=(
+            "Spitze, runde oder verformte Zähne.",
+            "Deutliches seitliches Spiel oder Wackeln.",
+            "Rauer, schwergängiger oder klemmender Lauf.",
+            "Klicken, Rattern oder ungenaues Schalten, obwohl Zug und Kette in Ordnung sind.",
+        ),
+        act="Beide Röllchen als Paar erneuern, passend zur Gangzahl. Die Laufrichtung beachten und vor dem Einbau die Käfigschrauben mit dem Hersteller-Drehmoment anziehen. Abgenutzte Röllchen verschleißen Kette und Kassette schneller.",
     ),
     "bar_tape": Check(
         tools="Gute Beleuchtung",

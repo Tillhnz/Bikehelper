@@ -6,6 +6,7 @@ import { Kpi, Panel } from "../components/statsui.jsx";
 import { EmptyState, StatusPill } from "../components/ui.jsx";
 import { GOAL_META } from "../components/StatsExtra.jsx";
 import QuickDone from "../components/QuickDone.jsx";
+import WetNotice from "../components/WetNotice.jsx";
 import { Loading } from "../components/feedback.jsx";
 
 function greeting() {
@@ -106,6 +107,7 @@ export default function Home() {
         </EmptyState>
       ) : (
         <>
+          <WetNotice items={d.wet_notices} />
           <div className="home-grid">
             <Panel title={weekTitle(shown)} className="home-week">
               <div className="week-nav">

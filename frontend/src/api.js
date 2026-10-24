@@ -114,6 +114,7 @@ export const CATEGORIES = {
   headset: "Steuersatz",
   bottom_bracket: "Tretlager",
   hubs: "Naben",
+  pulleys: "Schaltröllchen",
   other: "Sonstiges",
 };
 

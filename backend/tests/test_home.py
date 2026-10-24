@@ -31,3 +31,19 @@ def test_past_week_view():
     assert w["totals"]["km"] == 70.0 and w["totals"]["rides"] == 2
     assert not any(d["today"] or d["future"] for d in w["days"])
     assert w["last_week_km"] == 70.0 and w["last_week_same_point_km"] == 70.0  # ganze Vorwoche, da die Woche vorbei ist
+
+
+def test_wet_notice_window_and_chain_care():
+    from datetime import timedelta
+    from app.routers.home import build_wet_notices
+    start = datetime(2026, 10, 24, 8, 0)
+    ride = {"activity_id": 1, "name": "Nass", "bike_id": 7, "bike_name": "Hobel", "lube": "wax", "start": start,
+            "moving_time_s": 3600, "wet_minutes": 40}  # endet 09:00
+    dry = {**ride, "activity_id": 2, "bike_id": 8, "wet_minutes": 2}
+    other = {**ride, "activity_id": 3, "start": start - timedelta(days=1)}  # älter, gleiches Rad: zählt nicht doppelt
+    out = build_wet_notices([ride, dry, other], datetime(2026, 10, 24, 10, 0), {})
+    assert [n["activity_id"] for n in out] == [1] and out[0]["expires_at"] == "2026-10-24T13:00:00Z" and out[0]["lube"] == "wax"
+    assert build_wet_notices([ride], datetime(2026, 10, 24, 12, 59), {}) != []          # kurz vor Ablauf
+    assert build_wet_notices([ride], datetime(2026, 10, 24, 13, 0), {}) == []           # nach 4 Stunden weg
+    assert build_wet_notices([ride], datetime(2026, 10, 24, 10, 0), {7: [datetime(2026, 10, 24, 9, 30)]}) == []  # Kette schon gepflegt
+    assert build_wet_notices([ride], datetime(2026, 10, 24, 10, 0), {7: [datetime(2026, 10, 24, 8, 30)]}) != []  # Pflege vor der Fahrt zählt nicht
