@@ -537,3 +537,34 @@ def test_login_is_throttled():
             assert c.post("/api/auth/login", json={"email": "throttle@example.com", "password": "x" * 9}).status_code == 401
         assert c.post("/api/auth/login", json={"email": "throttle@example.com", "password": "geheim1234"}).status_code == 429
     ratelimit.reset()
+
+
+def test_tire_catalog_import_search_and_tire_set_fields():
+    with TestClient(app) as c:
+        h = _user(c, "catalog@example.com")
+        csv = (
+            "brand;model;category;width_mm;tubeless;weight_g;watts;source_url\n"
+            "Testmarke;Rennreifen A;road;28;tubeless;300;9,5;https://example.org/a\n"
+            "Testmarke;Rennreifen A;road;30;tubeless;330;9,9;\n"
+            "Testmarke;Kaputt;unbekannt;;;;;\n"
+        )
+        r = c.post("/api/tire-catalog/import", headers=h, json={"csv": csv}).json()
+        assert r["added"] == 2 and r["error_count"] == 1
+        # Erneut importieren aktualisiert statt zu verdoppeln
+        assert c.post("/api/tire-catalog/import", headers=h, json={"csv": csv}).json()["updated"] == 2
+        hits = c.get("/api/tire-catalog", headers=h, params={"q": "testmarke 28"}).json()["items"]
+        assert len(hits) == 1 and hits[0]["watts"] == 9.5 and hits[0]["own"]
+        # Nur für den eigenen Nutzer sichtbar
+        other = _user(c, "catalog2@example.com")
+        assert c.get("/api/tire-catalog", headers=other, params={"q": "testmarke"}).json()["items"] == []
+        assert c.post("/api/tire-catalog/import", headers=h, json={"csv": "foo,bar\n1,2"}).status_code == 422
+
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        ts = c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={
+            "name": "Rennreifen A", "brand": "Testmarke", "width_mm": 28, "model_key": hits[0]["key"],
+            "weight_g": 300, "watts": 9.5, "source_url": "https://example.org/a",
+        }).json()
+        assert ts["watts"] == 9.5 and ts["weight_g"] == 300 and ts["model_key"] == hits[0]["key"]
+        assert c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={"name": "x", "source_url": "javascript:alert(1)"}).status_code == 422
+        assert c.delete("/api/tire-catalog/mine", headers=h).status_code == 204
+        assert c.get("/api/tire-catalog", headers=h, params={"q": "testmarke"}).json()["items"] == []

@@ -237,6 +237,12 @@ class TireSetIn(BaseModel):
     max_km: float | None = Field(default=None, gt=0)
     notes: str | None = None
     retired: bool = False
+    model_key: str | None = Field(default=None, max_length=160)
+    category: str | None = Field(default=None, max_length=12)
+    weight_g: float | None = Field(default=None, ge=50, le=3000)
+    watts: float | None = Field(default=None, ge=0.5, le=100)
+    watts_note: str | None = Field(default=None, max_length=200)
+    source_url: str | None = Field(default=None, max_length=255, pattern=r"^https?://")
 
 
 class TireSetCreate(TireSetIn):

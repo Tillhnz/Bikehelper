@@ -133,6 +133,12 @@ Fahrten deines Wahoo-ELEMNT werden über die Wahoo Cloud API abgeholt, ohne Stra
 
 Danach holt die App alle 30 Minuten neue Fahrten ab (oder sofort über „Jetzt abholen“) und ordnet sie dem gewählten Rad zu. Doppelte Fahrten, etwa aus einem früheren Strava-Export, werden erkannt. Neue Wahoo-Apps laufen im Testmodus mit höchstens 100 Abrufen pro Stunde und 250 pro Tag, und jede neue Fahrt braucht einen Abruf. Ein großer Altbestand verteilt sich deshalb über mehrere Läufe, die App macht automatisch weiter. Die Zugangsdaten liegen wie die anderen Einstellungen in der Datenbank. Mit `WAHOO_ENABLED=false` schaltest du die Funktion ab.
 
+### Reifenkatalog
+
+Beim Anlegen eines Reifensatzes suchst du den Reifen im Katalog (Marke, Modell, Breite) und die Felder werden gefüllt. Alles bleibt änderbar, und ein Reifen, der nicht im Katalog steht, lässt sich wie bisher von Hand eintragen. Zu jedem Satz kannst du Gewicht, Rollwiderstand (Watt je Reifen) und einen Quell-Link speichern. Hast du mehrere Sätze mit Watt-Werten, zeigt jede Karte den Abstand zum besten Satz.
+
+Der mitgelieferte Katalog (`backend/app/data/tires.csv`) ist bewusst klein: Er enthält nur Herstellerangaben (Breite, Gewicht, Art) mit Link zur Produktseite, aber keine Messwerte. Watt-Werte sind urheberrechtlich geschützte Messreihen einzelner Prüfstände und gehören nicht in ein öffentliches Repository. Du kannst sie unter Reifen → „Reifenkatalog erweitern“ als CSV für dein eigenes Konto einlesen (Spalten: `brand, model, category, width_mm, tubeless, weight_g, watts, watts_note, source_url`). Eigene Einträge sieht nur dein Konto. Neue Zeilen für die mitgelieferte Liste kannst du per Pull Request ergänzen.
+
 ## Statistik
 
 Die Statistik hat fünf Bereiche: **Übersicht** (Summen, Rekorde, Kacheln, Wetter), **Belastung**, **Jahresrückblick**, **Ziele** und **Vergleiche**.

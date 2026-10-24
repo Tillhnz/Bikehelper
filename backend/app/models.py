@@ -91,6 +91,13 @@ class TireSet(Base):
     max_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # erwartete Lebensdauer, optional
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     retired: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Aus dem Reifenkatalog (alles optional und frei änderbar)
+    model_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    weight_g: Mapped[float | None] = mapped_column(Float, nullable=True)  # je Reifen
+    watts: Mapped[float | None] = mapped_column(Float, nullable=True)  # Rollwiderstand je Reifen in Watt (Prüfstand)
+    watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     bike: Mapped[Bike] = relationship(back_populates="tire_sets")
     mounts: Mapped[list["TireMount"]] = relationship(back_populates="tire_set", cascade="all, delete-orphan")
@@ -306,3 +313,21 @@ class WahooSeen(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     workout_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     status: Mapped[str] = mapped_column(String(12))  # imported | duplicate | skipped
+
+
+class UserTire(Base):
+    """Eigener Eintrag im Reifenkatalog eines Nutzers (CSV-Import oder von Hand)."""
+    __tablename__ = "user_tires"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    key: Mapped[str] = mapped_column(String(160))
+    brand: Mapped[str] = mapped_column(String(120))
+    model: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(12), default="road")
+    width_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tubeless: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    weight_g: Mapped[float | None] = mapped_column(Float, nullable=True)
+    watts: Mapped[float | None] = mapped_column(Float, nullable=True)
+    watts_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)

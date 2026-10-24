@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmtDate, fmtKm, fmtNum, today } from "../api.js";
 import { Gauge } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
 
-const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
+const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", model_key: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
 
 const num = (v) => (v === "" || v == null ? null : Number(v));
 
@@ -17,7 +17,68 @@ function setPayload(f) {
     max_km: num(f.max_km),
     notes: f.notes || null,
     retired: !!f.retired,
+    model_key: f.model_key || null,
+    category: f.category || null,
+    weight_g: num(f.weight_g),
+    watts: num(f.watts),
+    watts_note: f.watts_note || null,
+    source_url: f.source_url || null,
   };
+}
+
+const TUBELESS_TEXT = { tubeless: "tubeless", clincher: "Drahtreifen", tubular: "Schlauchreifen", both: "tubeless oder Schlauch" };
+
+/** Suchfeld für den Reifenkatalog: tippen, Treffer anklicken, Felder werden gefüllt. Eigene Reifen bleiben frei eintragbar. */
+function CatalogPicker({ onPick, category }) {
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState(null);
+  const [open, setOpen] = useState(false);
+  const timer = useRef(null);
+
+  useEffect(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const params = new URLSearchParams({ q, limit: "15" });
+      if (category) params.set("category", category);
+      api.get(`/tire-catalog?${params}`).then(setRes).catch(() => setRes(null));
+    }, 200);
+    return () => clearTimeout(timer.current);
+  }, [q, category]);
+
+  const total = res ? res.bundled + res.own : 0;
+  return (
+    <div className="span-all catalog-picker">
+      <label>
+        Reifen aus dem Katalog suchen
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={total ? `z. B. Continental 28 (${total} Einträge)` : "Katalog ist noch leer, trage den Reifen unten selbst ein"}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="catalog-results"
+          autoComplete="off"
+        />
+      </label>
+      {open && res?.items?.length > 0 && (
+        <ul className="catalog-results" id="catalog-results" role="listbox">
+          {res.items.map((it) => (
+            <li key={it.key} role="option" aria-selected="false">
+              <button type="button" onClick={() => { onPick(it); setOpen(false); setQ(""); }}>
+                <strong>{it.label}</strong>
+                <span className="muted small">
+                  {[res.categories[it.category], it.tubeless && TUBELESS_TEXT[it.tubeless], it.weight_g && `${fmtNum(it.weight_g, 0)} g`, it.watts && `${fmtNum(it.watts)} W`, it.own && "eigener Eintrag"]
+                    .filter(Boolean).join(" · ")}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="hint">Nicht dabei? Einfach unten Bezeichnung und Breite selbst eintragen. Der Katalog ist nur eine Hilfe.</p>
+    </div>
+  );
 }
 
 function SetForm({ initial, adding, onSubmit, onCancel }) {
@@ -29,6 +90,16 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
       onSubmit={(e) => { e.preventDefault(); onSubmit(f); }}
     >
       <h3 className="span-all">{adding ? "Neuer Reifensatz" : "Reifensatz bearbeiten"}</h3>
+      {adding && (
+        <CatalogPicker
+          onPick={(it) => setF({
+            ...f, name: `${it.model}`, brand: it.brand, width_mm: it.width_mm ?? f.width_mm,
+            tubeless: it.tubeless ? it.tubeless !== "clincher" : f.tubeless, category: it.category ?? "",
+            weight_g: it.weight_g ?? "", watts: it.watts ?? "", watts_note: it.watts_note ?? "",
+            source_url: it.source_url ?? "", model_key: it.key,
+          })}
+        />
+      )}
       <label>
         Bezeichnung
         <input value={f.name} onChange={set("name")} placeholder="z. B. Continental GP5000 S TR" required autoFocus />
@@ -54,6 +125,19 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
       <label>
         Notiz
         <input value={f.notes ?? ""} onChange={set("notes")} />
+      </label>
+      <label>
+        Gewicht je Reifen (g)
+        <input type="number" min="50" max="3000" step="1" value={f.weight_g ?? ""} onChange={set("weight_g")} />
+      </label>
+      <label>
+        Rollwiderstand je Reifen (Watt)
+        <input type="number" min="0.5" max="100" step="0.1" value={f.watts ?? ""} onChange={set("watts")} placeholder="z. B. 9,5" />
+        <span className="hint">Prüfstandswert bei etwa 29 km/h und 42,5 kg Last, siehe Quelle. Dein Gesamtgewicht und höheres Tempo erhöhen ihn.</span>
+      </label>
+      <label>
+        Quelle des Werts (Link)
+        <input type="url" value={f.source_url ?? ""} onChange={set("source_url")} placeholder="https://" />
       </label>
       <label className="check span-all">
         <input type="checkbox" checked={!!f.tubeless} onChange={(e) => setF({ ...f, tubeless: e.target.checked })} />
@@ -110,7 +194,7 @@ function MountRow({ m, onSave, onDelete }) {
   );
 }
 
-function SetCard({ ts, run, onEdit, hasMounted }) {
+function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
   const [panel, setPanel] = useState(null); // "mount" | "past" | null
   const [day, setDay] = useState(today());
   const [past, setPast] = useState({ from_date: today(), to_date: today() });
@@ -138,6 +222,21 @@ function SetCard({ ts, run, onEdit, hasMounted }) {
           <Gauge progress={ts.progress} status={status} />
           <p className="muted small">{fmtKm(ts.km)} von {fmtKm(ts.max_km)} km erwartet</p>
         </>
+      )}
+      {(ts.weight_g || ts.watts) && (
+        <p className="tire-facts small">
+          {ts.weight_g && <span>{fmtNum(ts.weight_g, 0)} g je Reifen</span>}
+          {ts.watts && (
+            <span>
+              {fmtNum(ts.watts)} W Rollwiderstand je Reifen
+              {bestWatts != null && ts.watts > bestWatts + 0.05 && (
+                <span className="muted"> (+{fmtNum(ts.watts - bestWatts)} W gegenüber dem besten deiner Sätze, am Rad etwa +{fmtNum((ts.watts - bestWatts) * 2)} W)</span>
+              )}
+              {bestWatts != null && ts.watts <= bestWatts + 0.05 && <span className="muted"> (bester deiner Sätze)</span>}
+            </span>
+          )}
+          {ts.source_url && <a href={ts.source_url} target="_blank" rel="noopener noreferrer">Quelle</a>}
+        </p>
       )}
       {ts.notes && <p className="muted small">{ts.notes}</p>}
 
@@ -199,6 +298,58 @@ function SetCard({ ts, run, onEdit, hasMounted }) {
   );
 }
 
+function CatalogManager() {
+  const [info, setInfo] = useState(null);
+  const [csv, setCsv] = useState("");
+  const [replace, setReplace] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const load = useCallback(() => api.get("/tire-catalog?limit=1").then(setInfo).catch(() => {}), []);
+  useEffect(() => { load(); }, [load]);
+
+  async function readFile(e) {
+    const file = e.target.files?.[0];
+    if (file) setCsv(await file.text());
+  }
+
+  async function send(e) {
+    e.preventDefault();
+    setMsg("");
+    setError("");
+    try {
+      const r = await api.post("/tire-catalog/import", { csv, replace });
+      setMsg(`${r.added} neu, ${r.updated} aktualisiert${r.error_count ? `, ${r.error_count} Zeilen mit Fehlern: ${r.errors.slice(0, 3).join("; ")}` : ""}.`);
+      setCsv("");
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const template = "brand,model,category,width_mm,tubeless,weight_g,watts,watts_note,source_url\nContinental,Beispiel-Reifen,road,28,tubeless,300,9.5,Prüfstand 29 km/h,https://example.org/test\n";
+  return (
+    <details className="howto catalog-manager">
+      <summary>Reifenkatalog erweitern ({info ? `${info.bundled} mitgeliefert, ${info.own} eigene` : "…"})</summary>
+      <p className="muted small">
+        Die mitgelieferte Liste enthält Herstellerangaben mit Quelle (Gewichte laut Händlerseite, ungefähr ±5 bis 10 %). Messwerte (Watt) kannst du als CSV selbst einlesen,
+        etwa aus eigenen Notizen oder Tests, die du nutzen darfst. Spalten: brand, model, category (road, gravel, mtb, trekking, city, tt, other),
+        width_mm, tubeless (tubeless, clincher, tubular, both), weight_g, watts, watts_note, source_url. Brand und model sind Pflicht.
+      </p>
+      <form onSubmit={send} className="form-grid">
+        <label className="span-all">CSV-Datei<input type="file" accept=".csv,text/csv,text/plain" onChange={readFile} /></label>
+        <label className="span-all">oder hier einfügen<textarea rows="5" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={template} /></label>
+        <label className="check span-all"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />Bisherige eigene Einträge vorher löschen</label>
+        <div className="actions span-all">
+          <button className="btn primary" disabled={!csv.trim()}>Importieren</button>
+          <a className="btn" download="reifen-vorlage.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(template)}`}>Vorlage laden</a>
+        </div>
+      </form>
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </details>
+  );
+}
+
 /** Reifensätze eines Rades: welcher Satz montiert ist und wie viele Kilometer jeder hat. */
 export default function TireSets({ bike, onChanged }) {
   const [sets, setSets] = useState(null);
@@ -257,6 +408,8 @@ export default function TireSets({ bike, onChanged }) {
   const active = sets.filter((s) => !s.retired);
   const retired = sets.filter((s) => s.retired);
   const hasMounted = active.some((s) => s.mounted);
+  const wattValues = sets.filter((s) => s.watts).map((s) => s.watts);
+  const bestWatts = wattValues.length > 1 ? Math.min(...wattValues) : null;
 
   return (
     <section className="tire-sets-section">
@@ -285,9 +438,11 @@ export default function TireSets({ bike, onChanged }) {
         </div>
       ) : (
         <div className="component-list">
-          {active.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} />)}
+          {active.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} bestWatts={bestWatts} />)}
         </div>
       )}
+
+      <CatalogManager />
 
       {retired.length > 0 && (
         <details className="howto" style={{ marginTop: "1rem" }}>

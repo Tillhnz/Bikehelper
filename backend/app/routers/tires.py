@@ -31,6 +31,8 @@ def _out(db: Session, ts: TireSet) -> TireSetOut:
     return TireSetOut(
         id=ts.id, bike_id=ts.bike_id, name=ts.name, brand=ts.brand, width_mm=ts.width_mm, tubeless=ts.tubeless,
         start_km=ts.start_km, max_km=ts.max_km, notes=ts.notes, retired=ts.retired,
+        model_key=ts.model_key, category=ts.category, weight_g=ts.weight_g, watts=ts.watts,
+        watts_note=ts.watts_note, source_url=ts.source_url,
         km=round(km, 1), mounted=current is not None and not ts.retired,
         mounted_since=current.from_date if current else None,
         progress=round(km / ts.max_km, 3) if ts.max_km else None,

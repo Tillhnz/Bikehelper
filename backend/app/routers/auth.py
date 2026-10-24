@@ -9,7 +9,7 @@ from ..config import settings
 from ..database import get_db
 from .. import ratelimit
 from ..models import (
-    Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PlaceVisit, RuleNotice, TireSet, User, WahooSeen,
+    Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PlaceVisit, RuleNotice, TireSet, User, UserTire, WahooSeen,
 )
 from ..schemas import InviteOut, LoginIn, PasswordChangeIn, PasswordConfirmIn, RegisterIn, StravaSettingsIn, TokenOut, UserOut
 from ..security import create_token, current_user, hash_password, is_admin, require_admin, verify_password
@@ -110,7 +110,7 @@ def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depen
     for obj in [*comps, *db.scalars(select(TireSet).where(TireSet.user_id == uid)).all()]:
         db.delete(obj)  # Regeln, Wartungseinträge, Messungen, Montagen laufen über die Kaskade mit
     db.flush()
-    for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, Bike):
+    for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, UserTire, Bike):
         db.execute(delete(model).where(model.user_id == uid))
     db.delete(user)
     db.commit()
