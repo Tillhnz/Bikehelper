@@ -1,3 +1,8 @@
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
@@ -16,6 +21,43 @@ class ImportIn(BaseModel):
     replace: bool = False  # bisherige eigene Einträge vorher löschen
 
 
+class ImportUrlIn(BaseModel):
+    url: str = Field(max_length=500)
+    replace: bool = False
+
+
+def _fetch_csv(url: str) -> str:
+    """Lädt eine CSV von einer öffentlichen https-Adresse (keine lokalen oder privaten Ziele, höchstens 2 MB)."""
+    u = urlparse(url.strip())
+    if u.scheme != "https" or not u.hostname:
+        raise ValueError("Bitte eine https-Adresse angeben.")
+    if u.hostname == "github.com" and "/blob/" in u.path:  # normale GitHub-Seite -> Rohdatei
+        owner_repo, _, rest = u.path.partition("/blob/")
+        url = f"https://raw.githubusercontent.com{owner_repo}/{rest}"
+        u = urlparse(url)
+    try:
+        infos = socket.getaddrinfo(u.hostname, u.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError("Die Adresse ist nicht erreichbar.")
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise ValueError("Diese Adresse zeigt auf ein privates Netz und ist nicht erlaubt.")
+    chunks, size = [], 0
+    try:
+        with httpx.Client(timeout=20, follow_redirects=False) as c, c.stream("GET", url) as r:
+            if r.status_code != 200:
+                raise ValueError(f"Die Adresse antwortete mit Fehler {r.status_code} (Weiterleitungen werden nicht verfolgt).")
+            for chunk in r.iter_bytes():
+                size += len(chunk)
+                if size > cat.MAX_IMPORT_BYTES:
+                    raise ValueError("Die Datei ist zu groß (höchstens 2 MB).")
+                chunks.append(chunk)
+    except httpx.HTTPError:
+        raise ValueError("Die Adresse konnte nicht geladen werden.")
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
 def _mine(db: Session, user: User) -> list[cat.TireEntry]:
     rows = db.scalars(select(UserTire).where(UserTire.user_id == user.id)).all()
     return [
@@ -30,7 +72,7 @@ def _mine(db: Session, user: User) -> list[cat.TireEntry]:
 @router.get("")
 def search_catalog(
     q: str = Query(default="", max_length=80), category: str | None = Query(default=None, max_length=12),
-    limit: int = Query(default=20, ge=1, le=50), user: User = Depends(current_user), db: Session = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=300), user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     """Sucht im mitgelieferten Katalog und in den eigenen Einträgen (eigene zuerst bei gleichem Treffer)."""
     entries = _mine(db, user) + list(cat.bundled())
@@ -69,6 +111,16 @@ def import_csv(data: ImportIn, user: User = Depends(current_user), db: Session =
             added += 1
     db.commit()
     return {"added": added, "updated": updated, "errors": errors[:20], "error_count": len(errors)}
+
+
+@router.post("/import-url")
+def import_url(data: ImportUrlIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Liest eine Katalog-CSV (gleiches Format wie der Dateiimport) von einer frei gewählten https-Adresse."""
+    try:
+        text = _fetch_csv(data.url)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return import_csv(ImportIn(csv=text, replace=data.replace), user, db)
 
 
 @router.get("/mine")

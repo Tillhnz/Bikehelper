@@ -581,3 +581,13 @@ def test_advisor_uses_casing_from_the_mounted_tire_set():
         defs = c.get("/api/advisor/defaults", headers=h).json()
         assert defs["bikes"][0]["tire_set"]["casing"] == "supple"
         assert c.post(f"/api/bikes/{bike['id']}/tire-sets", headers=h, json={"name": "x", "casing": "kaputt"}).status_code == 422
+
+
+def test_tire_catalog_url_import_refuses_private_and_insecure_targets():
+    with TestClient(app) as c:
+        h = _user(c, "urlimport@example.com")
+        for url in ("http://example.org/a.csv", "https://localhost/a.csv", "https://127.0.0.1/a.csv", "https://192.168.1.10/a.csv"):
+            r = c.post("/api/tire-catalog/import-url", headers=h, json={"url": url})
+            assert r.status_code == 422, url
+        # Ohne Suchbegriff liefert der Katalog alle Größen (die Liste wird in der App nach Modell gruppiert)
+        assert len(c.get("/api/tire-catalog", headers=h, params={"limit": 300}).json()["items"]) >= 40

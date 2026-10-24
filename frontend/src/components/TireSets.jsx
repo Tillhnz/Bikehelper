@@ -56,7 +56,7 @@ function CatalogPicker({ onPick, category }) {
   useEffect(() => {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      const params = new URLSearchParams({ q, limit: "15" });
+      const params = new URLSearchParams({ q, limit: "300" });
       if (category) params.set("category", category);
       api.get(`/tire-catalog?${params}`).then(setRes).catch(() => setRes(null));
     }, 200);
@@ -64,6 +64,13 @@ function CatalogPicker({ onPick, category }) {
   }, [q, category]);
 
   const total = res ? res.bundled + res.own : 0;
+  const groups = [];
+  for (const it of res?.items ?? []) {
+    const id = `${it.brand}|${it.model}|${it.category}|${it.own}`;
+    let g = groups.find((x) => x.id === id);
+    if (!g) groups.push((g = { id, brand: it.brand, model: it.model, category: it.category, tubeless: it.tubeless, own: it.own, items: [] }));
+    g.items.push(it);
+  }
   return (
     <div className="span-all catalog-picker" ref={box}>
       <label>
@@ -72,27 +79,39 @@ function CatalogPicker({ onPick, category }) {
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder={total ? `z. B. Continental 28 (${total} Einträge)` : "Katalog ist noch leer, trage den Reifen unten selbst ein"}
+          placeholder={total ? `z. B. Continental 28 (${total} Größen im Katalog)` : "Katalog ist noch leer, trage den Reifen unten selbst ein"}
           role="combobox"
           aria-expanded={open}
           aria-controls="catalog-results"
           autoComplete="off"
         />
       </label>
-      {open && res?.items?.length > 0 && (
+      {open && groups.length > 0 && (
         <ul className="catalog-results" id="catalog-results" role="listbox">
-          {res.items.map((it) => (
-            <li key={it.key} role="option" aria-selected="false">
-              <button type="button" onClick={() => { onPick(it); setOpen(false); setQ(""); }}>
-                <strong>{it.label}</strong>
+          {groups.map((g) => (
+            <li key={g.id} role="presentation" className="catalog-group">
+              <div className="catalog-model">
+                <strong>{g.brand} {g.model}</strong>
                 <span className="muted small">
-                  {[res.categories[it.category], it.tubeless && TUBELESS_TEXT[it.tubeless], it.weight_g && `${fmtNum(it.weight_g, 0)} g`, it.watts && `${fmtNum(it.watts)} W`, it.own && "eigener Eintrag"]
-                    .filter(Boolean).join(" · ")}
+                  {[res.categories[g.category], g.tubeless && TUBELESS_TEXT[g.tubeless], g.own && "eigener Eintrag"].filter(Boolean).join(" · ")}
                 </span>
-              </button>
+              </div>
+              <div className="catalog-sizes">
+                {g.items.map((it) => (
+                  <button key={it.key} type="button" role="option" aria-selected="false" onClick={() => { onPick(it); setOpen(false); setQ(""); }}>
+                    {it.width_mm ? `${fmtNum(it.width_mm, 0)} mm` : "Größe offen"}
+                    {(it.weight_g || it.watts) && (
+                      <span className="muted small">{[it.weight_g && `${fmtNum(it.weight_g, 0)} g`, it.watts && `${fmtNum(it.watts)} W`].filter(Boolean).join(" · ")}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
+      )}
+      {open && q.trim() && res && groups.length === 0 && (
+        <p className="hint">Keine Treffer. Trage den Reifen unten selbst ein oder suche ihn <a href={`https://duckduckgo.com/?q=${encodeURIComponent(`${q} Reifen Rollwiderstand`)}`} target="_blank" rel="noopener noreferrer">im Netz</a>.</p>
       )}
       <p className="hint">Nicht dabei? Einfach unten Bezeichnung und Breite selbst eintragen. Der Katalog ist nur eine Hilfe.</p>
     </div>
@@ -250,7 +269,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           <p className="muted small">{fmtKm(ts.km)} von {fmtKm(ts.max_km)} km erwartet</p>
         </>
       )}
-      {(ts.weight_g || ts.watts || ts.casing) && (
+      {(ts.weight_g || ts.watts || ts.casing || ts.brand) && (
         <p className="tire-facts small">
           {ts.casing && <span>Karkasse: {CASING_TEXT[ts.casing]}</span>}
           {ts.weight_g && <span>{fmtNum(ts.weight_g, 0)} g je Reifen</span>}
@@ -264,6 +283,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
             </span>
           )}
           {ts.source_url && <a href={ts.source_url} target="_blank" rel="noopener noreferrer">Quelle</a>}
+          {!ts.watts && <a href={`https://duckduckgo.com/?q=${encodeURIComponent(`${ts.brand ?? ""} ${ts.name} Rollwiderstand Watt`)}`} target="_blank" rel="noopener noreferrer">Rollwiderstand nachschlagen</a>}
         </p>
       )}
       {ts.notes && <p className="muted small">{ts.notes}</p>}
@@ -329,6 +349,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
 function CatalogManager() {
   const [info, setInfo] = useState(null);
   const [csv, setCsv] = useState("");
+  const [url, setUrl] = useState("");
   const [replace, setReplace] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -345,9 +366,12 @@ function CatalogManager() {
     setMsg("");
     setError("");
     try {
-      const r = await api.post("/tire-catalog/import", { csv, replace });
+      const r = csv.trim()
+        ? await api.post("/tire-catalog/import", { csv, replace })
+        : await api.post("/tire-catalog/import-url", { url: url.trim(), replace });
       setMsg(`${r.added} neu, ${r.updated} aktualisiert${r.error_count ? `, ${r.error_count} Zeilen mit Fehlern: ${r.errors.slice(0, 3).join("; ")}` : ""}.`);
       setCsv("");
+      setUrl("");
       load();
     } catch (err) {
       setError(err.message);
@@ -367,8 +391,12 @@ function CatalogManager() {
         <label className="span-all">CSV-Datei<input type="file" accept=".csv,text/csv,text/plain" onChange={readFile} /></label>
         <label className="span-all">oder hier einfügen<textarea rows="5" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={template} /></label>
         <label className="check span-all"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />Bisherige eigene Einträge vorher löschen</label>
+        <label className="span-all">
+          oder von einer Adresse laden (https, gleiche Spalten)
+          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/…/reifen.csv" />
+        </label>
         <div className="actions span-all">
-          <button className="btn primary" disabled={!csv.trim()}>Importieren</button>
+          <button className="btn primary" disabled={!csv.trim() && !url.trim()}>Importieren</button>
           <a className="btn" download="reifen-vorlage.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(template)}`}>Vorlage laden</a>
         </div>
       </form>
