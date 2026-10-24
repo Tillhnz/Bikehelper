@@ -894,3 +894,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
   background: var(--ink-2); border: 1px solid var(--line); border-radius: 999px;
 }
 .catalog-results .catalog-sizes button:hover, .catalog-results .catalog-sizes button:focus-visible { border-color: var(--celeste); }
+
+.week-nav{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.75rem}
+.week-nav .btn.small{padding:.3rem .7rem;font-size:.85rem}
+.week-nav .btn:disabled{opacity:.4;cursor:default}

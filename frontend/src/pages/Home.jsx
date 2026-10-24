@@ -29,27 +29,56 @@ function WeekBars({ days }) {
   );
 }
 
-function compare(now, before) {
+function compare(now, before, current = true) {
   const diff = now - before;
   if (!before && !now) return null;
   return (
     <span className={`delta ${diff >= 0 ? "up" : "down"}`}>
-      {diff >= 0 ? "▲" : "▼"} {fmtKm(Math.abs(diff))} km zur gleichen Zeit der Vorwoche
+      {diff >= 0 ? "▲" : "▼"} {fmtKm(Math.abs(diff))} km {current ? "zur gleichen Zeit der Vorwoche" : "zur Woche davor"}
     </span>
   );
+}
+
+const MONTHS = ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."];
+
+/** Titel der Woche: "Diese Woche", "Letzte Woche" oder Kalenderwoche mit Datum. */
+function weekTitle(w) {
+  if (w.offset === 0) return "Diese Woche";
+  if (w.offset === -1) return "Letzte Woche";
+  const mon = new Date(`${w.monday}T00:00:00`);
+  const sun = new Date(mon.getTime() + 6 * 864e5);
+  const th = new Date(mon.getTime() + 3 * 864e5); // Donnerstag bestimmt die ISO-Woche
+  const kw = Math.ceil(((th - new Date(th.getFullYear(), 0, 1)) / 864e5 + 1) / 7);
+  const range = mon.getMonth() === sun.getMonth()
+    ? `${mon.getDate()}.–${sun.getDate()}. ${MONTHS[sun.getMonth()]}`
+    : `${mon.getDate()}. ${MONTHS[mon.getMonth()]} – ${sun.getDate()}. ${MONTHS[sun.getMonth()]}`;
+  return `KW ${kw}, ${range}${mon.getFullYear() !== new Date().getFullYear() ? ` ${mon.getFullYear()}` : ""}`;
 }
 
 export default function Home() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [past, setPast] = useState(null); // Daten einer früheren Woche
+  const [weekError, setWeekError] = useState("");
 
   useEffect(() => { api.get("/home").then(setD).catch((e) => setError(e.message)); }, []);
+
+  useEffect(() => {
+    if (offset === 0) { setPast(null); return undefined; }
+    let live = true;
+    setWeekError("");
+    api.get(`/home/week?offset=${offset}`).then((r) => { if (live) setPast(r); }).catch((e) => { if (live) setWeekError(e.message); });
+    return () => { live = false; };
+  }, [offset]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
   if (!d) return <p className="muted">Lade …</p>;
 
   const { week, year, maintenance: m, bikes, recent } = d;
-  const t = week.totals;
+  const shown = offset === 0 || !past ? week : past;
+  const t = shown.totals;
+  const isCurrent = offset === 0;
 
   return (
     <>
@@ -68,17 +97,23 @@ export default function Home() {
       ) : (
         <>
           <div className="home-grid">
-            <Panel title="Diese Woche" className="home-week">
+            <Panel title={weekTitle(shown)} className="home-week">
+              <div className="week-nav">
+                <button className="btn small" onClick={() => setOffset(offset - 1)} disabled={!shown.has_earlier || (offset !== 0 && !past)} aria-label="Eine Woche zurück">‹ Zurück</button>
+                {!isCurrent && <button className="link small" onClick={() => setOffset(0)}>Zu dieser Woche</button>}
+                <button className="btn small" onClick={() => setOffset(offset + 1)} disabled={isCurrent} aria-label="Eine Woche vor">Weiter ›</button>
+              </div>
+              {weekError && <p className="error" role="alert">{weekError}</p>}
               <div className="week-head">
                 <div className="week-total"><strong>{fmtKm(t.km)}</strong> <span className="muted">km</span></div>
-                {compare(t.km, week.last_week_same_point_km)}
+                {compare(t.km, shown.last_week_same_point_km, isCurrent)}
               </div>
-              <WeekBars days={week.days} />
+              <WeekBars key={shown.monday ?? "now"} days={shown.days} />
               <div className="week-facts">
                 <span>{t.rides} {t.rides === 1 ? "Fahrt" : "Fahrten"}</span>
                 <span>{fmtDuration(t.time_s)}</span>
                 <span>{fmtKm(t.elev_m)} m hoch</span>
-                <span>Vorwoche gesamt {fmtKm(week.last_week_km)} km</span>
+                <span>{isCurrent ? "Vorwoche" : "Woche davor"} gesamt {fmtKm(shown.last_week_km)} km</span>
               </div>
             </Panel>
 

@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -18,9 +18,10 @@ router = APIRouter(prefix="/api", tags=["home"])
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
 
-def build_home_week(rows: list[tuple[datetime, float, int, float]], today, weeks: int = 8) -> dict:
+def build_home_week(rows: list[tuple[datetime, float, int, float]], today, weeks: int = 8, offset: int = 0) -> dict:
     """Wochenübersicht aus (lokaler Start, km, Fahrzeit, Höhenmeter). Reiner Rechenkern ohne Datenbank."""
-    monday = today - timedelta(days=today.weekday())
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)  # offset: 0 = diese, -1 = Vorwoche
+    ref = min(today, monday + timedelta(days=6))  # "gleiche Zeit der Vorwoche" bis zu diesem Tag
     first = monday - timedelta(weeks=weeks - 1)
     days = {monday + timedelta(days=i): {"km": 0.0, "rides": 0} for i in range(7)}
     totals = {"km": 0.0, "time_s": 0, "elev_m": 0.0, "rides": 0}
@@ -36,7 +37,7 @@ def build_home_week(rows: list[tuple[datetime, float, int, float]], today, weeks
             days[d]["km"] += km
             days[d]["rides"] += 1
             totals["km"] += km; totals["time_s"] += t; totals["elev_m"] += elev; totals["rides"] += 1
-        elif w == last_monday and d <= today - timedelta(weeks=1):
+        elif w == last_monday and d <= ref - timedelta(weeks=1):
             same_point_last_week += km
     return {
         "days": [{"date": d.isoformat(), "label": WEEKDAYS[i], "km": round(v["km"], 1), "rides": v["rides"],
@@ -45,7 +46,25 @@ def build_home_week(rows: list[tuple[datetime, float, int, float]], today, weeks
         "last_week_same_point_km": round(same_point_last_week, 1),
         "last_week_km": round(per_week[last_monday], 1),
         "weeks": [{"week": w.isoformat(), "km": round(v, 1)} for w, v in per_week.items()],
+        "monday": monday.isoformat(),
+        "offset": offset,
     }
+
+
+@router.get("/home/week")
+def home_week(offset: int = Query(0, ge=-1040, le=0), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Wochenansicht der Startseite für eine frühere Woche (offset 0 = diese, -1 = Vorwoche, …)."""
+    tz = get_tz(settings.timezone)
+    today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
+    lo = datetime.combine(monday - timedelta(weeks=1, days=1), datetime.min.time())
+    hi = datetime.combine(monday + timedelta(days=8), datetime.min.time())
+    acts = db.scalars(select(Activity).where(Activity.user_id == user.id, Activity.start_date >= lo, Activity.start_date < hi)).all()
+    rows = [(local(a.start_date, tz), a.distance_km, a.moving_time_s, a.elevation_m or 0.0) for a in acts]
+    out = build_home_week(rows, today, weeks=2, offset=offset)
+    earliest = db.scalar(select(func.min(Activity.start_date)).where(Activity.user_id == user.id))
+    out["has_earlier"] = bool(earliest and local(earliest, tz).date() < monday)
+    return out
 
 
 @router.get("/home")
@@ -58,6 +77,8 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
                       .order_by(Activity.start_date.desc())).all()
     rows = [(local(a.start_date, tz), a.distance_km, a.moving_time_s, a.elevation_m or 0.0) for a in acts]
     week = build_home_week(rows, today)
+    earliest = db.scalar(select(func.min(Activity.start_date)).where(Activity.user_id == user.id))
+    week["has_earlier"] = bool(earliest and local(earliest, tz).date() < today - timedelta(days=today.weekday()))
     year_km = sum(r[1] for r in rows if r[0].year == today.year)
 
     goal = db.scalar(select(Goal).where(Goal.user_id == user.id, Goal.year == today.year, Goal.metric == "km"))
