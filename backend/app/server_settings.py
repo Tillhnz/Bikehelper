@@ -19,6 +19,7 @@ FIELDS: dict[str, tuple[str, str, bool]] = {
     "allow_registration": ("bool", "access", False),
     "token_expire_days": ("int:1:90", "access", False),
     "trusted_proxies": ("int:0:5", "access", False),
+    "frame_ancestors": ("origins", "access", False),
     "public_url": ("url", "general", False),
     "timezone": ("tz", "general", False),
     "smtp_host": ("host", "email", False),
@@ -41,6 +42,28 @@ HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.\-]{0,251}[A-Za-z0-9])?$")
 
 class SettingError(ValueError):
     pass
+
+
+ORIGIN_RE = re.compile(r"^(https?)://(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$")
+
+
+def normalize_origins(text: str) -> str:
+    """Adressen, die BikeHelper einbetten dürfen (z. B. Home Assistant). Nur Schema, Name und Port, ohne Pfad."""
+    out = []
+    for item in re.split(r"[\s,;]+", text or ""):
+        item = item.strip().lower().rstrip("/")
+        if not item:
+            continue
+        m = re.match(r"^(https?://[^/]+)(/.*)?$", item)
+        if m:
+            item = m.group(1)  # Pfad weglassen, der Browser prüft nur die Herkunft
+        if not ORIGIN_RE.match(item):
+            raise SettingError(f"„{item}“ ist keine Adresse wie https://ha.example.de oder http://192.168.1.20:8123")
+        if item not in out:
+            out.append(item)
+    if len(out) > 10:
+        raise SettingError("Höchstens 10 Adressen")
+    return " ".join(out)
 
 
 def coerce(key: str, raw):
@@ -79,6 +102,8 @@ def coerce(key: str, raw):
         if not re.match(r"^https?://[^\s]+$", text) or len(text) > 500:
             raise SettingError("Eine Adresse mit http:// oder https:// erwartet")
         return text.rstrip("/") if base == "url" else text
+    if base == "origins":
+        return normalize_origins(text)
     if base == "tz":
         try:
             ZoneInfo(text)

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,13 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
 
 # Für Anmeldungen mit unbekannter E-Mail wird trotzdem ein Hash geprüft, damit die Antwortzeit nichts verrät
 _DUMMY_HASH = hash_password("dummy-password-for-timing")
+
+
+@router.get("/frame-policy", include_in_schema=False)
+def frame_policy():
+    """Fragt der Webserver bei jedem Seitenaufruf ab: Wer darf BikeHelper einbetten? Leer = niemand."""
+    value = settings.frame_ancestors.strip()
+    return Response(status_code=204, headers={"X-BH-Frame-Ancestors": "'self' " + value} if value else {})
 
 
 @router.get("/config")

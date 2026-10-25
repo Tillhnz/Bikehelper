@@ -301,3 +301,7 @@ Zusätzlich lohnt sich ein regelmäßiges Proxmox-Backup der VM bzw. des LXC.
 backend/    FastAPI, SQLAlchemy, Auth (JWT), Garage-API, Tests
 frontend/   React + Vite, nginx als Auslieferung und /api-Proxy
 ```
+
+## In Home Assistant einbetten
+
+Aus Sicherheitsgründen verbietet BikeHelper, in fremde Seiten eingebettet zu werden (sonst könnte eine fremde Seite ihn unsichtbar einbetten und Klicks unterschieben). Unter **Administration → Zugang → In andere Seiten einbetten** trägst du die Adressen ein, unter denen du Home Assistant öffnest (z. B. `https://ha.example.de http://192.168.1.20:8123`). Die Änderung wirkt sofort: Der Webserver fragt bei jedem Seitenaufruf beim Backend nach. In Home Assistant legst du eine Webseiten-Karte oder einen Webseiten-Eintrag im Dashboard mit der Adresse von BikeHelper an; im eingebetteten Fenster meldest du dich beim ersten Mal einmal an.

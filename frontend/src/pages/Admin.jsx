@@ -267,6 +267,10 @@ const ACCESS = [
   { key: "token_expire_days", type: "number", label: "Anmeldung gilt (Tage)", min: 1, max: 90 },
   { key: "trusted_proxies", type: "number", label: "Proxys vor dem Webserver", min: 0, max: 5, hint: "1 für den Nginx Proxy Manager, 0 ohne Proxy. Wichtig für die Login-Drosselung." },
 ];
+const EMBED = [
+  { key: "frame_ancestors", type: "text", wide: true, label: "Diese Seiten dürfen BikeHelper einbetten", placeholder: "https://ha.example.de http://192.168.1.20:8123",
+    hint: "Zum Beispiel Home Assistant (Webseiten-Karte oder Seitenleiste). Trage jede Adresse ein, unter der du die Seite öffnest, mit Leerzeichen getrennt. Leer: Einbetten ist verboten (Schutz vor Klick-Tricks fremder Seiten)." },
+];
 const GENERAL = [
   { key: "public_url", type: "text", label: "Öffentliche Adresse", wide: true, placeholder: "https://bike.example.de", hint: "Wird für Links in Mails und für die Wahoo-Anmeldung genutzt." },
   { key: "timezone", type: "text", label: "Zeitzone", placeholder: "Europe/Berlin", hint: "Für Statistiken, Wochentage und Erinnerungszeiten." },
@@ -513,6 +517,7 @@ export default function Admin({ user }) {
       {tab === "server" && (!defs ? <Loading /> : (
         <>
           {block({ title: "Zugang", intro: "Wer sich anmelden darf und wie lange Anmeldungen gelten.", spec: ACCESS })}
+          {block({ title: "In andere Seiten einbetten", intro: <>So zeigst du BikeHelper zum Beispiel in Home Assistant an: Dort eine <strong>Webseiten-Karte</strong> oder unter Einstellungen → Dashboards einen <strong>Webseiten-Eintrag</strong> mit der Adresse <code>{window.location.origin}</code> anlegen und die Adresse von Home Assistant hier eintragen. Die Änderung wirkt sofort. Im eingebetteten Fenster meldest du dich beim ersten Mal einmal an.</>, spec: EMBED })}
           {block({ title: "Adresse und Zeit", spec: GENERAL })}
           {block({
             title: "E-Mail-Versand",

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     allow_registration: bool = False  # nur der erste Nutzer und Eingeladene dürfen sich registrieren
     trusted_proxies: int = 1  # Proxys vor dem Webserver (Nginx Proxy Manager = 1), für die Login-Drosselung
     token_expire_days: int = 7
+    frame_ancestors: str = ""  # Adressen, die BikeHelper einbetten dürfen (z. B. Home Assistant), mit Leerzeichen getrennt
     updater_url: str = ""  # leer = kein Update-Dienst
     weather_enabled: bool = True
     timezone: str = "Europe/Berlin"
