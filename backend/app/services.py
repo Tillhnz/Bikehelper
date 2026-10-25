@@ -318,6 +318,31 @@ def tire_set_km(db: Session, ts: TireSet) -> float:
     return ts.start_km + sum(mount_km(db, ts.bike_id, m) for m in ts.mounts)
 
 
+DEFAULT_TIRE_CHECK_KM = 1000
+
+
+def tire_state(db: Session, ts: TireSet) -> dict:
+    """Lebensdauer (max_km) und Sichtprüfung eines Reifensatzes. Gleiche Schwellen wie bei den Regeln: ab 80 % bald, ab 100 % fällig."""
+    km = tire_set_km(db, ts)
+    life = km / ts.max_km if ts.max_km else None
+    interval = ts.check_km or DEFAULT_TIRE_CHECK_KM
+    base = ts.checked_km if ts.checked_km is not None else ts.start_km
+    since = max(0.0, km - base)
+    cp = since / interval
+
+    def level(p):
+        return "ok" if p is None or p < 0.8 else "due" if p >= 1 else "soon"
+
+    life_status, check_status = level(life), level(cp)
+    return {
+        "km": km, "progress": round(life, 3) if life is not None else None,
+        "km_left": round(max(0.0, ts.max_km - km), 1) if ts.max_km else None, "life_status": life_status,
+        "check_interval_km": interval, "checked_on": ts.checked_on, "km_since_check": round(since, 1),
+        "check_progress": round(cp, 3), "check_status": check_status,
+        "status": worst_status([life_status, check_status]),
+    }
+
+
 def open_mount(ts: TireSet) -> TireMount | None:
     return next((m for m in ts.mounts if m.to_date is None), None)
 

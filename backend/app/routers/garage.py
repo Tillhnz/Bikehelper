@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..catalog import INSPECTIONS, WAX_LUBE_LABEL, WAX_VARIANTS, catalog_payload, guides_for
 from ..database import get_db
 from ..access import can_use
-from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, User
+from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, TireSet, User
 from ..schemas import (
     BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
     MeasurementIn, MeasurementOut, MountedTireSet, RuleOut, StandardComponentsIn, WaxVariantOut,
@@ -13,8 +13,8 @@ from ..schemas import (
 from ..security import current_user
 from ..services import (
     apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
-    effective_installed, is_tracked, measurement_points,
-    rule_state, tire_set_km, worst_status,
+    effective_installed, is_tracked, measurement_points, open_mount,
+    rule_state, tire_set_km, tire_state, worst_status,
 )
 
 router = APIRouter(prefix="/api", tags=["garage"])
@@ -360,5 +360,18 @@ def maintenance_overview(user: User = Depends(current_user), db: Session = Depen
                     "shop_url": c.shop_url, "rule_id": r.id, "is_inspection": r.label in INSPECTIONS,
                     "rule": r.label, "wet_factor": r.wet_factor or 1.0, **{k: v for k, v in st.items() if k != "interval_km_eff"},
                 })
+    # Montierte Reifensätze: Lebensdauer und Sichtprüfung
+    for ts in db.scalars(select(TireSet).where(TireSet.user_id == user.id, TireSet.retired.is_(False))).all():
+        if open_mount(ts) is None or ts.bike.retired:
+            continue
+        st = tire_state(db, ts)
+        base = {"component_id": f"tire-{ts.id}", "tire_set_id": ts.id, "component": ts.name, "category": "tires",
+                "bike_id": ts.bike_id, "bike": ts.bike.name, "shop_url": ts.shop_url, "rule_id": None, "wet_factor": 1.0}
+        if st["life_status"] != "ok":
+            items.append({**base, "rule": "Reifen wechseln", "is_inspection": False, "status": st["life_status"],
+                          "progress": st["progress"], "km": round(st["km"], 1)})
+        if st["check_status"] != "ok":
+            items.append({**base, "rule": "Reifen prüfen", "is_inspection": True, "status": st["check_status"],
+                          "progress": st["check_progress"], "km": round(st["km_since_check"], 1)})
     items.sort(key=lambda i: i["progress"], reverse=True)
     return {"items": items, "status": worst_status([i["status"] for i in items])}

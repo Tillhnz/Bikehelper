@@ -103,6 +103,9 @@ class TireSet(Base):
     source_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     casing: Mapped[str | None] = mapped_column(String(10), nullable=True)
     shop_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # eigener Einkaufslink für Ersatz
+    check_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # Sichtprüfung alle ... km (leer: Standard)
+    checked_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # Kilometerstand des Satzes bei der letzten Prüfung
+    checked_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     bike: Mapped[Bike] = relationship(back_populates="tire_sets")
     mounts: Mapped[list["TireMount"]] = relationship(back_populates="tire_set", cascade="all, delete-orphan")

@@ -11,7 +11,7 @@ from ..models import TireMount, TireSet, User
 from ..schemas import MountDateIn, MountOut, MountRangeIn, TireSetCreate, TireSetIn, TireSetOut
 from ..security import current_user
 from ..services import (
-    find_overlap, mount_km, mount_tire_set, open_mount, sync_bike_tires, tire_set_km, unmount_tire_set,
+    find_overlap, mount_km, mount_tire_set, open_mount, sync_bike_tires, tire_set_km, tire_state, unmount_tire_set,
 )
 from .garage import _shared_bike
 
@@ -26,17 +26,18 @@ def _own_set(db: Session, user: User, set_id: int) -> TireSet:
 
 
 def _out(db: Session, ts: TireSet) -> TireSetOut:
-    km = tire_set_km(db, ts)
+    st = tire_state(db, ts)
+    km = st.pop("km")
     current = open_mount(ts)
     mounts = sorted(ts.mounts, key=lambda m: m.from_date, reverse=True)
     return TireSetOut(
-        id=ts.id, bike_id=ts.bike_id, name=ts.name, brand=ts.brand, width_mm=ts.width_mm, tubeless=ts.tubeless,
+        id=ts.id, bike_id=ts.bike_id, check_km=ts.check_km, name=ts.name, brand=ts.brand, width_mm=ts.width_mm, tubeless=ts.tubeless,
         start_km=ts.start_km, max_km=ts.max_km, notes=ts.notes, retired=ts.retired,
         model_key=ts.model_key, category=ts.category, weight_g=ts.weight_g, watts=ts.watts,
         watts_note=ts.watts_note, source_url=ts.source_url, casing=ts.casing, shop_url=ts.shop_url,
         km=round(km, 1), mounted=current is not None and not ts.retired,
         mounted_since=current.from_date if current else None,
-        progress=round(km / ts.max_km, 3) if ts.max_km else None,
+        **st,
         mounts=[
             MountOut(id=m.id, from_date=m.from_date, to_date=m.to_date, km=round(mount_km(db, ts.bike_id, m), 1))
             for m in mounts
@@ -72,6 +73,16 @@ def update_tire_set(set_id: int, data: TireSetIn, user: User = Depends(current_u
         unmount_tire_set(db, ts, date.today())
     elif open_mount(ts):
         sync_bike_tires(ts.bike, ts)  # geänderte Breite gilt sofort für das Rad
+    db.commit()
+    return _out(db, ts)
+
+
+@router.post("/tire-sets/{set_id}/checked", response_model=TireSetOut)
+def tire_checked(set_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Sichtprüfung erledigt: Der Zähler bis zur nächsten Prüfung beginnt neu."""
+    ts = _own_set(db, user, set_id)
+    ts.checked_km = tire_set_km(db, ts)
+    ts.checked_on = date.today()
     db.commit()
     return _out(db, ts)
 

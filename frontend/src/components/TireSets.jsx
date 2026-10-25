@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmtDate, fmtKm, fmtNum, safeUrl, today } from "../api.js";
-import { Gauge } from "./ui.jsx";
+import { Gauge, StatusPill } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
 import { confirmDialog } from "./feedback.jsx";
 import CheckGuide from "./CheckGuide.jsx";
 
-const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", shop_url: "", model_key: "", casing: "", start_km: 0, max_km: "", notes: "", mountNow: true, mount_from: today() };
+const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", shop_url: "", model_key: "", casing: "", start_km: 0, max_km: "", check_km: "", notes: "", mountNow: true, mount_from: today() };
 
 const num = (v) => (v === "" || v == null ? null : Number(v));
 
@@ -17,6 +17,7 @@ function setPayload(f) {
     tubeless: f.tubeless,
     start_km: Number(f.start_km) || 0,
     max_km: num(f.max_km),
+    check_km: num(f.check_km),
     notes: f.notes || null,
     retired: !!f.retired,
     model_key: f.model_key || null,
@@ -160,7 +161,12 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
       <label>
         Erwartete Lebensdauer (km, optional)
         <input type="number" min="1" step="100" value={f.max_km ?? ""} onChange={set("max_km")} placeholder="z. B. 5000" />
-        <span className="hint">Damit zeigt eine Anzeige, wie viel verbraucht ist.</span>
+        <span className="hint">Damit siehst du, wie viele Kilometer noch übrig sind.</span>
+      </label>
+      <label>
+        Sichtprüfung alle … km
+        <input type="number" min="1" step="100" value={f.check_km ?? ""} onChange={set("check_km")} placeholder="1000" />
+        <span className="hint">Leer lassen für 1.000 km. Prüfe Profil, Flanken, Schnitte und Fremdkörper.</span>
       </label>
       <label>
         Notiz
@@ -252,7 +258,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
   const [panel, setPanel] = useState(null); // "mount" | "past" | null
   const [day, setDay] = useState(today());
   const [past, setPast] = useState({ from_date: today(), to_date: today() });
-  const status = ts.progress == null ? "ok" : ts.progress >= 1 ? "due" : ts.progress >= 0.8 ? "soon" : "ok";
+  const status = ts.life_status;
 
   return (
     <article className={`tire-set ${ts.mounted ? "mounted" : ""} ${ts.retired ? "retired" : ""}`}>
@@ -268,13 +274,28 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           <strong><CountUp value={ts.km} /></strong> <span className="muted">km</span>
           {ts.mounted && <span className="pill pill-ok">Montiert seit {fmtDate(ts.mounted_since)}</span>}
           {ts.retired && <span className="pill pill-muted">Ausgemustert</span>}
+          {!ts.retired && ts.status !== "ok" && <StatusPill status={ts.status} />}
         </div>
       </header>
 
-      {ts.max_km && (
+      {ts.max_km ? (
         <>
           <Gauge progress={ts.progress} status={status} />
-          <p className="muted small">{fmtKm(ts.km)} von {fmtKm(ts.max_km)} km erwartet</p>
+          <p className="muted small">
+            {fmtKm(ts.km)} von {fmtKm(ts.max_km)} km gefahren,{" "}
+            {ts.km_left > 0 ? <>noch etwa <strong>{fmtKm(ts.km_left)} km</strong> bis zum erwarteten Wechsel</> : <strong>erwartete Lebensdauer erreicht</strong>}
+          </p>
+        </>
+      ) : (
+        <p className="muted small">{fmtKm(ts.km)} km gefahren. Trage bei „Bearbeiten“ eine erwartete Lebensdauer ein, dann siehst du die Restkilometer.</p>
+      )}
+      {!ts.retired && (
+        <>
+          <Gauge progress={ts.check_progress} status={ts.check_status} />
+          <p className="muted small">
+            Sichtprüfung alle {fmtKm(ts.check_interval_km)} km: seit {ts.checked_on ? `der letzten Prüfung am ${fmtDate(ts.checked_on)}` : "dem Einbau"} {fmtKm(ts.km_since_check)} km
+            {ts.check_status === "due" ? <strong> – jetzt prüfen</strong> : ts.check_status === "soon" ? " – bald prüfen" : ""}
+          </p>
         </>
       )}
       {(ts.weight_g || ts.watts || ts.casing || ts.brand || ts.shop_url) && (
@@ -330,6 +351,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
       <div className="actions">
         {!ts.retired && !ts.mounted && <button className="btn small primary" onClick={() => setPanel("mount")}>Montieren</button>}
         {ts.mounted && <button className="btn small" onClick={() => run(`/tire-sets/${ts.id}/unmount`, { day: today() })}>Abmontieren</button>}
+        {!ts.retired && <button className={`btn small ${ts.check_status !== "ok" ? "primary" : ""}`} onClick={() => run(`/tire-sets/${ts.id}/checked`, {})}>Geprüft</button>}
         <button className="btn small" onClick={() => setPanel("past")}>Zeitraum nachtragen</button>
         <button className="btn small" onClick={() => onEdit(ts)}>Bearbeiten</button>
         <button className="btn small" onClick={() => onEdit(ts, { retired: !ts.retired })}>{ts.retired ? "Wieder aktivieren" : "Ausmustern"}</button>

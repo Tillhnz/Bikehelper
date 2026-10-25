@@ -274,6 +274,7 @@ class TireSetIn(BaseModel):
     source_url: str | None = Field(default=None, max_length=255, pattern=r"^https?://")
     casing: Literal["supple", "standard", "stiff"] | None = None  # Karkasse, wird vom Ratgeber genutzt
     shop_url: str | None = Field(default=None, max_length=500)  # eigener Einkaufslink
+    check_km: float | None = Field(default=None, gt=0, le=20000)  # Sichtprüfung alle ... km; leer = Standard (1.000 km)
 
     @field_validator("shop_url")
     @classmethod
@@ -299,6 +300,14 @@ class TireSetOut(TireSetIn):
     mounted: bool
     mounted_since: date | None = None
     progress: float | None = None  # km / max_km
+    km_left: float | None = None  # bis zur erwarteten Lebensdauer
+    life_status: str = "ok"
+    check_interval_km: float = 1000  # wirksames Prüfintervall
+    checked_on: date | None = None
+    km_since_check: float = 0
+    check_progress: float = 0
+    check_status: str = "ok"
+    status: str = "ok"  # das Schlechtere von Lebensdauer und Prüfung
     mounts: list[MountOut] = []
 
 

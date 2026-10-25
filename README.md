@@ -144,6 +144,10 @@ Beim Anlegen eines Reifensatzes suchst du den Reifen im Katalog (Marke, Modell, 
 
 Der mitgelieferte Katalog (`backend/app/data/tires.csv`) ist bewusst klein: Er enthält nur Herstellerangaben (Breite, Gewicht, Art) mit Link zur Produktseite, aber keine Messwerte. Watt-Werte sind urheberrechtlich geschützte Messreihen einzelner Prüfstände und gehören nicht in ein öffentliches Repository. Du kannst sie unter Reifen → „Reifenkatalog erweitern“ als CSV für dein eigenes Konto einlesen (Spalten: `brand, model, category, width_mm, tubeless, weight_g, watts, watts_note, source_url, casing`). Eigene Einträge sieht nur dein Konto. Alternativ lädt „Reifenkatalog erweitern“ eine CSV von einer https-Adresse deiner Wahl (zum Beispiel eine Datei in einem eigenen GitHub-Repository; lokale und private Adressen sind gesperrt). Eine offene Reifendatenbank mit Rollwiderstandswerten, die man direkt einbinden könnte, habe ich nicht gefunden. Neue Zeilen für die mitgelieferte Liste kannst du per Pull Request ergänzen.
 
+## Reifen: Lebensdauer und Sichtprüfung
+
+Jeder Reifensatz zeigt, wie viele Kilometer er gefahren ist und (wenn du eine erwartete Lebensdauer einträgst) wie viele noch übrig sind. Dazu kommt ein Prüfintervall für die Sichtprüfung (Standard 1.000 km). Mit „Geprüft“ beginnt der Zähler neu. Ab 80 % wird ein Satz „bald fällig“, ab 100 % „fällig“, und der montierte Satz erscheint dann unter „Das steht an“. Erinnerungen per E-Mail oder ntfy gibt es dafür noch nicht.
+
 ## Einkaufslinks und Mechanics-Modus
 
 **Einkaufslink:** Bei jeder Komponente und jedem Reifensatz kannst du einen Link hinterlegen, wo du das Teil nachkaufst (nur `http`/`https`). Er gehört zu deinem Rad, erscheint als „Nachkaufen“, steht in der Einkaufsliste und wird bei „Teil gewechselt“ ans neue Teil übernommen.
