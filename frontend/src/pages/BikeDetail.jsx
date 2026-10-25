@@ -201,7 +201,8 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   );
 }
 
-function ComponentCard({ comp, onChanged }) {
+function ComponentCard({ comp, onChanged, expandSignal }) {
+  const [open, setOpen] = useState(false);
   const [rules, setRules] = useState([]);
   const [logs, setLogs] = useState([]);
   const [panel, setPanel] = useState(null); // "log" | "rule" | "replace" | "date" | null
@@ -221,7 +222,8 @@ function ComponentCard({ comp, onChanged }) {
     setLogs(l);
   }, [comp.id]);
 
-  useEffect(() => { loadDetails().catch((e) => setError(e.message)); }, [loadDetails, comp.km]);
+  useEffect(() => { if (open) loadDetails().catch((e) => setError(e.message)); }, [open, loadDetails, comp.km]);
+  useEffect(() => { if (expandSignal) setOpen(expandSignal.open); }, [expandSignal]);
 
   async function refresh() {
     await loadDetails();
@@ -350,18 +352,20 @@ function ComponentCard({ comp, onChanged }) {
   const noDate = !comp.installed_effective;
 
   return (
-    <article className={`component ${retired ? "retired" : ""}`}>
-      <header className="component-head">
-        <div>
+    <article className={`component ${retired ? "retired" : ""} ${!retired && comp.status === "due" ? "is-due" : ""} ${!retired && comp.status === "soon" ? "is-soon" : ""}`}>
+      <button type="button" className="component-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="chevron" aria-hidden="true" />
+        <span className="component-title">
           <span className="muted small">{CATEGORIES[comp.category] ?? comp.category}</span>
           <h3>{comp.name}</h3>
-        </div>
-        <div className="component-km">
+        </span>
+        <span className="component-km">
           <strong>{fmtKm(comp.km)}</strong> <span className="muted">km</span>
-          {!retired && rules.length > 0 && <StatusPill status={comp.status} />}
           {retired && <span className="pill pill-muted">Ausgemustert</span>}
-        </div>
-      </header>
+          {!retired && comp.status !== "ok" && <StatusPill status={comp.status} />}
+        </span>
+      </button>
+      {open && <div className="component-body">
       <p className="muted small">
         {comp.brand ? `${comp.brand} · ` : ""}
         {noDate ? "Einbaudatum unbekannt" : comp.installed_inherited ? `seit dem Kauf des Rades am ${fmtDate(comp.installed_effective)}` : `eingebaut am ${fmtDate(comp.installed_at)}`}
@@ -486,6 +490,7 @@ function ComponentCard({ comp, onChanged }) {
           <button className="link small danger" onClick={remove}>Löschen</button>
         </div>
       )}
+      </div>}
     </article>
   );
 }
@@ -543,6 +548,7 @@ export default function BikeDetail() {
   const [adding, setAdding] = useState(false);
   const [catalog, setCatalog] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [expandSignal, setExpandSignal] = useState(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -587,6 +593,7 @@ export default function BikeDetail() {
   const tracked = components.filter((c) => !legacy.includes(c));
   const active = tracked.filter((c) => !c.retired_at);
   const retired = tracked.filter((c) => c.retired_at);
+  const dueCount = active.filter((c) => c.status === "due").length;
 
   return (
     <>
@@ -629,9 +636,15 @@ export default function BikeDetail() {
       <TireSets bike={bike} onChanged={load} />
 
       <header className="page-head">
-        <h2>Komponenten</h2>
+        <h2>Komponenten <span className="muted small">{active.length}{dueCount > 0 ? `, ${dueCount} fällig` : ""}</span></h2>
         {!adding && (
           <div className="actions" style={{ marginTop: 0 }}>
+            {active.length > 1 && (
+              <>
+                <button className="btn small" onClick={() => setExpandSignal({ open: true })}>Alle aufklappen</button>
+                <button className="btn small" onClick={() => setExpandSignal({ open: false })}>Alle zuklappen</button>
+              </>
+            )}
             <button className="btn" onClick={addStandard}>Standardkomponenten ergänzen</button>
             <button className="btn primary" onClick={() => setAdding(true)}>Komponente hinzufügen</button>
           </div>
@@ -655,7 +668,7 @@ export default function BikeDetail() {
         </EmptyState>
       ) : (
         <div className="component-list">
-          {active.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} />)}
+          {active.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} expandSignal={expandSignal} />)}
         </div>
       )}
 
@@ -667,7 +680,7 @@ export default function BikeDetail() {
             Meldungen aus. Du kannst sie löschen, sobald du die Reifensätze angelegt hast.
           </p>
           <div className="component-list">
-            {legacy.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} />)}
+            {legacy.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} expandSignal={expandSignal} />)}
           </div>
         </details>
       )}
@@ -676,7 +689,7 @@ export default function BikeDetail() {
         <>
           <h2 className="section-title">Ausgemusterte Komponenten</h2>
           <div className="component-list">
-            {retired.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} />)}
+            {retired.map((c) => <ComponentCard key={c.id} comp={c} onChanged={load} expandSignal={expandSignal} />)}
           </div>
         </>
       )}

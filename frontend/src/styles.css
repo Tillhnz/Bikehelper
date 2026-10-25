@@ -1044,3 +1044,21 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .rides .cell-pick{width:2.2rem;padding-right:0}
 .rides tr.picked td{background:rgba(79,140,255,.10)}
 .pick-all-mobile{display:none;margin:0 0 .6rem}
+
+/* Garage und Komponenten: übersichtlich, Details auf Klick */
+.attention-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.attention-head h2{margin:0;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.attention-head .pill{font-size:.75rem}
+.attention-list{margin-top:.8rem}
+.component-toggle{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:.8rem;width:100%;cursor:pointer;border-radius:8px}
+.component-toggle:focus-visible{outline:2px solid var(--celeste,#4f8cff);outline-offset:4px}
+.component-title{flex:1;min-width:0;display:flex;flex-direction:column}
+.component-title h3{margin:0}
+.component-toggle .component-km strong{font-size:1.4rem}
+.chevron{width:.6rem;height:.6rem;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(-45deg);transition:transform .15s;flex:none}
+.component-toggle[aria-expanded="true"] .chevron{transform:rotate(45deg)}
+.component-body{margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--line)}
+.component.is-due{border-left:4px solid var(--signal)}
+.component.is-soon{border-left:4px solid var(--amber)}
+@media (prefers-reduced-motion: reduce){.chevron{transition:none}}
+@media (max-width:800px){.component-toggle{flex-wrap:wrap}.component-toggle .component-km{width:100%;padding-left:1.4rem}}

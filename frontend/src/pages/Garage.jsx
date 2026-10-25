@@ -74,6 +74,7 @@ export default function Garage() {
   const [overview, setOverview] = useState({ items: [] });
   const [adding, setAdding] = useState(false);
   const [shop, setShop] = useState(false);
+  const [showTodo, setShowTodo] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -92,6 +93,8 @@ export default function Garage() {
   if (!bikes) return <Loading />;
 
   const active = bikes.filter((b) => !b.retired);
+  const dueN = overview.items.filter((i) => i.status === "due").length;
+  const soonN = overview.items.length - dueN;
   const retired = bikes.filter((b) => b.retired);
 
   return (
@@ -115,8 +118,15 @@ export default function Garage() {
 
       {overview.items.length > 0 && (
         <section className="panel attention">
-          <h2>Das steht an</h2>
-          <ul className="attention-list">
+          <div className="attention-head">
+            <h2>
+              {overview.items.length} {overview.items.length === 1 ? "Wartung" : "Wartungen"} offen
+              {dueN > 0 && <span className="pill pill-due">{dueN} fällig</span>}
+              {soonN > 0 && <span className="pill pill-soon">{soonN} bald</span>}
+            </h2>
+            <button className="btn small" aria-expanded={showTodo} onClick={() => setShowTodo((v) => !v)}>{showTodo ? "Ausblenden" : "Anzeigen"}</button>
+          </div>
+          {showTodo && <ul className="attention-list">
             {overview.items.map((i) => (
               <li key={`${i.component_id}-${i.rule}`}>
                 <Link to={`/bikes/${i.bike_id}`}>
@@ -131,7 +141,7 @@ export default function Garage() {
                 </Link>
               </li>
             ))}
-          </ul>
+          </ul>}
         </section>
       )}
 
