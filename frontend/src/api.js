@@ -115,6 +115,8 @@ export const CATEGORIES = {
   bottom_bracket: "Tretlager",
   hubs: "Naben",
   pulleys: "Schaltröllchen",
+  pedals: "Pedale",
+  fasteners: "Schrauben und Gewinde",
   other: "Sonstiges",
 };
 

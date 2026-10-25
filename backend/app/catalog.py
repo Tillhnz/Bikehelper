@@ -197,22 +197,38 @@ CATALOG: dict[str, ComponentTemplate] = {
             hint="Etwa jährlich prüfen und bei Bedarf fetten oder tauschen, besonders bei Konuslagern und Freilauf.",
         ),
     )),
+    "pedals": ComponentTemplate("pedals", "Pedale", (
+        RuleTemplate(
+            "Pedalgewinde fetten, Lager prüfen", interval_months=12,
+            hint="Beim Einbau und einmal im Jahr: Gewinde reinigen und dünn mit Montagefett oder Anti-Seize-Paste einreiben, "
+                 "dann mit dem Drehmoment des Herstellers festziehen (meist etwa 30 bis 40 Nm). Rechts Rechtsgewinde, links Linksgewinde. "
+                 "Das verhindert Knarzen und festgerostete Pedalen.",
+        ),
+    )),
+    "fasteners": ComponentTemplate("fasteners", "Schrauben und Gewinde", (
+        RuleTemplate(
+            "Gewinde fetten, Schrauben nachziehen", interval_months=12,
+            hint="Einmal im Jahr bei der Inspektion: Schrauben von Vorbau, Lenker, Sattelstütze, Kurbel, Kassettenverschlussring und Steckachsen "
+                 "lösen, Gewinde dünn fetten und mit dem Drehmoment des Herstellers anziehen (steht meist auf dem Bauteil). "
+                 "An Carbon-Bauteilen statt Fett die Carbon-Montagepaste nehmen. Nie Bremsscheiben oder Beläge einfetten.",
+        ),
+    )),
 }
 
 BIKE_TEMPLATES: dict[str, tuple[str, ...]] = {
     "road": (
         "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
-        "cables", "bar_tape", "headset", "bottom_bracket", "hubs",
+        "cables", "bar_tape", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "gravel": (
         "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
-        "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs",
+        "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "mtb": (
         "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
-        "cables", "sealant", "headset", "bottom_bracket", "hubs",
+        "cables", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
-    "other": ("chain", "cassette", "pulleys", "brake_pads", "cables"),
+    "other": ("chain", "cassette", "pulleys", "brake_pads", "cables", "pedals"),
 }
 
 
@@ -321,6 +337,9 @@ GUIDES: dict[str, tuple[Guide, ...]] = {
         Guide("Pressfit-Innenlager aus- und einbauen", _PT + "bottom-bracket-removal-installation-press-fit", PT, True),
         Guide("Innenlager zum Einschrauben aus- und einbauen", _PT + "bottom-bracket-removal-installation-thread-together", PT),
         Guide("Innenlager mit Konuslager warten", _PT + "bottom-bracket-service-adjustable-cup-and-cone", PT),
+    ),
+    "Pedalgewinde fetten, Lager prüfen": (
+        Guide("Pedale aus- und einbauen", _PT + "pedal-installation-and-removal", PT),
     ),
     "Nabenlager warten": (
         Guide("Nabe warten und einstellen (Konuslager)", _PT.replace("en-us", "en-int") + "hub-overhaul-and-adjustment", PT, True),
@@ -501,6 +520,44 @@ CHECKS: dict[str, Check] = {
             "Die Schaltung ist ungenau, obwohl sie eingestellt ist.",
         ),
         act="Zug und Hülle gemeinsam erneuern, sobald sie rostig, ausgefranst oder zäh sind. Ein gerissener Bremszug ist ein Sicherheitsrisiko: lieber früher wechseln.",
+    ),
+    "pedals": Check(
+        tools="Pedalschlüssel oder Inbus (je nach Pedal), Lappen, Montagefett oder Anti-Seize-Paste",
+        how=(
+            "Pedale an Kurbel und Pedalachse anfassen und seitlich wackeln: Es darf kein Spiel zwischen Pedale und Kurbel geben.",
+            "Pedalkörper um die Achse drehen: leichtgängig, ohne Rauheit, Klemmen oder spürbares Spiel.",
+            "Beim Fahren auf Knarzen oder Knacken achten, das im Takt der Kurbel kommt.",
+            "Beim Ausbau (einmal im Jahr oder beim Wechsel): Gewinde und Kurbelauge reinigen, Gewinde dünn fetten, wieder einschrauben. Rechte Pedale hat Rechtsgewinde (im Uhrzeigersinn festziehen), die linke Linksgewinde (gegen den Uhrzeigersinn, von der jeweiligen Seite gesehen).",
+        ),
+        good=(
+            "Kein Spiel an der Kurbel, die Achse läuft leicht und leise.",
+            "Gewinde sauber, leicht gefettet, ohne Rost oder Aluminiumabrieb.",
+        ),
+        bad=(
+            "Spiel zwischen Pedale und Kurbel oder lose Pedalachse.",
+            "Raues oder schwergängiges Lager, Knarzen im Takt der Kurbel.",
+            "Festgerostetes oder verschmiertes Gewinde, das sich nur mit Gewalt lösen lässt.",
+        ),
+        act="Gewinde fetten und mit dem Hersteller-Drehmoment festziehen. Ein beschädigtes Kurbelgewinde nicht weiterfahren, sondern in der Werkstatt prüfen lassen. Lose Pedale sofort nachziehen.",
+    ),
+    "fasteners": Check(
+        tools="Drehmomentschlüssel mit Inbus-Bits, Montagefett, bei Carbon Carbon-Montagepaste, Lappen",
+        how=(
+            "Die Anzugsdrehmomente stehen meist auf dem Bauteil oder in der Anleitung des Herstellers; sie vorher nachschlagen.",
+            "Schrauben nacheinander lösen (jeweils nur eine Verbindung, damit nichts verrutscht), Gewinde und Auflage reinigen.",
+            "Gewinde dünn fetten (an Carbon die Montagepaste) und mit dem Drehmomentschlüssel kreuzweise festziehen.",
+            "Nach einer kurzen Fahrt den Sitz von Vorbau, Lenker, Sattelstütze und Kurbel noch einmal prüfen.",
+        ),
+        good=(
+            "Schrauben lassen sich leicht lösen, Gewinde sind sauber und leicht gefettet.",
+            "Nichts knarzt, wackelt oder hat sich verstellt.",
+        ),
+        bad=(
+            "Festgerostete oder festgefressene Schrauben, Aluminium-Abrieb am Gewinde.",
+            "Knarzen von Vorbau, Sattelstütze oder Kurbel.",
+            "Schraubenköpfe mit ausgeleiertem Inbus.",
+        ),
+        act="Gewinde fetten und mit dem Drehmomentschlüssel nach Herstellerangabe anziehen. Zu fest ist so gefährlich wie zu lose, besonders an Carbon. Beschädigte Schrauben ersetzen.",
     ),
     "pulleys": Check(
         tools="Lappen, Taschenlampe, Entfetter oder Bürste zum Reinigen",
