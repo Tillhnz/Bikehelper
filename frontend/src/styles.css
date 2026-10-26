@@ -807,7 +807,7 @@ input[type="range"]:focus-visible { outline-offset: 0; border-radius: 999px; }
 .week-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
 .week-total strong{font-family:var(--font-display);font-size:3rem;line-height:1}
 .week-head .delta{margin:0}
-.week-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;height:170px;margin:1rem 0 .75rem}
+.week-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;height:96px;margin:.6rem 0 .5rem}
 .week-day{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
 .week-km{font-size:.75rem;color:var(--mute);height:1rem;font-variant-numeric:tabular-nums}
 .week-track{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--ink-2);border-radius:6px;overflow:hidden}
@@ -1062,3 +1062,8 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .component.is-soon{border-left:4px solid var(--amber)}
 @media (prefers-reduced-motion: reduce){.chevron{transition:none}}
 @media (max-width:800px){.component-toggle{flex-wrap:wrap}.component-toggle .component-km{width:100%;padding-left:1.4rem}}
+
+/* Startseite: „Diese Woche“ nimmt nur den Platz, den sie braucht */
+.home-week{align-self:start}
+.home-week .week-nav{margin-bottom:.4rem}
+@media (max-width:800px){.week-bars{height:84px}}
