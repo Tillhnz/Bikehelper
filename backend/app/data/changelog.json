@@ -1,0 +1,34 @@
+[
+  {
+    "id": "2026-10-27.2",
+    "date": "2026-10-27",
+    "title": "Gruppen, bessere Radvorschläge und mehr Übersicht",
+    "changes": [
+      "Neu: Gruppen. Lade Freunde per E-Mail ein und vergleiche Kilometer, Höhenmeter, Fahrzeit, Tempo und mehr in Ranglisten für Woche, Monat, Jahr und gesamt. Es werden nur Kennzahlen geteilt, keine Strecken.",
+      "Radvorschläge berücksichtigen jetzt auch Leistungs- und Trittfrequenzdaten, Datenquelle, Fahrtart und Tempo. Der Vorschlag erscheint auch in der Fahrtansicht.",
+      "Der Import-Bereich in der Fahrtenliste ist einklappbar und braucht weniger Platz.",
+      "Im Live-Protokoll öffnet ein Klick auf einen Serverfehler die vollständige Meldung mit Fehlercode."
+    ]
+  },
+  {
+    "id": "2026-10-27.1",
+    "date": "2026-10-27",
+    "title": "Fahrten aus intervals.icu",
+    "changes": [
+      "Neue Schnittstelle zu intervals.icu: Fahrten von Garmin, Wahoo, Hammerhead, Zwift, Polar und Suunto kommen automatisch in die App. Verbinde dort deinen Radcomputer direkt, nicht Strava, denn Strava gibt Aktivitäten nicht über die Schnittstelle weiter.",
+      "Jede Fahrt zeigt ihre Herkunft, und die Fahrtenliste lässt sich danach filtern.",
+      "Fahrten ohne Rad bekommen einen Vorschlag aus deinen bisherigen Zuordnungen. Das Wetter wird nach jedem Import sofort geholt."
+    ],
+    "action": {"label": "Jetzt einrichten", "to": "/settings#intervals"}
+  },
+  {
+    "id": "2026-10-25",
+    "date": "2026-10-25",
+    "title": "Reifen, Garage und Wartung",
+    "changes": [
+      "Reifen haben jetzt Restkilometer, ein Sichtprüfintervall und einen Geprüft-Knopf. Anstehende Prüfungen erscheinen unter „Das steht an“.",
+      "Die Garage ist übersichtlicher: Wartungen als Zähler mit Aufklappliste, Komponenten eingeklappt.",
+      "Neu im Katalog: Pedale sowie Schrauben und Gewinde, die jährlich gefettet und mit Drehmoment angezogen werden."
+    ]
+  }
+]

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, notify
+from .. import audit, changelog, notify
 from ..config import settings
 from ..database import get_db
 from .. import ratelimit
@@ -18,10 +18,6 @@ from ..security import create_token, current_user, hash_password, is_admin, veri
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
-# Hinweis „Neu“, der einmal pro Konto nach der Anmeldung erscheint. Zum nächsten Hinweis die Kennung ändern.
-CURRENT_WHATSNEW = "intervals-2026-10"
-
-
 def _user_out(u: User, admin: bool = False) -> UserOut:
     return UserOut(
         id=u.id,
@@ -32,7 +28,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         is_admin=admin,
         role="admin" if admin else "user",
         mechanic_enabled=bool(u.mechanic_enabled),
-        whatsnew=CURRENT_WHATSNEW if u.whatsnew_seen != CURRENT_WHATSNEW else None,
+        whatsnew=changelog.unseen(u.whatsnew_seen) or None,
     )
 
 
@@ -67,7 +63,7 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_409_CONFLICT, "E-Mail bereits vergeben")
     user = User(email=email, password_hash=hash_password(data.password), token_version=0,
                 role="admin" if first_user else "user", active=True,
-                whatsnew_seen=CURRENT_WHATSNEW)  # neue Konten brauchen den Hinweis nicht
+                whatsnew_seen=changelog.latest_id())  # neue Konten brauchen den Hinweis nicht
     db.add(user)
     if invite is not None:
         invite.used_by_email, invite.used_at = email, datetime.utcnow()
@@ -157,7 +153,7 @@ def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depen
 
 @router.post("/me/whatsnew/seen", status_code=204)
 def whatsnew_seen(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    user.whatsnew_seen = CURRENT_WHATSNEW
+    user.whatsnew_seen = changelog.latest_id()
     db.commit()
 
 

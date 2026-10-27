@@ -9,6 +9,7 @@ import httpx  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
+from app import changelog  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.importers.parsers import parse_activity_file  # noqa: E402
 from app.intervals import service  # noqa: E402
@@ -110,9 +111,20 @@ def test_whatsnew_popup_shows_once_for_existing_accounts_only():
             u = db.scalar(select(User).where(User.email == "icu4@example.com"))
             u.whatsnew_seen = None
             db.commit()
-        assert c.get("/api/me", headers=h).json()["whatsnew"] == "intervals-2026-10"
+        w = c.get("/api/me", headers=h).json()["whatsnew"]
+        assert [e["id"] for e in w][0] == changelog.latest_id() and all(e["changes"] and e["title"] for e in w)
         assert c.post("/api/me/whatsnew/seen", headers=h).status_code == 204
         assert c.get("/api/me", headers=h).json()["whatsnew"] is None
+
+
+def test_changelog_shows_only_newer_entries():
+    items = changelog.entries()
+    ids = [e["id"] for e in items]
+    assert len(ids) == len(set(ids)) and ids == sorted(ids, reverse=True)  # eindeutig, neueste zuerst
+    assert all(e["title"] and e["date"] and e["changes"] for e in items)
+    assert changelog.unseen(ids[0]) == [] and [e["id"] for e in changelog.unseen(ids[1])] == [ids[0]]
+    assert [e["id"] for e in changelog.unseen("intervals-2026-10")] == ids[: ids.index("2026-10-27.1")]  # alte Kennung
+    assert len(changelog.unseen("unbekannt")) == min(5, len(ids))
 
 
 def test_full_resync_restores_a_ride_deleted_in_bikehelper(monkeypatch):

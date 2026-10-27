@@ -1103,3 +1103,9 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 
 ul.plain{list-style:none;padding:0;margin:.5rem 0}
 ul.plain li{padding:.25rem 0}
+.whatsnew .wn-scroll{max-height:55vh;overflow:auto;margin:.4rem 0}
+.wn-entry+.wn-entry{border-top:1px solid var(--line);margin-top:.8rem;padding-top:.8rem}
+.wn-entry h4{margin:0 0 .4rem}
+.wn-entry h4 .small{font-weight:400;margin-left:.4rem}
+.wn-entry ul{margin:.3rem 0 0;padding-left:1.2rem}
+.wn-entry li{margin:.3rem 0}
