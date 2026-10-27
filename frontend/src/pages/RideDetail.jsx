@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { WEATHER_TEXT, api, fmtDateTime, fmtDuration, fmtKm, fmtKm1, fmtNum } from "../api.js";
+import { WEATHER_TEXT, api, sourceLabel, fmtDateTime, fmtDuration, fmtKm, fmtKm1, fmtNum } from "../api.js";
 import { ProfileChart } from "../components/charts.jsx";
 import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
 import AfterRide from "../components/AfterRide.jsx";
@@ -112,6 +112,7 @@ export default function RideDetail() {
           <p className="muted">
             {fmtDateTime(a.start_date)}
             {a.bike_name ? <> · <Link className="link" to={`/bikes/${a.bike_id}`}>{a.bike_name}</Link></> : a.gear_name ? ` · ${a.gear_name}` : ""}
+            {sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}
           </p>
         </div>
         <div className="actions" style={{ marginTop: 0 }}>

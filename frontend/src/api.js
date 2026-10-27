@@ -186,3 +186,13 @@ export const safeUrl = (u) => {
     return null;
   }
 };
+
+/** Woher eine Fahrt stammt (Feld `source`). Ältere oder unbekannte Werte erscheinen unverändert. */
+export const SOURCE_LABEL = {
+  wahoo: "Wahoo",
+  intervals: "intervals.icu",
+  upload: "Datei-Upload",
+  strava_export: "Strava-Export",
+  strava: "Strava",
+};
+export const sourceLabel = (s) => (s ? SOURCE_LABEL[s] ?? s : null);

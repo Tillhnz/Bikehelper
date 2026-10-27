@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { WEATHER_TEXT, api, fmtDate, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
+import { WEATHER_TEXT, api, sourceLabel, fmtDate, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
 import { dismiss, isBusy, startFileImport, startStravaImport, useUploads } from "../uploads.js";
 import { confirmDialog, toast } from "../components/feedback.jsx";
@@ -496,7 +496,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                 <tr key={a.id} className={picked.has(a.id) || allMatching ? "picked" : ""}>
                   <td className="cell-pick"><input type="checkbox" aria-label={`${a.name} auswählen`} checked={picked.has(a.id) || allMatching} onChange={() => togglePick(a.id)} /></td>
                   <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
-                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link></td>
+                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}</td>
                   <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap" data-label="Zeit">{fmtDuration(a.moving_time_s)}</td>
                   <td className="num nowrap" data-label="Höhenmeter">{Math.round(a.elevation_m)} m</td>
