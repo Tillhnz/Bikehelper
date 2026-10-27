@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CATEGORIES, api, safeUrl, today } from "../api.js";
+import { copyText } from "../clipboard.js";
 import { toast } from "./feedback.jsx";
 
 const REPLACE = /wechsel|tausch|erneuer|ersetz/i;
@@ -32,7 +33,7 @@ export default function ShoppingList({ onClose }) {
     (care.length ? `Pflege und Prüfung:\n${care.map((i) => `- ${i.rule}: ${i.component}${i.bike ? ` (${i.bike})` : ""}`).join("\n")}\n` : "");
 
   async function copy() {
-    try { await navigator.clipboard.writeText(text); toast("Liste kopiert."); } catch { toast("Kopieren ist hier nicht möglich.", "error"); }
+    if (await copyText(text)) toast("Liste kopiert."); else toast("Kopieren ist hier nicht möglich. Markiere den Text und kopiere ihn von Hand.", "error");
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, fmtDate, fmtDateTime } from "../api.js";
+import { copyText } from "../clipboard.js";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
 
 const ROLE_TEXT = { admin: "Administrator", user: "Nutzer" };
@@ -147,6 +148,10 @@ function Invites() {
     try { await fn(); if (done) toast(done); await load(); } catch (err) { setError(err.message); }
   };
   const link = (code) => `${window.location.origin}/login?invite=${code}`;
+  const [manual, setManual] = useState(null); // Link zum Selbstkopieren, wenn die Zwischenablage gesperrt ist
+  async function copyLink(code) {
+    if (await copyText(link(code))) { setManual(null); toast("Einladungslink kopiert."); } else setManual(link(code));
+  }
 
   return (
     <section className="panel">
@@ -158,6 +163,12 @@ function Invites() {
       <div className="actions">
         <button className="btn primary" onClick={() => run(() => api.post("/admin/invites", {}))}>Neue Einladung erzeugen</button>
       </div>
+      {manual && (
+        <label className="block" role="status">
+          Der Browser erlaubt hier kein Kopieren. Markiere den Link und kopiere ihn von Hand:
+          <input readOnly value={manual} onFocus={(e) => e.target.select()} onClick={(e) => e.target.select()} autoFocus />
+        </label>
+      )}
       {invites?.length > 0 && (
         <ul className="log-list">
           {invites.map((i) => (
@@ -165,7 +176,7 @@ function Invites() {
               <span><strong>{i.code}</strong> <span className="muted">{i.used_by_email ? `verwendet von ${i.used_by_email}` : "offen"}</span></span>
               <span className="rule-actions">
                 {!i.used_by_email && (
-                  <button className="link small" onClick={() => run(() => navigator.clipboard.writeText(link(i.code)), "Einladungslink kopiert.")}>Link kopieren</button>
+                  <button className="link small" onClick={() => copyLink(i.code)}>Link kopieren</button>
                 )}
                 <button className="link small danger" onClick={() => run(() => api.del(`/admin/invites/${i.id}`))}>Löschen</button>
               </span>
