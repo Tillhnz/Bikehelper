@@ -32,7 +32,7 @@ class User(Base):
     remind_email: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     ntfy_topic: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    # Wahoo Cloud: eigene Entwickler-App des Nutzers (developers.wahooligan.com), Verbindung per OAuth
+    # Wahoo Cloud (veraltet): die direkte Anbindung wurde entfernt, die Spalten bleiben ungenutzt in der Datenbank
     wahoo_client_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     wahoo_client_secret: Mapped[str | None] = mapped_column(String(160), nullable=True)
     wahoo_access_token: Mapped[str | None] = mapped_column(String(255), nullable=True)

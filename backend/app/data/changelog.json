@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-27.8",
+    "date": "2026-10-27",
+    "title": "Wahoo-Direktanbindung entfernt",
+    "changes": [
+      "Die direkte Wahoo-Schnittstelle gibt es nicht mehr. Neue Fahrten kommen per Datei-Upload, Strava-Export oder über intervals.icu, wo du deinen Wahoo-, Garmin- oder Hammerhead-Radcomputer verbindest.",
+      "Bereits importierte Wahoo-Fahrten bleiben erhalten und behalten ihre Herkunft „Wahoo“."
+    ]
+  },
+  {
     "id": "2026-10-27.7",
     "date": "2026-10-27",
     "title": "Gruppen: mehr Statistiken und Freigaben",

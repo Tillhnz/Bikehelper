@@ -46,7 +46,6 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       NTFY_SERVER: ${NTFY_SERVER:-https://ntfy.sh}
-      WAHOO_ENABLED: ${WAHOO_ENABLED:-true}
       GEO_ENABLED: ${GEO_ENABLED:-true}
       NOMINATIM_URL: ${NOMINATIM_URL:-https://nominatim.openstreetmap.org}
 

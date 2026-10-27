@@ -32,7 +32,6 @@ FIELDS: dict[str, tuple[str, str, bool]] = {
     "reminders_enabled": ("bool", "features", False),
     "weather_enabled": ("bool", "features", False),
     "geo_enabled": ("bool", "features", False),
-    "wahoo_enabled": ("bool", "features", False),
     "intervals_enabled": ("bool", "features", False),
     "carto_api_key": ("str:128", "maps", True),
     "map_tile_url": ("tileurl", "maps", False),

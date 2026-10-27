@@ -269,113 +269,6 @@ function InstallSettings() {
   );
 }
 
-function WahooSettings() {
-  const [st, setSt] = useState(null);
-  const [bikes, setBikes] = useState([]);
-  const [form, setForm] = useState({ client_id: "", client_secret: "" });
-  const [msg, setMsg] = useState("");
-  const [error, setError] = useState("");
-
-  const load = useCallback(
-    () => api.get("/settings/wahoo").then((r) => { setSt(r); setForm((f) => ({ ...f, client_id: r.client_id })); }).catch((e) => setError(e.message)),
-    [],
-  );
-  useEffect(() => {
-    load();
-    api.get("/bikes").then(setBikes).catch(() => {});
-    const result = new URLSearchParams(window.location.search).get("wahoo");
-    if (result === "ok") setMsg("Wahoo ist verbunden. Die ersten Fahrten werden gerade abgeholt.");
-    if (result === "denied") setError("Du hast den Zugriff bei Wahoo nicht erlaubt.");
-    if (result === "failed") setError("Die Verbindung mit Wahoo ist fehlgeschlagen. Prüfe Client-ID, Secret und Redirect-URI.");
-  }, [load]);
-
-  // Solange ein Lauf aktiv ist, den Stand regelmäßig nachladen
-  useEffect(() => {
-    if (!st?.running) return undefined;
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
-  }, [st?.running, load]);
-
-  async function run(fn, done) {
-    setMsg("");
-    setError("");
-    try {
-      await fn();
-      if (done) setMsg(done);
-      await load();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  const save = (e) => {
-    e.preventDefault();
-    return run(async () => {
-      await api.put("/settings/wahoo", { client_id: form.client_id, client_secret: form.client_secret, bike_id: st.bike_id });
-      setForm((f) => ({ ...f, client_secret: "" }));
-    }, "Gespeichert.");
-  };
-  const connect = () =>
-    run(async () => {
-      const { url } = await api.get("/wahoo/connect");
-      window.location.assign(url);
-    });
-  const setBike = (value) =>
-    run(() => api.put("/settings/wahoo", { client_id: null, client_secret: null, bike_id: value ? Number(value) : null }));
-
-  if (!st) return <section className="panel"><h2>Wahoo</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
-  if (!st.enabled) return null;
-
-  return (
-    <section className="panel">
-      <h2>Wahoo (ELEMNT)</h2>
-      <p className="muted">
-        Neue Fahrten deines Wahoo-Radcomputers werden alle 30 Minuten automatisch abgeholt, ohne Strava.
-        Du brauchst dafür eine eigene App im <a href="https://developers.wahooligan.com" target="_blank" rel="noopener noreferrer">Wahoo-Entwicklerportal</a>.
-      </p>
-      <details className="howto">
-        <summary>So richtest du es ein</summary>
-        <ol>
-          <li>Im Entwicklerportal mit deinem Wahoo-Konto anmelden und eine neue Anwendung anlegen.</li>
-          <li>Als Redirect-URI diese Adresse eintragen: <code>{st.redirect_uri}</code></li>
-          <li>Berechtigungen <code>user_read</code>, <code>workouts_read</code> und <code>offline_data</code> aktivieren.</li>
-          <li>Client-ID und Client-Secret unten eintragen, speichern und auf „Mit Wahoo verbinden“ klicken.</li>
-        </ol>
-        <p className="muted small">
-          Neue Apps laufen zuerst im Testmodus mit einem Limit von 100 Abrufen pro Stunde und 250 pro Tag. Der erste Import vieler Fahrten verteilt sich deshalb über einige Stunden bis Tage.
-        </p>
-      </details>
-      <form className="inline-form" onSubmit={save}>
-        <label>Client-ID<input value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} autoComplete="off" /></label>
-        <label>Client-Secret<input type="password" value={form.client_secret} placeholder={st.configured ? "gespeichert, leer lassen zum Behalten" : ""} onChange={(e) => setForm({ ...form, client_secret: e.target.value })} autoComplete="off" /></label>
-        <button className="btn">Speichern</button>
-      </form>
-      <div className="actions">
-        {!st.connected && <button className="btn primary" onClick={connect} disabled={!st.configured}>Mit Wahoo verbinden</button>}
-        {st.connected && <button className="btn primary" onClick={() => run(() => api.post("/wahoo/sync", {}), "Import gestartet.")} disabled={st.running}>{st.running ? "Läuft …" : "Jetzt abholen"}</button>}
-        {st.connected && <button className="btn" onClick={() => run(() => api.del("/wahoo/connection"), "Verbindung getrennt.")}>Trennen</button>}
-      </div>
-      {st.connected && (
-        <label className="block">
-          Importierte Fahrten diesem Rad zuordnen
-          <select value={st.bike_id ?? ""} onChange={(e) => setBike(e.target.value)}>
-            <option value="">Keinem Rad (später zuordnen)</option>
-            {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </label>
-      )}
-      {st.connected && (
-        <p className="muted small">
-          {st.imported} Fahrten importiert{st.last_sync ? `, letzter Lauf ${fmtDateTime(st.last_sync)}` : ""}.{st.status ? ` ${st.status}.` : ""}
-        </p>
-      )}
-      {!st.connected && st.status && <p className="muted small">{st.status}</p>}
-      {msg && <p className="ok" role="status">{msg}</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-    </section>
-  );
-}
-
 function IntervalsSettings() {
   const [st, setSt] = useState(null);
   const [bikes, setBikes] = useState([]);
@@ -673,7 +566,6 @@ export default function Settings({ user, onChange }) {
 
       <InstallSettings />
 
-      <WahooSettings />
 
       <IntervalsSettings />
 
