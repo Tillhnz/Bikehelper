@@ -442,3 +442,17 @@ class GroupInvite(Base):
     invited_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     multi: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True = Einladungslink für mehrere Personen (30 Tage), sonst einmalig
+
+
+class GroupGoal(Base):
+    """Gemeinsames Ziel einer Gruppe: z. B. 10 000 km zusammen bis Jahresende. Zählt nur Kennzahlen der Mitglieder, die teilen."""
+    __tablename__ = "group_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), unique=True, index=True)  # ein Ziel je Gruppe
+    metric: Mapped[str] = mapped_column(String(12))  # km | elev_m | rides
+    target: Mapped[float] = mapped_column(Float)
+    start: Mapped[date] = mapped_column(Date)
+    end: Mapped[date] = mapped_column(Date)  # einschließlich
+    title: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

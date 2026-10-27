@@ -146,3 +146,61 @@ def test_group_series_follows_period_and_extras_need_consent():
         assert c.put(f"/api/groups/{gid}/me", headers=b, json={"shared": ["rhythm", "load"]}).status_code == 200
         by = {r["display_name"]: r for r in c.get(f"/api/groups/{gid}/stats?period=all", headers=a).json()["rows"]}
         assert set(by["Ben"]["extras"]) == {"rhythm", "load"} and sum(by["Ben"]["extras"]["rhythm"]["weekdays"]) == 60
+
+
+def test_group_helpers():
+    from datetime import date
+
+    from app.routers.groups import crossed_milestone, current_week_streak, improvement_pct, rides_per_week
+    today = date(2026, 10, 28)  # Mittwoch
+    days = {date(2026, 10, 26), date(2026, 10, 20), date(2026, 10, 13)}
+    assert current_week_streak(days, today) == 3
+    assert current_week_streak({date(2026, 10, 20), date(2026, 10, 13)}, today) == 2  # diese Woche noch keine Fahrt: zählt bis letzte Woche
+    assert current_week_streak({date(2026, 10, 1)}, today) == 0
+    assert improvement_pct(120, 100) == 20.0 and improvement_pct(10, 0) is None and improvement_pct(10, 3) is None
+    assert crossed_milestone(950, 1020) == 1000 and crossed_milestone(1020, 1100) is None
+    assert rides_per_week(4, date(2026, 10, 1), date(2026, 10, 28)) == 1.0 and rides_per_week(0, None, today) is None
+    assert rides_per_week(3, date(2026, 10, 26), today) == 3.0  # unter einer Woche: als Woche gerechnet
+
+
+def test_group_goal_duel_and_fair_rank():
+    with TestClient(app) as c:
+        a = _user(c, "gg1@example.com")
+        b = _user(c, "gg2@example.com")
+        _rides(_uid("gg1@example.com"), [60, 40])
+        _rides(_uid("gg2@example.com"), [30])
+        gid = c.post("/api/groups", headers=a, json={"name": "Ziele", "display_name": "Gerda"}).json()["id"]
+        token = c.post(f"/api/groups/{gid}/invites", headers=a, json={"email": "gg2@example.com"}).json()["link"].rsplit("/", 1)[1]
+        assert c.post("/api/groups/join", headers=b, json={"token": token, "display_name": "Gustav"}).status_code == 200
+        uid_a, uid_b = _uid("gg1@example.com"), _uid("gg2@example.com")
+
+        # Ziel: nur Admins setzen, alle sehen es
+        today = datetime.utcnow().date()
+        body = {"metric": "km", "target": 1000, "start": (today - timedelta(days=100)).isoformat(), "end": (today + timedelta(days=100)).isoformat(), "title": "Herbst"}
+        assert c.put(f"/api/groups/{gid}/goal", headers=b, json=body).status_code == 404
+        assert c.put(f"/api/groups/{gid}/goal", headers=a, json={**body, "metric": "bpm"}).status_code == 422
+        assert c.put(f"/api/groups/{gid}/goal", headers=a, json={**body, "end": (today - timedelta(days=200)).isoformat()}).status_code == 422
+        g = c.put(f"/api/groups/{gid}/goal", headers=a, json=body).json()["goal"]
+        assert g["done"] == 130 and g["target"] == 1000 and g["title"] == "Herbst" and not g["finished"]
+        assert [m["display_name"] for m in g["members"]] == ["Gerda", "Gustav"]
+        assert c.get(f"/api/groups/{gid}/goal", headers=b).json()["goal"]["done"] == 130
+        # Pausierte Mitglieder zählen nicht mit
+        c.put(f"/api/groups/{gid}/me", headers=b, json={"share": False})
+        assert c.get(f"/api/groups/{gid}/goal", headers=a).json()["goal"]["done"] == 100
+        c.put(f"/api/groups/{gid}/me", headers=b, json={"share": True})
+        assert c.delete(f"/api/groups/{gid}/goal", headers=b).status_code == 404
+        assert c.delete(f"/api/groups/{gid}/goal", headers=a).status_code == 204
+        assert c.get(f"/api/groups/{gid}/goal", headers=a).json() == {"goal": None}
+
+        # Duell
+        d = c.get(f"/api/groups/{gid}/duel?a={uid_a}&b={uid_b}", headers=a).json()
+        assert d["a"]["display_name"] == "Gerda" and len(d["weeks"]) == 12 and sum(d["weeks_won"].values()) == 12
+        assert c.get(f"/api/groups/{gid}/duel?a={uid_a}&b={uid_a}", headers=a).status_code == 422
+        c.put(f"/api/groups/{gid}/me", headers=b, json={"share": False})
+        assert c.get(f"/api/groups/{gid}/duel?a={uid_a}&b={uid_b}", headers=a).status_code == 409
+        c.put(f"/api/groups/{gid}/me", headers=b, json={"share": True})
+
+        # faire Wertung: Felder sind da, ohne Namen oder Strecken
+        s = c.get(f"/api/groups/{gid}/stats?period=month", headers=a).json()
+        row = s["rows"][0]
+        assert {"rides_per_week", "improve_pct", "milestone"} <= set(row) and "improve_pct" in row["rank"]

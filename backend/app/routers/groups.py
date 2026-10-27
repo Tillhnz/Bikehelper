@@ -17,9 +17,9 @@ from sqlalchemy.orm import Session
 from .. import notify
 from ..config import settings
 from ..database import get_db
-from ..models import Activity, Group, GroupInvite, GroupMember, User
+from ..models import Activity, Group, GroupGoal, GroupInvite, GroupMember, User
 from ..security import current_user
-from ..stats.extra import DAYPARTS, load_series, longest_week_streak, ride_load
+from ..stats.extra import DAYPARTS, MILESTONES, load_series, longest_week_streak, ride_load
 from ..stats.overview import DISTANCE_BUCKETS, Row, _bucket, get_tz, local, streaks
 
 log = logging.getLogger("bikehelper.groups")
@@ -39,7 +39,7 @@ MAX_PENDING_INVITES = 30
 INVITE_DAYS = 14
 LINK_DAYS = 30
 PERIODS = ("week", "month", "year", "all")
-METRICS = ("km", "elev_m", "time_s", "rides", "avg_speed", "longest_km", "active_days")
+METRICS = ("km", "elev_m", "time_s", "rides", "avg_speed", "longest_km", "active_days", "rides_per_week", "improve_pct")
 
 
 class GroupIn(BaseModel):
@@ -139,6 +139,7 @@ def leave_all(db: Session, user_id: int) -> None:
         rest = db.scalars(select(GroupMember).where(GroupMember.group_id == gid).order_by(GroupMember.joined_at, GroupMember.user_id)).all()
         if not rest:
             db.execute(delete(GroupInvite).where(GroupInvite.group_id == gid))
+            db.execute(delete(GroupGoal).where(GroupGoal.group_id == gid))
             db.execute(delete(Group).where(Group.id == gid))
         elif not any(m.role == "admin" for m in rest):
             rest[0].role = "admin"
@@ -247,6 +248,7 @@ def delete_group(group_id: int, user: User = Depends(current_user), db: Session 
     _admin(db, group_id, user)
     db.execute(delete(GroupInvite).where(GroupInvite.group_id == group_id))
     db.execute(delete(GroupMember).where(GroupMember.group_id == group_id))
+    db.execute(delete(GroupGoal).where(GroupGoal.group_id == group_id))
     db.execute(delete(Group).where(Group.id == group_id))
     db.commit()
 
@@ -405,6 +407,40 @@ class _R(Row):
     """Row mit lokalem Tag und lokaler Uhrzeit (day, hour, start_local), damit nicht überall neu umgerechnet wird."""
 
 
+def current_week_streak(days: set[date], today: date) -> int:
+    """Wochen in Folge mit mindestens einer Fahrt, bis zur aktuellen Woche. Hat die aktuelle Woche noch keine Fahrt, zählt die Serie bis letzte Woche."""
+    weeks = {d - timedelta(days=d.weekday()) for d in days}
+    w = today - timedelta(days=today.weekday())
+    if w not in weeks:
+        w -= timedelta(weeks=1)
+    n = 0
+    while w in weeks:
+        n += 1
+        w -= timedelta(weeks=1)
+    return n
+
+
+def rides_per_week(rides: int, first: date | None, last: date) -> float | None:
+    """Fahrten je Woche über die bisher vergangene Zeit des Zeitraums (mindestens eine Woche gerechnet)."""
+    if first is None or rides == 0:
+        return None
+    weeks = max(1.0, ((last - first).days + 1) / 7)
+    return round(rides / weeks, 1)
+
+
+def improvement_pct(now_km: float, before_km: float) -> float | None:
+    """Veränderung der Kilometer gegenüber dem Zeitraum davor in Prozent; erst ab 5 km davor aussagekräftig."""
+    if before_km < 5:
+        return None
+    return round((now_km / before_km - 1) * 100, 1)
+
+
+def crossed_milestone(before_km: float, after_km: float) -> int | None:
+    """Höchste Kilometermarke, die zwischen zwei Ständen überschritten wurde."""
+    hit = [m for m in MILESTONES if before_km < m <= after_km]
+    return hit[-1] if hit else None
+
+
 def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -> dict:
     """Nur die Bereiche, die das Mitglied freigegeben hat. Summen und Verteilungen, keine einzelnen Fahrten."""
     out: dict = {}
@@ -436,6 +472,7 @@ def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -
             "fastest_avg": round(max((r.km / (r.time_s / 3600) for r in fast), default=0.0), 1) or None,
             "day_streak": streaks(days, end)[0],
             "week_streak": longest_week_streak(days),
+            "week_streak_now": current_week_streak({r.day for r in all_rows if r.day <= end}, end),
         }
     if "load" in cats:
         series = load_series([(r.start_local, r) for r in all_rows if r.day <= end], end)
@@ -511,7 +548,17 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
         row = {"user_id": uid, "display_name": m.display_name, "is_me": uid == user.id, **_totals(cur), "shared": _shared(m)}
         if period != "all":
             row["prev"] = {k: v for k, v in _totals(within(rs, plo, phi)).items() if k in ("km", "elev_m", "time_s", "rides")}
-        row["extras"] = _extras(_shared(m), cur, rs, min(today, (hi - timedelta(days=1)) if hi else today), tz)
+        end_day = min(today, (hi - timedelta(days=1)) if hi else today)
+        row["extras"] = _extras(_shared(m), cur, rs, end_day, tz)
+        first_day = lo if lo else min((r.day for r in cur), default=None)
+        row["rides_per_week"] = rides_per_week(len(cur), first_day, end_day)
+        if period != "all":
+            row["improve_pct"] = improvement_pct(row["km"], row["prev"]["km"])
+            before = sum(r.km for r in rs if r.day < lo)
+            row["milestone"] = crossed_milestone(before, before + row["km"])
+        else:
+            row["improve_pct"] = None
+            row["milestone"] = None
         result.append(row)
         pts: dict[int, float] = {}
         for r in cur:
@@ -531,9 +578,9 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
     for r in result:  # Rang je Kennzahl, 1 = bester; gleiche Werte teilen sich den Rang; leere Werte zählen nicht
         r["rank"] = {}
     for metric in METRICS:
-        vals = sorted({r[metric] for r in result if r[metric]}, reverse=True)
+        vals = sorted({r[metric] for r in result if r[metric] and (metric != "improve_pct" or r[metric] > 0)}, reverse=True)
         for r in result:
-            r["rank"][metric] = vals.index(r[metric]) + 1 if r[metric] else None
+            r["rank"][metric] = vals.index(r[metric]) + 1 if r[metric] in vals else None
     result.sort(key=lambda r: (-(r["km"] or 0), r["display_name"].lower()))
     return {
         "period": period, "offset": offset, "label": label,
@@ -545,3 +592,139 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
                    "members": [{"display_name": r["display_name"], "is_me": r["is_me"],
                                 "km": [round(series_raw[r["user_id"]].get(k, 0.0), 1) for k in slots]} for r in result]},
     }
+
+
+# ---------- Gemeinsames Ziel ----------
+
+GOAL_METRICS = {"km": "Kilometer", "elev_m": "Höhenmeter", "rides": "Fahrten"}
+
+
+class GoalIn(BaseModel):
+    metric: str
+    target: float = Field(gt=0, le=10_000_000)
+    start: date
+    end: date
+    title: str | None = Field(default=None, max_length=80)
+
+
+def goal_progress(goal: GroupGoal, daily: dict[str, dict[date, float]], names: dict[int, str], today: date) -> dict:
+    """Stand des Gruppenziels aus Tageswerten je Mitglied (user_id als Schlüssel in `daily`, Namen in `names`)."""
+    total_days = (goal.end - goal.start).days + 1
+    upto = min(today, goal.end)
+    elapsed = max(0, (upto - goal.start).days + 1)
+    per_member = {uid: sum(v for d, v in days.items() if goal.start <= d <= upto) for uid, days in daily.items()}
+    done = sum(per_member.values())
+    series, acc = [], 0.0
+    for i in range(elapsed):
+        d = goal.start + timedelta(days=i)
+        acc += sum(days.get(d, 0.0) for days in daily.values())
+        series.append(round(acc, 1))
+    projected = done / elapsed * total_days if elapsed else 0.0
+    return {
+        "metric": goal.metric, "metric_label": GOAL_METRICS.get(goal.metric, goal.metric), "target": goal.target,
+        "title": goal.title, "start": goal.start.isoformat(), "end": goal.end.isoformat(),
+        "done": round(done, 1), "percent": round(min(999.0, done / goal.target * 100), 1),
+        "days_total": total_days, "days_elapsed": elapsed, "days_left": max(0, (goal.end - today).days),
+        "series": series, "expected_per_day": round(goal.target / total_days, 2),
+        "projected": round(projected), "on_track": projected >= goal.target or done >= goal.target,
+        "finished": done >= goal.target, "over": today > goal.end,
+        "members": sorted(
+            ({"display_name": names[uid], "value": round(v, 1)} for uid, v in per_member.items() if uid in names),
+            key=lambda x: -x["value"],
+        ),
+    }
+
+
+def _goal_daily(db: Session, goal: GroupGoal, sharing: dict[int, GroupMember], tz) -> dict[int, dict[date, float]]:
+    daily: dict[int, dict[date, float]] = {uid: {} for uid in sharing}
+    if not sharing:
+        return daily
+    lo = datetime.combine(goal.start - timedelta(days=1), datetime.min.time())
+    hi = datetime.combine(goal.end + timedelta(days=2), datetime.min.time())
+    q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m).where(
+        Activity.user_id.in_(sharing), Activity.start_date >= lo, Activity.start_date < hi)
+    for uid, start, km, elev in db.execute(q):
+        d = local(start, tz).date()
+        value = {"km": km or 0.0, "elev_m": elev or 0.0, "rides": 1.0}[goal.metric]
+        daily[uid][d] = daily[uid].get(d, 0.0) + value
+    return daily
+
+
+@router.get("/{group_id}/goal")
+def get_goal(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _member(db, group_id, user)
+    goal = db.scalar(select(GroupGoal).where(GroupGoal.group_id == group_id))
+    if goal is None:
+        return {"goal": None}
+    tz = get_tz(settings.timezone)
+    today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
+    members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.share.is_(True))).all()
+    sharing = {m.user_id: m for m in members}
+    names = {m.user_id: m.display_name for m in members}
+    return {"goal": goal_progress(goal, _goal_daily(db, goal, sharing, tz), names, today)}
+
+
+@router.put("/{group_id}/goal")
+def set_goal(group_id: int, data: GoalIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _admin(db, group_id, user)
+    if data.metric not in GOAL_METRICS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unbekannte Kennzahl für das Ziel")
+    if data.end < data.start or (data.end - data.start).days > 800:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Das Ende muss nach dem Start liegen, höchstens 800 Tage.")
+    goal = db.scalar(select(GroupGoal).where(GroupGoal.group_id == group_id))
+    title = (data.title or "").strip() or None
+    if goal is None:
+        db.add(GroupGoal(group_id=group_id, metric=data.metric, target=data.target, start=data.start, end=data.end, title=title))
+    else:
+        goal.metric, goal.target, goal.start, goal.end, goal.title = data.metric, data.target, data.start, data.end, title
+    db.commit()
+    return get_goal(group_id, user, db)
+
+
+@router.delete("/{group_id}/goal", status_code=204)
+def delete_goal(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _admin(db, group_id, user)
+    db.execute(delete(GroupGoal).where(GroupGoal.group_id == group_id))
+    db.commit()
+
+
+# ---------- Duell ----------
+
+@router.get("/{group_id}/duel")
+def duel(group_id: int, a: int, b: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Zwei Mitglieder im direkten Vergleich über die letzten 12 Wochen. Nur wer teilt, kann verglichen werden."""
+    _member(db, group_id, user)
+    if a == b:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Bitte zwei verschiedene Mitglieder wählen.")
+    members = {m.user_id: m for m in db.scalars(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id.in_([a, b])))}
+    if a not in members or b not in members:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mitglied nicht gefunden")
+    if not (members[a].share and members[b].share):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Eines der Mitglieder teilt seine Kennzahlen gerade nicht.")
+    tz = get_tz(settings.timezone)
+    today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
+    first = today - timedelta(days=today.weekday()) - timedelta(weeks=11)
+    since = datetime.combine(first - timedelta(days=1), datetime.min.time())
+    weeks = [first + timedelta(weeks=i) for i in range(12)]
+    acc = {uid: {w: {"km": 0.0, "elev_m": 0.0, "rides": 0, "time_s": 0} for w in weeks} for uid in (a, b)}
+    q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m, Activity.moving_time_s).where(
+        Activity.user_id.in_([a, b]), Activity.start_date >= since)
+    for uid, start, km, elev, secs in db.execute(q):
+        d = local(start, tz).date()
+        w = d - timedelta(days=d.weekday())
+        if w in acc[uid]:
+            x = acc[uid][w]
+            x["km"] += km or 0.0
+            x["elev_m"] += elev or 0.0
+            x["rides"] += 1
+            x["time_s"] += secs or 0
+    out = {}
+    for uid in (a, b):
+        tot = {k: sum(acc[uid][w][k] for w in weeks) for k in ("km", "elev_m", "rides", "time_s")}
+        out[uid] = {"display_name": members[uid].display_name, "is_me": uid == user.id,
+                    "km_by_week": [round(acc[uid][w]["km"], 1) for w in weeks],
+                    "totals": {"km": round(tot["km"], 1), "elev_m": round(tot["elev_m"]), "rides": int(tot["rides"]), "time_s": int(tot["time_s"]),
+                               "avg_speed": round(tot["km"] / (tot["time_s"] / 3600), 1) if tot["time_s"] >= 600 else None}}
+    won_a = sum(1 for w in weeks if acc[a][w]["km"] > acc[b][w]["km"])
+    won_b = sum(1 for w in weeks if acc[b][w]["km"] > acc[a][w]["km"])
+    return {"weeks": [w.isoformat() for w in weeks], "a": out[a], "b": out[b], "weeks_won": {"a": won_a, "b": won_b, "draw": 12 - won_a - won_b}}
