@@ -755,6 +755,26 @@ def test_rides_day_filter():
         assert [a["name"] for a in r["items"]] == ["Morgens"]
 
 
+def test_event_log_keeps_full_error_text_for_server_errors():
+    from app.audit import scrub
+    assert "a@b.de" not in scrub("Fehler für a@b.de von 10.1.2.3 [SQL: INSERT x] [parameters: ('geheim',)]")
+    assert "geheim" not in scrub("Fehler [parameters: ('geheim',)]") and "<IP>" in scrub("von 10.1.2.3")
+
+    def boom():
+        raise RuntimeError("kaputt für test@example.com")
+
+    app.add_api_route("/api/_boom", boom)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as c:
+            h = _user(c, "boom-user@example.com")
+            assert c.get("/api/_boom", headers=h).status_code == 500
+            rows = c.get("/api/admin/audit", headers=_admin_headers(), params={"limit": 50}).json()
+            err = next(r for r in rows if r["action"] == "error")
+            assert "Fehlercode 500" in err["error_text"] and "RuntimeError: kaputt" in err["error_text"] and "test@example.com" not in err["error_text"]
+    finally:
+        app.router.routes[:] = [r for r in app.router.routes if getattr(r, "path", "") != "/api/_boom"]
+
+
 def test_event_log_records_logins_and_coarse_actions_without_content():
     with TestClient(app) as c:
         h = _user(c, "live-user@example.com")

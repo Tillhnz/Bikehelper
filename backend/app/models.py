@@ -381,6 +381,7 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(255))  # E-Mail des Handelnden oder "System"
     action: Mapped[str] = mapped_column(String(40))
     detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    error_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # volle Fehlermeldung bei Serverfehlern (ohne Personendaten)
 
 
 class PasswordReset(Base):

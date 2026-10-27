@@ -1021,7 +1021,11 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 .live-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:var(--celeste);margin-right:.2rem;animation:live-pulse 1.6s ease-in-out infinite}
 @keyframes live-pulse{50%{opacity:.3}}
 .event-list{list-style:none;margin:.8rem 0 0;padding:0;max-height:70vh;overflow:auto}
-.event-list li{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.45rem .4rem;border-top:1px solid var(--line);font-size:.92rem}
+.event-list li{padding:.45rem .4rem;border-top:1px solid var(--line);font-size:.92rem}
+.ev-row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.event-list li.expandable .ev-row{cursor:pointer}
+.ev-more{margin-left:auto;text-decoration:underline}
+.ev-error{margin:.5rem 0 .2rem;padding:.6rem .7rem;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font:.82rem/1.45 ui-monospace,Menlo,Consolas,monospace;user-select:text}
 .event-list li.fresh{background:var(--panel-2);animation:ev-in .4s ease-out}
 .ev-time{min-width:6.5rem;font-variant-numeric:tabular-nums}
 .ev-who{font-weight:500;overflow-wrap:anywhere}

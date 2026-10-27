@@ -1,7 +1,11 @@
 import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 
 from . import audit, notify, suggest
@@ -73,11 +77,24 @@ _SPECIAL = {
 _VERB = {"POST": "neu oder ausgeführt", "PUT": "geändert", "PATCH": "geändert", "DELETE": "gelöscht"}
 
 
+@app.exception_handler(StarletteHTTPException)
+async def keep_http_detail(request, exc):
+    """Merkt sich die Meldung, damit das Ereignisprotokoll sie bei Fehlern ab 500 vollständig zeigen kann."""
+    request.state.http_detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    return await http_exception_handler(request, exc)
+
+
 @app.middleware("http")
 async def event_log(request, call_next):
     """Schreibt Aktionen und Serverfehler ins Ereignisprotokoll. Nur Bereich und Art, keine Inhalte."""
-    response = await call_next(request)
     path = request.url.path
+    crash = None
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # nicht abgefangener Fehler: ins Protokoll und als normale 500-Antwort ausliefern
+        logging.getLogger("bikehelper").exception("Unbehandelter Fehler bei %s %s", request.method, path)
+        crash = exc
+        response = JSONResponse({"detail": "Interner Serverfehler"}, status_code=500)
     if not path.startswith("/api/") or path.startswith(("/api/admin", "/api/health")):
         return response
     try:
@@ -85,7 +102,13 @@ async def event_log(request, call_next):
         route = request.scope.get("route")
         template = getattr(route, "path", path)
         if response.status_code >= 500:
-            audit.event(actor or "System", "error", f"{request.method} {template} -> {response.status_code}")
+            if crash is not None:
+                tb = traceback.extract_tb(crash.__traceback__)
+                where = f"{tb[-1].filename.split('/app/')[-1]}:{tb[-1].lineno} in {tb[-1].name}" if tb else "?"
+                text = f"Fehlercode {response.status_code}: {type(crash).__name__}: {crash}\nStelle: {where}"
+            else:
+                text = f"Fehlercode {response.status_code}: {getattr(request.state, 'http_detail', None) or 'keine Meldung'}"
+            audit.event(actor or "System", "error", f"{request.method} {template} -> {response.status_code}", text)
         elif actor and request.method in _VERB and response.status_code < 400:
             if path in _SPECIAL:
                 action, text = _SPECIAL[path]

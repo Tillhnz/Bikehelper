@@ -407,7 +407,9 @@ function AuditLog() {
   const [live, setLive] = useState(true);
   const [filter, setFilter] = useState("all");
   const [fresh, setFresh] = useState(new Set());
+  const [open, setOpen] = useState(new Set());
   const top = useRef(0);
+  const toggle = (id) => setOpen((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   useEffect(() => {
     let stop = false;
@@ -449,7 +451,7 @@ function AuditLog() {
       </div>
       <p className="muted small">
         Wer sich wann angemeldet hat, was grob getan wurde und was auf dem Server passiert. Aus Datenschutzgründen steht hier nur, <em>in welchem Bereich</em> etwas passiert ist
-        (zum Beispiel „Lager: gelöscht“), nie ein Name, eine Zahl, ein Passwort oder eine IP-Adresse. Einträge bleiben 30 Tage.
+        (zum Beispiel „Lager: gelöscht“), nie ein Name, eine Zahl, ein Passwort oder eine IP-Adresse. Bei Serverfehlern öffnet ein Klick auf den Eintrag die vollständige Fehlermeldung mit Fehlercode (E-Mail-Adressen, IP-Adressen und Datenbankwerte werden entfernt). Einträge bleiben 30 Tage.
       </p>
       <div className="seg" role="group" aria-label="Filter">
         {[["all", "Alle"], ...Object.entries(KIND_TEXT)].map(([k, label]) => (
@@ -463,12 +465,17 @@ function AuditLog() {
         <ul className="event-list" aria-live={live ? "polite" : "off"}>
           {shown.map((r) => {
             const kind = kindOf(r.action);
+            const expandable = !!r.error_text;
             return (
-              <li key={r.id} className={fresh.has(r.id) ? "fresh" : ""}>
-                <span className="muted small ev-time">{timeText(r.at)}</span>
-                <span className={`pill ${KIND_PILL[kind]}`}>{ACTION_TEXT[r.action] || r.action}</span>
-                <span className="ev-who">{r.actor}</span>
-                {r.detail && <span className="muted small">{r.detail}</span>}
+              <li key={r.id} className={`${fresh.has(r.id) ? "fresh" : ""} ${expandable ? "expandable" : ""}`}>
+                <div className="ev-row" {...(expandable ? { role: "button", tabIndex: 0, "aria-expanded": open.has(r.id), onClick: () => toggle(r.id), onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(r.id); } } } : {})}>
+                  <span className="muted small ev-time">{timeText(r.at)}</span>
+                  <span className={`pill ${KIND_PILL[kind]}`}>{ACTION_TEXT[r.action] || r.action}</span>
+                  <span className="ev-who">{r.actor}</span>
+                  {r.detail && <span className="muted small">{r.detail}</span>}
+                  {expandable && <span className="muted small ev-more">{open.has(r.id) ? "Weniger" : "Meldung anzeigen"}</span>}
+                </div>
+                {expandable && open.has(r.id) && <pre className="ev-error">{r.error_text}</pre>}
               </li>
             );
           })}

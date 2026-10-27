@@ -208,7 +208,7 @@ def create_backup(admin: User = Depends(require_admin), db: Session = Depends(ge
 def audit_log(limit: int = 100, after: int = 0, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Neueste Einträge zuerst. Mit after=<id> kommen nur neuere Einträge (für die Live-Ansicht)."""
     rows = db.scalars(select(AuditEntry).where(AuditEntry.id > after).order_by(AuditEntry.id.desc()).limit(max(1, min(limit, 500)))).all()
-    return [{"id": r.id, "at": r.at.isoformat() if r.at else None, "actor": r.actor, "action": r.action, "detail": r.detail} for r in rows]
+    return [{"id": r.id, "at": r.at.isoformat() if r.at else None, "actor": r.actor, "action": r.action, "detail": r.detail, "error_text": r.error_text} for r in rows]
 
 
 def _db_size(db: Session) -> int | None:
