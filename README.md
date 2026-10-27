@@ -142,7 +142,7 @@ Danach holt die App alle 30 Minuten neue Fahrten ab (oder sofort über „Jetzt 
 
 [intervals.icu](https://intervals.icu) sammelt Fahrten aus Garmin Connect, Wahoo, Zwift, Polar, Suunto und weiteren Diensten. BikeHelper holt sie von dort ab, das ist auch der Weg für Garmin ohne Strava (Garmin vergibt seine eigene API nur an Geschäftskunden):
 
-1. Bei intervals.icu das Garmin- oder andere Konto verbinden.
+1. Bei intervals.icu das Garmin-, Wahoo- oder Hammerhead-Konto verbinden, **nicht Strava**: Strava gibt Aktivitäten nicht über die Schnittstelle weiter.
 2. Dort unter Einstellungen → Entwicklereinstellungen den persönlichen API-Schlüssel kopieren.
 3. In BikeHelper unter Einstellungen → intervals.icu einfügen und „Verbinden“ klicken.
 

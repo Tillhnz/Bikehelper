@@ -6,7 +6,7 @@ import { WEATHER_TEXT, api, sourceLabel, fmtDateTime, fmtDuration, fmtKm, fmtKm1
 import { ProfileChart } from "../components/charts.jsx";
 import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
 import AfterRide from "../components/AfterRide.jsx";
-import { confirmDialog, Loading } from "../components/feedback.jsx";
+import { confirmDialog, Loading, toast } from "../components/feedback.jsx";
 
 function RouteMap({ polyline, hoverPoint, cfg }) {
   const boxRef = useRef(null);
@@ -59,6 +59,8 @@ export default function RideDetail() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
   const [cfg, setCfg] = useState(null);
+  const [bikes, setBikes] = useState([]);
+  const [suggestion, setSuggestion] = useState(null);
 
   useEffect(() => {
     loadMapConfig(api).then(setCfg).catch(() => {});
@@ -68,6 +70,14 @@ export default function RideDetail() {
     setA(null);
     api.get(`/activities/${id}`).then((r) => { setA(r); setName(r.name); }).catch((e) => setError(e.message));
   }, [id]);
+
+  const unassigned = a ? !a.bike_id : false;
+  useEffect(() => {
+    setSuggestion(null);
+    if (!unassigned) return;
+    api.get("/bikes").then(setBikes).catch(() => {});
+    api.get(`/activities/suggestions?activity_id=${id}`).then((r) => setSuggestion(r[id] || null)).catch(() => {});
+  }, [id, unassigned]);
 
   const profile = a?.details?.profile;
   const llPoints = useMemo(() => (profile?.ll ? decodePolyline(profile.ll) : null), [profile]);
@@ -84,6 +94,14 @@ export default function RideDetail() {
       const r = await api.put(`/activities/${a.id}`, { name });
       setA({ ...a, name: r.name });
       setEditing(false);
+    } catch (err) { setError(err.message); }
+  }
+
+  async function setBike(bikeId) {
+    try {
+      const r = await api.put(`/activities/${a.id}`, { bike_id: Number(bikeId) });
+      setA({ ...a, bike_id: r.bike_id, bike_name: r.bike_name });
+      toast("Rad zugeordnet.");
     } catch (err) { setError(err.message); }
   }
 
@@ -120,6 +138,28 @@ export default function RideDetail() {
           <button className="link small danger" onClick={remove}>Löschen</button>
         </div>
       </header>
+
+      {unassigned && (
+        <section className="panel attention bike-assign">
+          <strong>Kein Rad zugeordnet.</strong>{" "}
+          {suggestion ? (
+            <>
+              Vorschlag: <strong>{suggestion.bike_name}</strong>
+              <span className="muted small"> ({suggestion.reason})</span>{" "}
+              <button className="btn small primary" onClick={() => setBike(suggestion.bike_id)}>Übernehmen</button>{" "}
+            </>
+          ) : null}
+          {bikes.length > 0 && (
+            <label className="inline-select">
+              <span className="muted small">{suggestion ? "oder anderes Rad: " : "Rad wählen: "}</span>
+              <select value="" onChange={(e) => e.target.value && setBike(e.target.value)} aria-label="Rad zuordnen">
+                <option value="">–</option>
+                {bikes.filter((b) => !b.retired).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </label>
+          )}
+        </section>
+      )}
 
       <AfterRide bikeId={a.bike_id} />
 

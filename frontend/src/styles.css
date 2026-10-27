@@ -248,6 +248,12 @@ input:focus, select:focus { border-color: var(--celeste); }
 
 .import-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; align-items: start; }
 .import-grid .panel { margin-bottom: 0; }
+.import-fold{margin-bottom:1rem;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.import-fold>summary{cursor:pointer;padding:.55rem .9rem;font-weight:600;display:flex;gap:.7rem;align-items:baseline;flex-wrap:wrap}
+.import-fold[open]>summary{border-bottom:1px solid var(--line)}
+.import-fold .import-grid{padding:1rem}
+.bike-assign{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.inline-select{display:inline-flex;gap:.3rem;align-items:center}
 .import-grid + .panel, .import-grid + section { margin-top: 1.5rem; }
 .import-grid form { display: grid; gap: 1rem; }
 

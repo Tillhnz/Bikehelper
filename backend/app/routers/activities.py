@@ -155,13 +155,14 @@ def list_activities(
 
 
 @router.get("/activities/suggestions")
-def bike_suggestions(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Radvorschläge für die neuesten Fahrten ohne Rad (höchstens 300)."""
+def bike_suggestions(activity_id: int | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Radvorschläge für die neuesten Fahrten ohne Rad (höchstens 300) oder, mit activity_id, für genau diese Fahrt."""
     from ..suggest import suggest_bikes
-    rows = db.scalars(
-        select(Activity).options(defer(Activity.polyline), defer(Activity.details), defer(Activity.tiles))
-        .where(Activity.user_id == user.id, Activity.bike_id.is_(None)).order_by(Activity.start_date.desc()).limit(300)
-    ).all()
+    q = (select(Activity).options(defer(Activity.polyline), defer(Activity.details), defer(Activity.tiles))
+         .where(Activity.user_id == user.id, Activity.bike_id.is_(None)))
+    if activity_id is not None:
+        q = q.where(Activity.id == activity_id)
+    rows = db.scalars(q.order_by(Activity.start_date.desc()).limit(300)).all()
     return suggest_bikes(db, user.id, rows)
 
 

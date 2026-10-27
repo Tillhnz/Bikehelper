@@ -659,10 +659,13 @@ export default function Rides() {
     <>
       <header className="page-head"><h1>Fahrten</h1></header>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="import-grid">
-        <StravaImport />
-        <FileImport bikes={bikes} />
-      </div>
+      <details className="import-fold">
+        <summary>Fahrten importieren <span className="muted small">Strava-Export oder Dateien hochladen</span></summary>
+        <div className="import-grid">
+          <StravaImport />
+          <FileImport bikes={bikes} />
+        </div>
+      </details>
       <GearAssign gear={gear} bikes={bikes} onDone={refresh} />
       <WeatherPanel refreshKey={refreshKey} />
       <ActivityList bikes={bikes} refreshKey={refreshKey} onChanged={refresh} />

@@ -168,6 +168,8 @@ def test_bike_suggestions_from_gear_name_and_similar_rides():
         assert s[str(ids[0])]["bike_id"] == ids[3] and "Radnamen" in s[str(ids[0])]["reason"]
         assert s[str(ids[1])]["bike_id"] == ids[3] and "ähnlichen" in s[str(ids[1])]["reason"]
         assert str(ids[2]) not in s  # anderer Startort: kein Vorschlag
+        one = c.get(f"/api/activities/suggestions?activity_id={ids[1]}", headers=h).json()
+        assert list(one) == [str(ids[1])] and one[str(ids[1])]["bike_id"] == ids[3]  # Vorschlag für die Einzelansicht
 
 
 def test_bike_suggestions_from_power_source_terrain_and_speed():

@@ -23,7 +23,11 @@ export default function WhatsNew({ user, onClose }) {
           BikeHelper kann jetzt neue Fahrten automatisch aus <strong>intervals.icu</strong> abholen. Dorthin synchronisieren
           unter anderem Garmin Connect, Wahoo, Zwift, Polar und Suunto. So kommen auch Garmin-Fahrten ohne Strava in die App.
         </p>
-        <p className="muted small">Du brauchst nur deinen persönlichen API-Schlüssel von intervals.icu. Fahrten, die dort von Strava stammen, gibt intervals.icu nicht heraus.</p>
+        <p>
+          <strong>Verbinde in intervals.icu nicht Strava, sondern direkt deinen Radcomputer</strong> (Wahoo, Garmin oder Hammerhead).
+          Strava gibt Aktivitäten nicht über die Schnittstelle weiter, solche Fahrten kann BikeHelper deshalb nicht abholen.
+        </p>
+        <p className="muted small">Du brauchst nur deinen persönlichen API-Schlüssel von intervals.icu.</p>
         <div className="actions">
           <button className="btn" onClick={() => close(false)}>Später</button>
           <button ref={okRef} className="btn primary" onClick={() => close(true)}>Jetzt einrichten</button>
