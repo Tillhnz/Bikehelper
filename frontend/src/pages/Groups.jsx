@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api.js";
+import { api, fmtDate, fmtNum } from "../api.js";
 import { copyText } from "../clipboard.js";
 import { EmptyState } from "../components/ui.jsx";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
@@ -123,9 +123,116 @@ export function GroupJoin() {
   );
 }
 
+// ---------- Gemeinsames Ziel ----------
+
+const GOAL_UNITS = { km: "km", elev_m: "m", rides: "Fahrten" };
+
+function GoalChart({ g }) {
+  const W = 640, H = 170, padL = 40, padR = 10, padT = 10, padB = 22;
+  const max = Math.max(g.target, ...g.series, 1);
+  const x = (i) => padL + (i / Math.max(1, g.days_total - 1)) * (W - padL - padR);
+  const y = (v) => padT + (1 - v / max) * (H - padT - padB);
+  const path = g.series.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Fortschritt des Gruppenziels">
+      {[0, 0.5, 1].map((f) => (
+        <g key={f}><line x1={padL} x2={W - padR} y1={y(max * f)} y2={y(max * f)} className="chart-grid" /><text x={padL - 4} y={y(max * f) + 3} textAnchor="end" className="chart-label">{fmtNum(max * f, 0)}</text></g>
+      ))}
+      <line x1={x(0)} y1={y(0)} x2={x(g.days_total - 1)} y2={y(g.target)} stroke="var(--mute)" strokeWidth="1.5" strokeDasharray="5 4" />
+      {g.series.length > 1 && <path className="draw" pathLength="1" d={path} fill="none" stroke="var(--celeste)" strokeWidth="2.5" strokeLinejoin="round" />}
+      <text x={padL} y={H - 6} className="chart-label">{fmtDate(g.start)}</text>
+      <text x={W - padR} y={H - 6} textAnchor="end" className="chart-label">{fmtDate(g.end)}</text>
+    </svg>
+  );
+}
+
+function GroupGoal({ groupId, isAdmin }) {
+  const [state, setState] = useState(undefined);
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState({ metric: "km", target: "", start: "", end: "", title: "" });
+  const [error, setError] = useState("");
+  const load = useCallback(() => api.get(`/groups/${groupId}/goal`).then((r) => setState(r.goal)).catch((e) => setError(e.message)), [groupId]);
+  useEffect(() => { load(); }, [load]);
+
+  function startEdit() {
+    const y = new Date().getFullYear();
+    setForm(state
+      ? { metric: state.metric, target: String(state.target), start: state.start, end: state.end, title: state.title || "" }
+      : { metric: "km", target: "", start: `${y}-01-01`, end: `${y}-12-31`, title: "" });
+    setEdit(true);
+  }
+  async function save(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      const r = await api.put(`/groups/${groupId}/goal`, { ...form, target: Number(form.target), title: form.title || null });
+      setState(r.goal);
+      setEdit(false);
+      toast("Ziel gespeichert");
+    } catch (err) { setError(err.message); }
+  }
+  async function remove() {
+    if (!(await confirmDialog("Gruppenziel entfernen? Die Fahrten der Mitglieder bleiben unberührt."))) return;
+    try { await api.del(`/groups/${groupId}/goal`); setState(null); setEdit(false); } catch (err) { setError(err.message); }
+  }
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  if (state === undefined && !error) return null;
+  if (!state && !isAdmin && !edit) return null;
+  const unit = state ? GOAL_UNITS[state.metric] : "";
+  return (
+    <section className="panel group-goal">
+      <div className="log-head">
+        <h2>{state?.title || "Gemeinsames Ziel"}</h2>
+        {isAdmin && !edit && <button className="btn small" onClick={startEdit}>{state ? "Ändern" : "Ziel setzen"}</button>}
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+      {edit && (
+        <form className="inline-form" onSubmit={save}>
+          <label>Kennzahl<select value={form.metric} onChange={set("metric")}><option value="km">Kilometer</option><option value="elev_m">Höhenmeter</option><option value="rides">Fahrten</option></select></label>
+          <label>Ziel<input type="number" min="1" step="any" required value={form.target} onChange={set("target")} /></label>
+          <label>Von<input type="date" required value={form.start} onChange={set("start")} /></label>
+          <label>Bis<input type="date" required value={form.end} onChange={set("end")} /></label>
+          <label className="grow">Titel (optional)<input maxLength={80} value={form.title} onChange={set("title")} placeholder="z. B. 10 000 km bis Silvester" /></label>
+          <button className="btn primary">Speichern</button>
+          <button type="button" className="btn" onClick={() => setEdit(false)}>Abbrechen</button>
+          {state && <button type="button" className="btn danger" onClick={remove}>Entfernen</button>}
+        </form>
+      )}
+      {!state && !edit && <p className="muted">Als Gruppenadministrator kannst du ein gemeinsames Ziel setzen, etwa „10 000 km in diesem Jahr“. Alle sehen den Fortschritt, gezählt wird, was Mitglieder in dieser Gruppe teilen.</p>}
+      {state && !edit && (
+        <>
+          <div className="goal-line">
+            <strong>{fmtNum(state.done, 0)}</strong> <span className="muted">von {fmtNum(state.target, 0)} {unit}</span>
+            <span className={`goal-status ${state.finished ? "done" : state.on_track ? "ok" : "late"}`}>
+              {state.finished ? "Geschafft! 🎉" : state.over ? "Zeit abgelaufen" : state.on_track ? "Im Plan" : "Hinterher"}
+            </span>
+          </div>
+          <div className="goal-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.min(100, state.percent)}>
+            <span style={{ width: `${Math.min(100, state.percent)}%` }} />
+          </div>
+          <p className="muted small">
+            {fmtNum(state.percent, 0)} % · {state.over ? "beendet" : `noch ${state.days_left} ${state.days_left === 1 ? "Tag" : "Tage"}`}
+            {!state.over && !state.finished && ` · Hochgerechnet ${fmtNum(state.projected, 0)} ${unit}`}
+          </p>
+          <GoalChart g={state} />
+          <p className="small group-legend"><span><i style={{ background: "var(--celeste)" }} />Bisher</span><span><i style={{ background: "var(--mute)" }} />Sollverlauf</span></p>
+          {state.members.length > 0 && (
+            <ul className="hbars compact">
+              {state.members.map((m) => (
+                <li key={m.display_name}><span className="hbar-label">{m.display_name}</span><span className="hbar-track"><span className="hbar-fill" style={{ width: `${(m.value / Math.max(1, state.members[0].value)) * 100}%` }} /></span><span className="hbar-val">{fmtNum(m.value, 0)} {unit}</span></li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 // ---------- Gruppenansicht ----------
 
-function Board({ groupId }) {
+function Board({ groupId, isAdmin }) {
   const [period, setPeriod] = useState("week");
   const [offset, setOffset] = useState(0);
   const [d, setD] = useState(null);
@@ -137,6 +244,7 @@ function Board({ groupId }) {
 
   return (
     <>
+      <GroupGoal groupId={groupId} isAdmin={isAdmin} />
       <section className="panel">
         <div className="log-head">
           <h2>Gruppenstatistik</h2>
@@ -157,7 +265,7 @@ function Board({ groupId }) {
         {d?.not_sharing.length > 0 && <p className="muted small">Pausieren: {d.not_sharing.join(", ")}</p>}
         {d?.rows.length > 0 && <p className="muted small">Mehr Bereiche (Rhythmus, Rekorde, Belastung, Wetter) erscheinen, sobald Mitglieder sie unter „Meine Teilnahme“ freigeben. Orte, Strecken, Räder und Wartung werden nie geteilt.</p>}
       </section>
-      {d?.rows.length > 0 && <GroupStats d={d} />}
+      {d?.rows.length > 0 && <GroupStats d={d} groupId={groupId} />}
     </>
   );
 }
@@ -312,7 +420,7 @@ export function GroupDetail() {
     <>
       <p><Link to="/groups" className="link">← Alle Gruppen</Link></p>
       <header className="page-head"><h1>{g.name}</h1></header>
-      <Board groupId={g.id} key={`${g.id}-${g.share}-${g.shared.join()}`} />
+      <Board groupId={g.id} isAdmin={g.role === "admin"} key={`${g.id}-${g.share}-${g.shared.join()}`} />
       <Members g={g} reload={load} />
     </>
   );

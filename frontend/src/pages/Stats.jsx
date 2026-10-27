@@ -6,9 +6,10 @@ import { Bars, CalendarHeat, CumulativeLines, HBars } from "../components/charts
 import { EmptyState } from "../components/ui.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
 import { CompareView, GoalsView, LoadView, PlacesView, ReviewView } from "../components/StatsExtra.jsx";
+import { BikesView, PatternsView, PowerView, RoutesView } from "../components/StatsDeep.jsx";
 import { Loading } from "../components/feedback.jsx";
 
-const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"], ["heatmap", "Heatmap"]];
+const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["power", "Leistung"], ["patterns", "Muster & Wetter"], ["bikes", "Räder"], ["routes", "Strecken"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"], ["heatmap", "Heatmap"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
 export default function Stats() {
@@ -51,10 +52,10 @@ export default function Stats() {
             {options.years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         )}
-        <select value={filters.bike_id} onChange={set("bike_id")} aria-label="Rad">
+        {tab !== "bikes" && tab !== "routes" && <select value={filters.bike_id} onChange={set("bike_id")} aria-label="Rad">
           <option value="">Alle Räder</option>
           {options.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        </select>}
       </div>
     </header>
   );
@@ -67,6 +68,10 @@ export default function Stats() {
   );
   const years = options.years.length ? options.years : (d.years ? d.years.map((y) => y.year) : []);
   if (tab === "load") return <>{header}{tabs}<LoadView bikeId={filters.bike_id} /></>;
+  if (tab === "power") return <>{header}{tabs}<PowerView bikeId={filters.bike_id} /></>;
+  if (tab === "patterns") return <>{header}{tabs}<PatternsView bikeId={filters.bike_id} /></>;
+  if (tab === "bikes") return <>{header}{tabs}<BikesView /></>;
+  if (tab === "routes") return <>{header}{tabs}<RoutesView /></>;
   if (tab === "review") return <>{header}{tabs}<ReviewView bikeId={filters.bike_id} years={years} /></>;
   if (tab === "goals") return <>{header}{tabs}<GoalsView /></>;
   if (tab === "places") return <>{header}{tabs}<PlacesView /></>;

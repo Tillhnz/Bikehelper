@@ -1178,3 +1178,37 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .group-legend i{display:inline-block}
 @media (max-width:800px){.member-bars li,.stacked li{grid-template-columns:90px 1fr 70px}.record-win{font-size:1.8rem}}
 @media (prefers-reduced-motion:reduce){.podium-step{animation:none}}
+
+/* Tiefe Auswertungen */
+.insights{list-style:none;margin:0 0 1.25rem;padding:0;display:grid;gap:.5rem}
+.insights li{padding:.65rem .9rem;border-left:3px solid var(--celeste);background:var(--panel);border-radius:0 8px 8px 0;font-size:.92rem;line-height:1.45}
+.plain-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:.9rem;margin-top:.75rem}
+.plain-table th,.plain-table td{text-align:left;padding:.4rem .6rem;border-bottom:1px solid var(--line);white-space:nowrap}
+.plain-table thead th{color:var(--mute);font-weight:500}
+.compare-table tbody th{color:var(--mute);font-weight:500;position:sticky;left:0;background:var(--panel)}
+.compare-table td{white-space:normal;min-width:7.5rem}
+.forecast{list-style:none;margin:0;padding:0;display:grid}
+.forecast li{display:flex;justify-content:space-between;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.forecast li:last-child{border-bottom:0}
+.forecast li.due{border-left:3px solid var(--signal);padding-left:.7rem}
+.forecast li.soon{border-left:3px solid var(--amber);padding-left:.7rem}
+.forecast-when{text-align:right}
+@media (max-width:560px){.forecast li{flex-direction:column;gap:.2rem}.forecast-when{text-align:left}}
+
+/* Gruppen: Ziel, Duell, Serien */
+.group-goal .goal-line{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap}
+.group-goal .goal-line strong{font-family:var(--font-display);font-size:2.2rem;line-height:1}
+.goal-status{margin-left:auto;font-size:.85rem;padding:.15rem .65rem;border-radius:999px;border:1px solid var(--line)}
+.goal-status.ok,.goal-status.done{border-color:var(--celeste);color:var(--celeste)}
+.goal-status.late{border-color:var(--amber);color:var(--amber)}
+.group-goal .goal-bar{height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin:.5rem 0}
+.group-goal .goal-bar span{display:block;height:100%;background:var(--celeste);border-radius:999px}
+.milestone-list{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
+.duel-pick{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem}
+.duel-score{display:flex;justify-content:center;align-items:center;gap:1.2rem;flex-wrap:wrap;margin:.5rem 0 0}
+.duel-score strong{font-family:var(--font-display);font-size:2.6rem;line-height:1}
+.duel-lines{list-style:none;margin:1rem 0 0;padding:0;display:grid}
+.duel-lines li{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.duel-lines li span:first-child{text-align:right}
+.duel-lines .win{font-weight:700;color:var(--celeste)}
+@media (prefers-reduced-motion:reduce){.group-goal .goal-bar span{transition:none}}

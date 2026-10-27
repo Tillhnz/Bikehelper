@@ -21,7 +21,7 @@ function useData(path, deps) {
 }
 
 /** Liniendiagramm mit mehreren Reihen über Datumswerte, Nulllinie bei negativen Werten. */
-function Lines({ labels, series, height = 200, zeroLine = false }) {
+export function Lines({ labels, series, height = 200, zeroLine = false }) {
   const W = 640, padL = 36, padR = 8, padT = 10, padB = 22;
   const all = series.flatMap((s) => s.values);
   const lo = Math.min(0, ...all), hi = Math.max(1, ...all);

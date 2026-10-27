@@ -1,5 +1,28 @@
 [
   {
+    "id": "2026-10-27.11",
+    "date": "2026-10-27",
+    "title": "Gruppen: Ziel, Duell, Serien und fairere Wertung",
+    "changes": [
+      "Gruppenadministratoren können ein gemeinsames Ziel setzen (Kilometer, Höhenmeter oder Fahrten) mit Fortschrittsbalken, Sollverlauf und Hochrechnung.",
+      "Neuer Reiter „Duell“: zwei Mitglieder über 12 Wochen gegeneinander, mit gewonnenen Wochen.",
+      "Neuer Reiter „Serien & Meilensteine“: überschrittene Kilometermarken, größte Steigerung zum Zeitraum davor, Fahrten pro Woche und die aktuelle Wochenserie.",
+      "In der Rangliste gibt es zwei neue Kennzahlen: Fahrten pro Woche und Verbesserung."
+    ]
+  },
+  {
+    "id": "2026-10-27.10",
+    "date": "2026-10-27",
+    "title": "Tiefere Auswertungen in der Statistik",
+    "changes": [
+      "Neuer Reiter „Leistung“: Leistungskurve, geschätzte FTP mit Verlauf, Zonen, Stunden je Zone und eine Form-Kurve aus Wattwerten.",
+      "Neuer Reiter „Muster & Wetter“: dein Tempo nach Temperatur, Wind, Regen, Wochentag, Tageszeit, Jahreszeit und Ruhetagen.",
+      "Neuer Reiter „Räder“: alle Räder nebeneinander, dazu eine Prognose, wann Wartungen voraussichtlich fällig werden.",
+      "Neuer Reiter „Strecken“: BikeHelper erkennt Runden, die du oft fährst, und zeigt, wie sich deine Zeiten dort entwickeln.",
+      "Neu importierte Fahrten mit Wattwerten speichern jetzt einen Sekundenverlauf der Bestwerte, ältere werden aus dem Streckenprofil genähert."
+    ]
+  },
+  {
     "id": "2026-10-27.9",
     "date": "2026-10-27",
     "title": "Gruppenstatistik mit Grafiken",

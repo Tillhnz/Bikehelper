@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { fmtDuration, fmtNum } from "../api.js";
+import { useEffect, useState } from "react";
+import { api, fmtDuration, fmtNum } from "../api.js";
 import { Kpi, Panel } from "./statsui.jsx";
 
 export const COLORS = ["var(--celeste)", "#f2b84b", "#ff6b6b", "#8fd16a", "#b48cf2", "#4aa8ff", "#e58bc1", "#9aa7b2", "#5fd0c0", "#d9a066"];
@@ -14,6 +14,8 @@ export const METRICS = {
   avg_speed: { label: "Ø Tempo", short: "Tempo", cell: (v) => `${fmtNum(v, 1)} km/h` },
   longest_km: { label: "Längste Fahrt", short: "Längste", cell: (v) => `${fmtNum(v, 1)} km` },
   active_days: { label: "Aktive Tage", short: "Tage", cell: (v) => String(v) },
+  rides_per_week: { label: "Fahrten pro Woche", short: "pro Woche", cell: (v) => fmtNum(v, 1) },
+  improve_pct: { label: "Verbesserung", short: "Steigerung", cell: (v) => `${v > 0 ? "+" : ""}${fmtNum(v, 0)} %` },
 };
 
 /** Jedes Mitglied behält in allen Diagrammen seine Farbe (nach Konto-Nummer, nicht nach Rang). */
@@ -30,7 +32,7 @@ const dash = <span className="muted" title="Wird nicht geteilt oder hat keine We
 
 /** Siegerpodest für die Top 3 einer Kennzahl. */
 function Podium({ rows, metric, color }) {
-  const top = [...rows].filter((r) => r[metric]).sort((a, b) => b[metric] - a[metric]).slice(0, 3);
+  const top = [...rows].filter((r) => r[metric] > 0).sort((a, b) => b[metric] - a[metric]).slice(0, 3);
   if (!top.length) return <p className="muted">Noch keine Werte in diesem Zeitraum.</p>;
   const order = [top[1], top[0], top[2]].filter(Boolean);
   const height = { 0: 120, 1: 88, 2: 64 };
@@ -261,11 +263,79 @@ function RecordCard({ title, rows, color, get, fmt }) {
   );
 }
 
+
+// ---------- Duell ----------
+
+function Duel({ groupId, rows, color }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [d, setD] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!a || !b || a === b) { setD(null); return; }
+    setError("");
+    api.get(`/groups/${groupId}/duel?a=${a}&b=${b}`).then(setD).catch((e) => { setD(null); setError(e.message); });
+  }, [groupId, a, b]);
+  const byId = (id) => rows.find((r) => String(r.user_id) === String(id));
+  const ra = byId(a), rb = byId(b);
+  const cmp = (x, y, higherWins = true) => (x == null || y == null || x === y ? [false, false] : higherWins ? [x > y, y > x] : [x < y, y < x]);
+  const lines = d ? [
+    ["Kilometer", d.a.totals.km, d.b.totals.km, (v) => `${fmtNum(v, 1)} km`],
+    ["Höhenmeter", d.a.totals.elev_m, d.b.totals.elev_m, (v) => `${fmtNum(v, 0)} m`],
+    ["Fahrten", d.a.totals.rides, d.b.totals.rides, String],
+    ["Fahrzeit", d.a.totals.time_s, d.b.totals.time_s, fmtDuration],
+    ["Ø Tempo", d.a.totals.avg_speed, d.b.totals.avg_speed, (v) => `${fmtNum(v, 1)} km/h`],
+  ] : [];
+  return (
+    <Panel title="Duell" sub="Zwei Mitglieder über die letzten 12 Wochen. Es zählen nur Kennzahlen, die ohnehin in der Gruppe stehen.">
+      <div className="duel-pick">
+        <select value={a} onChange={(e) => setA(e.target.value)} aria-label="Erstes Mitglied">
+          <option value="">Mitglied wählen</option>
+          {rows.map((r) => <option key={r.user_id} value={r.user_id}>{nameOf(r)}</option>)}
+        </select>
+        <span className="muted">gegen</span>
+        <select value={b} onChange={(e) => setB(e.target.value)} aria-label="Zweites Mitglied">
+          <option value="">Mitglied wählen</option>
+          {rows.map((r) => <option key={r.user_id} value={r.user_id}>{nameOf(r)}</option>)}
+        </select>
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+      {!d && !error && <p className="muted">Wähle zwei Mitglieder.</p>}
+      {d && ra && rb && (
+        <>
+          <p className="duel-score">
+            <span><Dot color={color(ra)} />{d.a.display_name}</span>
+            <strong>{d.weeks_won.a} : {d.weeks_won.b}</strong>
+            <span><Dot color={color(rb)} />{d.b.display_name}</span>
+          </p>
+          <p className="muted small" style={{ textAlign: "center" }}>Wochen gewonnen nach Kilometern{d.weeks_won.draw ? ` (${d.weeks_won.draw} unentschieden)` : ""}</p>
+          <GroupedBars
+            labels={d.weeks.map((w) => w.slice(8, 10) + "." + w.slice(5, 7))} unit=" km"
+            series={[{ name: d.a.display_name, color: color(ra), values: d.a.km_by_week }, { name: d.b.display_name, color: color(rb), values: d.b.km_by_week }]}
+          />
+          <ul className="duel-lines">
+            {lines.map(([label, x, y, fmt]) => {
+              const [wa, wb] = cmp(x, y);
+              return (
+                <li key={label}>
+                  <span className={wa ? "win" : ""}>{x == null ? "–" : fmt(x)}</span>
+                  <span className="muted small">{label}</span>
+                  <span className={wb ? "win" : ""}>{y == null ? "–" : fmt(y)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 // ---------- Hauptansicht ----------
 
-const TAB_LIST = [["overview", "Übersicht"], ["course", "Verlauf"], ["rhythm", "Rhythmus"], ["records", "Rekorde"], ["load", "Belastung"], ["weather", "Wetter"], ["table", "Alle Zahlen"]];
+const TAB_LIST = [["overview", "Übersicht"], ["streaks", "Serien & Meilensteine"], ["duel", "Duell"], ["course", "Verlauf"], ["rhythm", "Rhythmus"], ["records", "Rekorde"], ["load", "Belastung"], ["weather", "Wetter"], ["table", "Alle Zahlen"]];
 
-export default function GroupStats({ d }) {
+export default function GroupStats({ d, groupId }) {
   const [tab, setTab] = useState("overview");
   const [metric, setMetric] = useState("km");
   const [cumulative, setCumulative] = useState(false);
@@ -317,7 +387,7 @@ export default function GroupStats({ d }) {
               <ol className="rank-list">
                 {sorted.map((r, i) => (
                   <li key={r.user_id} className={r.is_me ? "me" : ""}>
-                    <span className="rank-pos">{r[metric] ? (MEDAL[r.rank[metric] - 1] || r.rank[metric]) : "–"}</span>
+                    <span className="rank-pos">{r.rank[metric] ? (MEDAL[r.rank[metric] - 1] || r.rank[metric]) : "–"}</span>
                     <Dot color={color(r)} /><span className="rank-name">{nameOf(r)}</span>
                     <span className="rank-val">{r[metric] ? METRICS[metric].cell(r[metric]) : dash}{change(r)}</span>
                   </li>
@@ -331,6 +401,35 @@ export default function GroupStats({ d }) {
           </div>
         </>
       )}
+
+      {active === "streaks" && (
+        <>
+          <div className="grid-2">
+            <Panel title="Meilensteine" sub="Gesamtkilometer, die in diesem Zeitraum überschritten wurden.">
+              {rows.some((r) => r.milestone)
+                ? <ul className="milestone-list">{rows.filter((r) => r.milestone).sort((a, b) => b.milestone - a.milestone).map((r) => (
+                  <li key={r.user_id}><Dot color={color(r)} /><strong>{nameOf(r)}</strong> hat die {fmtNum(r.milestone, 0)}-km-Marke geknackt 🎉</li>
+                ))}</ul>
+                : <p className="muted">In diesem Zeitraum wurde keine Marke überschritten (500, 1000, 2500, 5000, 10 000 km und weiter). Bei „Gesamt“ entfällt die Anzeige.</p>}
+            </Panel>
+            <Panel title="Größte Steigerung" sub="Kilometer im Vergleich zum Zeitraum davor. Wer sich verbessert, gewinnt, auch mit weniger Kilometern.">
+              <MemberBars rows={rows} color={color} get={(r) => r.improve_pct} fmt={(v) => `${v > 0 ? "+" : ""}${fmtNum(v, 0)} %`} note="Ab 5 km im Zeitraum davor aussagekräftig." />
+            </Panel>
+          </div>
+          <div className="grid-2">
+            <Panel title="Fahrten pro Woche" sub="Regelmäßigkeit statt Kilometer: wer fährt am häufigsten?">
+              <MemberBars rows={rows} color={color} get={(r) => r.rides_per_week} fmt={(v) => fmtNum(v, 1)} />
+            </Panel>
+            {has("records") && (
+              <Panel title="Aktuelle Wochenserie" sub="Wochen in Folge mit mindestens einer Fahrt. Nur Mitglieder, die Rekorde teilen.">
+                <MemberBars rows={rows} color={color} get={ex("records", "week_streak_now")} fmt={(v) => `${v} ${v === 1 ? "Woche" : "Wochen"}`} />
+              </Panel>
+            )}
+          </div>
+        </>
+      )}
+
+      {active === "duel" && <Duel groupId={groupId} rows={rows} color={color} />}
 
       {active === "course" && (
         <Panel title={`Kilometer im Verlauf: ${d.label}`}>
@@ -414,10 +513,10 @@ export default function GroupStats({ d }) {
               <tbody>
                 {sorted.map((r) => (
                   <tr key={r.user_id} className={r.is_me ? "me" : ""}>
-                    <td>{r[metric] ? (MEDAL[r.rank[metric] - 1] || r.rank[metric]) : "–"}</td>
+                    <td>{r.rank[metric] ? (MEDAL[r.rank[metric] - 1] || r.rank[metric]) : "–"}</td>
                     <td><Dot color={color(r)} />{nameOf(r)}</td>
                     {Object.entries(METRICS).map(([k, m]) => (
-                      <td key={k} className={`${metric === k ? "sorted" : ""} ${r[k] && r[k] === best(k) ? "best" : ""}`}>{r[k] ? m.cell(r[k]) : "–"}{k === metric && change(r)}</td>
+                      <td key={k} className={`${metric === k ? "sorted" : ""} ${r[k] && r[k] === best(k) ? "best" : ""}`}>{r[k] != null && r[k] !== 0 ? m.cell(r[k]) : "–"}{k === metric && change(r)}</td>
                     ))}
                   </tr>
                 ))}
