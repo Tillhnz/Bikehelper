@@ -29,6 +29,11 @@ class Row:
     wet_minutes: float | None = None
     weather_status: str | None = None
     tiles: set | None = None
+    wind_kmh: float | None = None
+    avg_power: float | None = None
+    terrain: str | None = None
+    curve: dict | None = None  # beste Leistung je Dauer (Sekunden -> Watt), siehe stats/deep.py
+    curve_approx: bool = False
 
 
 def get_tz(name: str):

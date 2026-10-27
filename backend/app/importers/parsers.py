@@ -122,6 +122,45 @@ def _round(v: float | None, n: int = 1) -> float | None:
     return None if v is None else round(v, n)
 
 
+POWER_CURVE_SECONDS = (5, 30, 60, 300, 1200, 3600)
+
+
+def power_curve(points: list[Point]) -> dict | None:
+    """Beste Durchschnittsleistung über feste Zeiträume (Sekunden -> Watt) aus den Rohpunkten, auf 1 Hz gebracht.
+
+    Lücken über 10 s (Pausen, Funkloch) zählen als 0 W, damit eine Pause keine Spitzenwerte vortäuscht.
+    """
+    pts = [p for p in points if p.time is not None and p.pwr is not None]
+    if len(pts) < 10:
+        return None
+    t0 = pts[0].time
+    series: list[float] = []
+    for i, p in enumerate(pts):
+        t = int((p.time - t0).total_seconds())
+        if t < 0:
+            continue
+        nxt = int((pts[i + 1].time - t0).total_seconds()) if i + 1 < len(pts) else t + 1
+        span = max(1, nxt - t)
+        val = max(0.0, float(p.pwr)) if span <= 10 else 0.0
+        fill = span if span <= 10 else 1
+        while len(series) < t:
+            series.append(0.0)
+        series.extend([val] * fill)
+        if span > 10:
+            series.extend([0.0] * (span - 1))
+    if len(series) > 16 * 3600:
+        return None
+    acc = [0.0]
+    for v in series:
+        acc.append(acc[-1] + v)
+    out = {}
+    for d in POWER_CURVE_SECONDS:
+        if len(series) >= d:
+            best = max(acc[i + d] - acc[i] for i in range(0, len(series) - d + 1))
+            out[str(d)] = round(best / d)
+    return out or None
+
+
 def build_details(points: list[Point], cum: list[float], segs: list[tuple[float, float]], total_m: float) -> dict | None:
     """Kennzahlen und ein auf ca. 300 Stützpunkte verdichteter Verlauf (Höhe, Tempo, Puls, Frequenz, Leistung).
 
@@ -206,6 +245,7 @@ def build_details(points: list[Point], cum: list[float], segs: list[tuple[float,
         "avg_cadence": _round(_avg(cads), 0),
         "avg_power": _round(_avg(pwrs), 0),
         "max_power": _round(max(pwrs), 0) if pwrs else None,
+        "pc": power_curve(points) if pwrs else None,
         "profile": profile,
     }
 
