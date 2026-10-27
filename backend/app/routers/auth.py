@@ -137,6 +137,8 @@ def delete_user_data(db: Session, user: User) -> None:
         db.delete(obj)  # Regeln, Wartungseinträge, Messungen, Montagen laufen über die Kaskade mit
     db.flush()
     db.execute(delete(PasswordReset).where(PasswordReset.user_id == uid))
+    from .groups import leave_all
+    leave_all(db, uid)
     db.execute(delete(MechanicGrant).where((MechanicGrant.owner_id == uid) | (MechanicGrant.mechanic_id == uid)))
     for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, IntervalsSeen, UserTire, Bike):
         db.execute(delete(model).where(model.user_id == uid))

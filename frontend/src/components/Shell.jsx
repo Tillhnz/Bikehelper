@@ -12,6 +12,7 @@ const NAV = [
   { to: "/rides", label: "Fahrten", icon: "M8 6 H20 M8 12 H20 M8 18 H20 M4 6 H4.01 M4 12 H4.01 M4 18 H4.01" },
   { to: "/heatmap", label: "Heatmap", icon: "M12 21 C7 15 5 12 5 9 A7 7 0 0 1 19 9 C19 12 17 15 12 21 Z M12 11 A2 2 0 1 0 12.01 11" },
   { to: "/stats", label: "Statistik", icon: "M5 20 V12 M12 20 V5 M19 20 V9" },
+  { to: "/groups", label: "Gruppen", icon: "M9 11 A3 3 0 1 0 9.01 11 M17 10 A2.5 2.5 0 1 0 17.01 10 M3 19 C3 15 6 14 9 14 C12 14 15 15 15 19 M15 14 C19 13.5 21 15 21 19" },
   { to: "/settings", label: "Einstellungen", short: "Konto", icon: "M12 9 A3 3 0 1 0 12.01 9 M12 3 V5 M12 19 V21 M3 12 H5 M19 12 H21 M5.6 5.6 L7 7 M17 17 L18.4 18.4 M18.4 5.6 L17 7 M7 17 L5.6 18.4" },
 ];
 

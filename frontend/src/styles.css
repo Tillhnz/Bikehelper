@@ -1083,3 +1083,23 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 @media (max-width:800px){.rides .source-tag{margin-left:0;margin-top:.2rem}}
 .suggest{display:block;margin-top:.3rem;font-size:.82rem;color:var(--mute)}
 .suggest strong{color:inherit}
+
+/* Gruppen */
+.group-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-bottom:1.25rem}
+.group-card{display:block;text-decoration:none;color:inherit;margin-bottom:0}
+.group-card:hover{border-color:var(--celeste)}
+.group-card h2{margin:0 0 .25rem}
+.group-period{display:flex;align-items:center;gap:.8rem;margin:.6rem 0}
+.group-table th,.group-table td{white-space:nowrap;text-align:right;padding:.4rem .6rem}
+.group-table th:nth-child(-n+2),.group-table td:nth-child(-n+2){text-align:left}
+.group-table tr.me{background:var(--panel-2)}
+.group-table td.sorted,.group-table th.sorted{font-weight:600}
+.group-table td.best{color:var(--celeste)}
+.th-btn{font:inherit;background:none;border:0;color:inherit;cursor:pointer;text-decoration:underline dotted;padding:0}
+.group-legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:.3rem 0 0}
+.group-legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;margin-right:.35rem}
+.group-members li{display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;padding:.35rem 0;border-top:1px solid var(--line)}
+.group-link code{overflow-wrap:anywhere}
+
+ul.plain{list-style:none;padding:0;margin:.5rem 0}
+ul.plain li{padding:.25rem 0}

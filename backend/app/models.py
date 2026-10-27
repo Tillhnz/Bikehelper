@@ -407,3 +407,35 @@ class MechanicGrant(Base):
     status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | active
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Group(Base):
+    """Gruppe von Nutzern, die ihre Kennzahlen (nicht ihre Strecken) in einer Rangliste vergleichen."""
+    __tablename__ = "groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    role: Mapped[str] = mapped_column(String(10), default="member")  # admin | member
+    display_name: Mapped[str] = mapped_column(String(60))  # Anzeigename nur in dieser Gruppe, nie die E-Mail-Adresse
+    share: Mapped[bool] = mapped_column(Boolean, default=True)  # Kennzahlen in dieser Gruppe zeigen
+    joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class GroupInvite(Base):
+    """Einladung per Link (einmal gültig, 14 Tage)."""
+    __tablename__ = "group_invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    invited_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

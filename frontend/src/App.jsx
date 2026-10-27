@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
 import WhatsNew from "./components/WhatsNew.jsx";
@@ -19,6 +19,14 @@ import RideDetail from "./pages/RideDetail.jsx";
 import Heatmap from "./pages/Heatmap.jsx";
 import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
+import Groups, { GroupDetail, GroupJoin, pendingGroupToken } from "./pages/Groups.jsx";
+
+/** Einladungslink ohne Anmeldung: Schlüssel merken, anmelden lassen, danach weiter zur Einladung. */
+function RememberInvite() {
+  const { token } = useParams();
+  pendingGroupToken.set(token);
+  return <Navigate to="/login" replace />;
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -37,12 +45,14 @@ export default function App() {
     try {
       setUser(await api.get("/me"));
       resumeActive();
+      const pending = pendingGroupToken.get();
+      if (pending) navigate(`/groups/join/${pending}`);
     } catch {
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -60,6 +70,7 @@ export default function App() {
       <FeedbackHost />
       <Routes>
         <Route path="/login" element={<Login onLoggedIn={loadUser} />} />
+        <Route path="/groups/join/:token" element={<RememberInvite />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       </>
@@ -82,6 +93,9 @@ export default function App() {
         <Route path="/rides/:id" element={<RideDetail />} />
         <Route path="/heatmap" element={<Heatmap />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/groups" element={<Groups />} />
+        <Route path="/groups/join/:token" element={<GroupJoin />} />
+        <Route path="/groups/:id" element={<GroupDetail />} />
         {user.role === "admin" && <Route path="/admin" element={<Admin user={user} />} />}
         <Route path="/settings" element={<Settings user={user} onChange={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
