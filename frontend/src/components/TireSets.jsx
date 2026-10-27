@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmtDate, fmtKm, fmtNum, safeUrl, today } from "../api.js";
 import { Gauge, StatusPill } from "./ui.jsx";
 import { CountUp } from "./motion.jsx";
-import { confirmDialog } from "./feedback.jsx";
+import { confirmDialog, toast } from "./feedback.jsx";
 import CheckGuide from "./CheckGuide.jsx";
 
 const EMPTY = { name: "", brand: "", width_mm: "", tubeless: true, category: "", weight_g: "", watts: "", watts_note: "", source_url: "", shop_url: "", model_key: "", casing: "", start_km: 0, max_km: "", check_km: "", notes: "", mountNow: true, mount_from: today() };
@@ -223,6 +223,12 @@ function SetForm({ initial, adding, onSubmit, onCancel }) {
 function MountRow({ m, onSave, onDelete }) {
   const [edit, setEdit] = useState(false);
   const [r, setR] = useState({ from_date: m.from_date, to_date: m.to_date ?? "" });
+  const [err, setErr] = useState("");
+  function startEdit() {  // immer mit den aktuell gespeicherten Werten beginnen, nicht mit denen vom letzten Mal
+    setR({ from_date: m.from_date, to_date: m.to_date ?? "" });
+    setErr("");
+    setEdit(true);
+  }
   if (!edit) {
     return (
       <li>
@@ -231,9 +237,10 @@ function MountRow({ m, onSave, onDelete }) {
           <span className="muted">{fmtKm(m.km)} km</span>
         </span>
         <span className="rule-actions">
-          <button className="link small" onClick={() => setEdit(true)}>Ändern</button>
-          <button className="link small danger" onClick={onDelete}>Löschen</button>
+          <button className="link small" onClick={startEdit}>Ändern</button>
+          <button className="link small danger" onClick={() => onDelete(setErr)}>Löschen</button>
         </span>
+        {err && <p className="error span-all" role="alert" style={{ flexBasis: "100%" }}>{err}</p>}
       </li>
     );
   }
@@ -242,13 +249,14 @@ function MountRow({ m, onSave, onDelete }) {
       <form
         className="inline-form"
         style={{ width: "100%", margin: 0 }}
-        onSubmit={async (e) => { e.preventDefault(); if (await onSave({ from_date: r.from_date, to_date: r.to_date || null })) setEdit(false); }}
+        onSubmit={async (e) => { e.preventDefault(); if (await onSave({ from_date: r.from_date, to_date: r.to_date || null }, setErr)) setEdit(false); }}
       >
         <label>Von<input type="date" value={r.from_date} onChange={(e) => setR({ ...r, from_date: e.target.value })} required /></label>
         <label>Bis<input type="date" value={r.to_date} onChange={(e) => setR({ ...r, to_date: e.target.value })} /></label>
         <button className="btn primary small">Speichern</button>
         <button type="button" className="btn small" onClick={() => setEdit(false)}>Abbrechen</button>
         <p className="hint span-all" style={{ flexBasis: "100%" }}>„Bis“ leer lassen, wenn der Satz noch montiert ist.</p>
+        {err && <p className="error span-all" role="alert" style={{ flexBasis: "100%" }}>{err}</p>}
       </form>
     </li>
   );
@@ -258,6 +266,9 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
   const [panel, setPanel] = useState(null); // "mount" | "past" | null
   const [day, setDay] = useState(today());
   const [past, setPast] = useState({ from_date: today(), to_date: today() });
+  const [formErr, setFormErr] = useState("");
+  const [history, setHistory] = useState(false);
+  const openPanel = (name) => { setFormErr(""); setPanel(name); };
   const status = ts.life_status;
 
   return (
@@ -321,7 +332,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
       {panel === "mount" && (
         <form
           className="inline-form"
-          onSubmit={async (e) => { e.preventDefault(); if (await run(`/tire-sets/${ts.id}/mount`, { day })) setPanel(null); }}
+          onSubmit={async (e) => { e.preventDefault(); if (await run(`/tire-sets/${ts.id}/mount`, { day }, "post", setFormErr)) setPanel(null); }}
         >
           <label>Montiert ab<input type="date" value={day} onChange={(e) => setDay(e.target.value)} required /></label>
           <button className="btn primary">Montieren</button>
@@ -330,6 +341,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
             Alle Fahrten des Rades ab diesem Tag zählen auf diesen Satz, bis du einen anderen montierst.
             {hasMounted ? " Der bisherige Satz endet am Vortag." : ""}
           </p>
+          {formErr && <p className="error" role="alert" style={{ flexBasis: "100%" }}>{formErr}</p>}
         </form>
       )}
 
@@ -338,36 +350,41 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           className="inline-form"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (await run(`/tire-sets/${ts.id}/mounts`, { from_date: past.from_date, to_date: past.to_date || null })) setPanel(null);
+            if (await run(`/tire-sets/${ts.id}/mounts`, { from_date: past.from_date, to_date: past.to_date || null }, "post", setFormErr)) { setPanel(null); setHistory(true); toast("Zeitraum eingetragen."); setPast({ from_date: today(), to_date: today() }); }
           }}
         >
           <label>Von<input type="date" value={past.from_date} onChange={(e) => setPast({ ...past, from_date: e.target.value })} required /></label>
           <label>Bis<input type="date" value={past.to_date} onChange={(e) => setPast({ ...past, to_date: e.target.value })} /></label>
           <button className="btn primary">Zeitraum eintragen</button>
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
+          <p className="hint" style={{ flexBasis: "100%" }}>
+            Alle Fahrten dieses Rades in dem Zeitraum zählen auf diesen Satz (beide Tage mit). „Bis“ leer lassen, wenn der Satz noch montiert ist.
+            Zeiträume verschiedener Sätze dürfen sich nicht überschneiden.
+          </p>
+          {formErr && <p className="error" role="alert" style={{ flexBasis: "100%" }}>{formErr}</p>}
         </form>
       )}
 
       <div className="actions">
-        {!ts.retired && !ts.mounted && <button className="btn small primary" onClick={() => setPanel("mount")}>Montieren</button>}
+        {!ts.retired && !ts.mounted && <button className="btn small primary" onClick={() => openPanel("mount")}>Montieren</button>}
         {ts.mounted && <button className="btn small" onClick={() => run(`/tire-sets/${ts.id}/unmount`, { day: today() })}>Abmontieren</button>}
         {!ts.retired && <button className={`btn small ${ts.check_status !== "ok" ? "primary" : ""}`} onClick={() => run(`/tire-sets/${ts.id}/checked`, {})}>Geprüft</button>}
-        <button className="btn small" onClick={() => setPanel("past")}>Zeitraum nachtragen</button>
+        <button className="btn small" onClick={() => openPanel("past")}>Zeitraum nachtragen</button>
         <button className="btn small" onClick={() => onEdit(ts)}>Bearbeiten</button>
         <button className="btn small" onClick={() => onEdit(ts, { retired: !ts.retired })}>{ts.retired ? "Wieder aktivieren" : "Ausmustern"}</button>
         <button className="link small danger" onClick={() => onEdit(ts, null, true)}>Löschen</button>
       </div>
 
       {ts.mounts.length > 0 && (
-        <details className="howto log-history">
+        <details className="howto log-history" open={history} onToggle={(e) => setHistory(e.currentTarget.open)}>
           <summary>Verlauf auf dem Rad ({ts.mounts.length})</summary>
           <ul className="log-list">
             {ts.mounts.map((m) => (
               <MountRow
                 key={m.id}
                 m={m}
-                onSave={(body) => run(`/tire-mounts/${m.id}`, body, "put")}
-                onDelete={async () => { if (await confirmDialog("Diesen Zeitraum löschen? Die Kilometer zählen dann nicht mehr auf diesen Satz.")) run(`/tire-mounts/${m.id}`, null, "del"); }}
+                onSave={(body, sink) => run(`/tire-mounts/${m.id}`, body, "put", sink)}
+                onDelete={async (sink) => { if (await confirmDialog("Diesen Zeitraum löschen? Die Kilometer zählen dann nicht mehr auf diesen Satz.")) run(`/tire-mounts/${m.id}`, null, "del", sink); }}
               />
             ))}
           </ul>
@@ -454,15 +471,16 @@ export default function TireSets({ bike, onChanged }) {
   useEffect(() => { load(); }, [load]);
 
   /** Führt eine Änderung aus und lädt danach Sätze und Rad neu. Gibt true bei Erfolg zurück. */
-  async function run(path, body, method = "post") {
+  async function run(path, body, method = "post", sink) {
     setError("");
+    sink?.("");
     try {
       await api[method](path, body ?? undefined);
       await load();
       onChanged();
       return true;
     } catch (e) {
-      setError(e.message);
+      (sink || setError)(e.message);  // Fehler dort zeigen, wo der Nutzer gerade arbeitet (Formular), sonst oben
       return false;
     }
   }

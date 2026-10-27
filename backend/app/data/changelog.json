@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-27.6",
+    "date": "2026-10-27",
+    "title": "Reifen: Zeiträume nachtragen",
+    "changes": [
+      "Fehlermeldungen beim Nachtragen oder Ändern von Zeiträumen (zum Beispiel bei Überschneidung mit einem anderen Satz) erscheinen jetzt direkt am Formular.",
+      "Ein nachgetragener Zeitraum wird bestätigt und der Verlauf klappt auf. Beim erneuten Ändern zeigt das Formular immer die gespeicherten Werte."
+    ]
+  },
+  {
     "id": "2026-10-27.5",
     "date": "2026-10-27",
     "title": "Rundgang für neue Konten",
