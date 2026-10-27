@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fmtDuration, fmtNum } from "../api.js";
+import { api } from "../api.js";
 import { copyText } from "../clipboard.js";
 import { EmptyState } from "../components/ui.jsx";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
+import GroupStats from "../components/GroupStats.jsx";
 
 const PENDING_KEY = "bikehelper.pendingGroupToken";
 export const pendingGroupToken = {
@@ -13,16 +14,6 @@ export const pendingGroupToken = {
 };
 
 const PERIODS = [["week", "Woche"], ["month", "Monat"], ["year", "Jahr"], ["all", "Gesamt"]];
-const METRICS = {
-  km: { label: "Kilometer", cell: (v) => `${fmtNum(v, 1)} km` },
-  elev_m: { label: "Höhenmeter", cell: (v) => `${fmtNum(v, 0)} m` },
-  time_s: { label: "Fahrzeit", cell: (v) => fmtDuration(v) },
-  rides: { label: "Fahrten", cell: (v) => String(v) },
-  avg_speed: { label: "Ø Tempo", cell: (v) => `${fmtNum(v, 1)} km/h` },
-  longest_km: { label: "Längste Fahrt", cell: (v) => `${fmtNum(v, 1)} km` },
-  active_days: { label: "Aktive Tage", cell: (v) => String(v) },
-};
-const MEDAL = ["🥇", "🥈", "🥉"];
 
 // ---------- Übersicht ----------
 
@@ -134,116 +125,9 @@ export function GroupJoin() {
 
 // ---------- Gruppenansicht ----------
 
-const COLORS = ["var(--celeste)", "#f2b84b", "#ff6b6b", "#8fd16a", "#b48cf2", "#4aa8ff", "#e58bc1", "#9aa7b2"];
-
-/** Verlauf je Mitglied; die Punkte folgen dem gewählten Zeitraum (Tage, Monate oder Jahre), optional aufsummiert. */
-function SeriesChart({ data, cumulative }) {
-  const { labels, members } = data;
-  if (!members.length || labels.length < 2) return <p className="muted small">Für „Gesamt“ braucht der Verlauf mindestens zwei Jahre.</p>;
-  const lines = members.map((m) => ({ ...m, v: cumulative ? m.km.reduce((acc, x) => [...acc, (acc[acc.length - 1] || 0) + x], []) : m.km }));
-  const W = 640, H = 210, padL = 44, padB = 24, padT = 10, padR = 12;
-  const max = Math.max(1, ...lines.flatMap((m) => m.v));
-  const sx = (i) => padL + (i / (labels.length - 1)) * (W - padL - padR);
-  const sy = (v) => padT + (1 - v / max) * (H - padT - padB);
-  const every = Math.ceil(labels.length / 10);
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label={cumulative ? "Aufsummierte Kilometer je Mitglied" : "Kilometer je Mitglied im Zeitraum"}>
-        {[0, 0.5, 1].map((f) => (
-          <g key={f}>
-            <line x1={padL} x2={W - padR} y1={sy(max * f)} y2={sy(max * f)} className="chart-grid" />
-            <text x={padL - 6} y={sy(max * f) + 4} textAnchor="end" className="chart-label">{fmtNum(max * f, 0)}</text>
-          </g>
-        ))}
-        {labels.map((l, i) => (i % every === 0 ? <text key={l + i} x={sx(i)} y={H - 6} textAnchor="middle" className="chart-label">{l}</text> : null))}
-        {lines.map((m, k) => (
-          <path key={m.display_name} d={m.v.map((v, i) => `${i ? "L" : "M"}${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join("")}
-            fill="none" stroke={COLORS[k % COLORS.length]} strokeWidth={m.is_me ? 3 : 1.8} strokeLinejoin="round" />
-        ))}
-      </svg>
-      <p className="small group-legend">
-        {lines.map((m, k) => <span key={m.display_name}><i style={{ background: COLORS[k % COLORS.length] }} />{m.display_name}{m.is_me ? " (du)" : ""}</span>)}
-      </p>
-    </div>
-  );
-}
-
-const dash = <span className="muted" title="Wird nicht geteilt oder hat keine Werte">–</span>;
-const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-
-/** Tabelle für einen freigegebenen Bereich: eine Zeile je Mitglied, der beste Wert je Spalte ist hervorgehoben. */
-function ExtraTable({ title, note, rows, cat, cols }) {
-  const has = rows.some((r) => r.extras[cat]);
-  if (!has) return null;
-  const vals = cols.map((c) => rows.map((r) => (r.extras[cat] ? c.get(r.extras[cat]) : null)));
-  return (
-    <>
-      <h3>{title}</h3>
-      {note && <p className="muted small">{note}</p>}
-      <div className="table-wrap">
-        <table className="group-table">
-          <thead><tr><th>Mitglied</th>{cols.map((c) => <th key={c.label}>{c.label}</th>)}</tr></thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.user_id} className={r.is_me ? "me" : ""}>
-                <td>{r.display_name}{r.is_me ? " (du)" : ""}</td>
-                {cols.map((c, k) => {
-                  const v = vals[k][i];
-                  const best = c.best && v != null && v > 0 && v === Math.max(...vals[k].filter((x) => x != null));
-                  return <td key={c.label} className={best ? "best" : ""}>{v == null || v === 0 && !c.zero ? dash : c.fmt(v)}</td>;
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-const km1 = (v) => `${fmtNum(v, 1)} km`;
-const num0 = (v) => fmtNum(v, 0);
-
-function Extras({ rows }) {
-  return (
-    <>
-      <ExtraTable title="Fahrrhythmus: Kilometer je Wochentag" cat="rhythm" rows={rows}
-        cols={WD.map((d, i) => ({ label: d, get: (x) => x.weekdays[i], fmt: num0, best: true }))} />
-      <ExtraTable title="Fahrrhythmus: Fahrzeit je Tageszeit" cat="rhythm" rows={rows}
-        cols={(rows.find((r) => r.extras.rhythm)?.extras.rhythm.dayparts || []).map((d, i) => ({ label: d.label, get: (x) => x.dayparts[i].hours, fmt: (v) => `${fmtNum(v, 1)} h`, best: true }))} />
-      <ExtraTable title="Fahrrhythmus: Fahrten nach Länge" cat="rhythm" rows={rows}
-        cols={(rows.find((r) => r.extras.rhythm)?.extras.rhythm.distances || []).map((d, i) => ({ label: d.label, get: (x) => x.distances[i].rides, fmt: String, best: true }))} />
-      <ExtraTable title="Rekorde im Zeitraum" cat="records" rows={rows} cols={[
-        { label: "Längste Fahrt", get: (x) => x.longest_km, fmt: km1, best: true },
-        { label: "Meiste Höhenmeter (Fahrt)", get: (x) => x.most_climb_m, fmt: (v) => `${num0(v)} m`, best: true },
-        { label: "Bester Tag", get: (x) => x.best_day_km, fmt: km1, best: true },
-        { label: "Schnellster Schnitt", get: (x) => x.fastest_avg, fmt: (v) => `${fmtNum(v, 1)} km/h`, best: true },
-        { label: "Serie in Tagen", get: (x) => x.day_streak, fmt: String, best: true },
-        { label: "Serie in Wochen", get: (x) => x.week_streak, fmt: String, best: true },
-      ]} />
-      <ExtraTable title="Belastung und Form" note="Geschätzt aus Fahrzeit, Höhenmetern und Tempo, ohne Puls oder Leistung. Stand am Ende des Zeitraums (Fitness 42 Tage, Ermüdung 7 Tage)." cat="load" rows={rows} cols={[
-        { label: "Belastung im Zeitraum", get: (x) => x.period_load, fmt: num0, best: true },
-        { label: "Fitness", get: (x) => x.fitness, fmt: (v) => fmtNum(v, 1), best: true },
-        { label: "Ermüdung", get: (x) => x.fatigue, fmt: (v) => fmtNum(v, 1) },
-        { label: "Form", get: (x) => x.form, fmt: (v) => fmtNum(v, 1), zero: true },
-      ]} />
-      <ExtraTable title="Wetter" cat="weather" rows={rows} cols={[
-        { label: "Ø Temperatur", get: (x) => x.avg_temp, fmt: (v) => `${fmtNum(v, 1)} °C`, zero: true },
-        { label: "Kilometer bei Regen/nass", get: (x) => x.wet_km, fmt: km1, best: true },
-        { label: "Anteil nass", get: (x) => x.wet_share, fmt: (v) => `${v} %` },
-        { label: "Regenfahrten", get: (x) => x.rainy_rides, fmt: String, best: true },
-        { label: "Kälteste Fahrt", get: (x) => x.coldest, fmt: (v) => `${fmtNum(v, 1)} °C`, zero: true },
-        { label: "Wärmste Fahrt", get: (x) => x.hottest, fmt: (v) => `${fmtNum(v, 1)} °C`, zero: true },
-      ]} />
-    </>
-  );
-}
-
 function Board({ groupId }) {
   const [period, setPeriod] = useState("week");
   const [offset, setOffset] = useState(0);
-  const [metric, setMetric] = useState("km");
-  const [cumulative, setCumulative] = useState(false);
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
 
@@ -251,75 +135,30 @@ function Board({ groupId }) {
     api.get(`/groups/${groupId}/stats?period=${period}&offset=${offset}`).then((r) => { setD(r); setError(""); }).catch((e) => setError(e.message));
   }, [groupId, period, offset]);
 
-  const rows = d ? [...d.rows].sort((a, b) => (b[metric] ?? -1) - (a[metric] ?? -1) || a.display_name.localeCompare(b.display_name)) : [];
-  const best = (m) => Math.max(0, ...(d?.rows || []).map((r) => r[m] ?? 0));
-  const change = (r) => {
-    const before = r.prev?.[metric];
-    if (before == null || !before || metric === "avg_speed" || metric === "longest_km" || metric === "active_days") return null;
-    const pct = Math.round(((r[metric] - before) / before) * 100);
-    return pct === 0 ? null : <span className={`delta ${pct > 0 ? "up" : "down"}`} title="Veränderung gegenüber dem Zeitraum davor">{pct > 0 ? "▲" : "▼"} {Math.abs(pct)} %</span>;
-  };
-
   return (
-    <section className="panel">
-      <div className="log-head">
-        <h2>Rangliste</h2>
-        <div className="segmented" role="group" aria-label="Zeitraum">
-          {PERIODS.map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => { setPeriod(k); setOffset(0); }}>{label}</button>)}
-        </div>
-      </div>
-      {d && (
-        <p className="group-period">
-          <button className="btn small" onClick={() => setOffset(offset - 1)} disabled={!d.can_prev} aria-label="Früherer Zeitraum">‹</button>
-          <strong>{d.label}</strong>
-          <button className="btn small" onClick={() => setOffset(offset + 1)} disabled={!d.can_next} aria-label="Späterer Zeitraum">›</button>
-        </p>
-      )}
-      {error && <p className="error" role="alert">{error}</p>}
-      {!d && !error && <Loading rows={3} />}
-      {d && d.rows.length === 0 && <p className="muted">Niemand in dieser Gruppe teilt gerade Kennzahlen.</p>}
-      {d && d.rows.length > 0 && (
-        <div className="table-wrap">
-          <table className="group-table">
-            <thead>
-              <tr>
-                <th>#</th><th>Mitglied</th>
-                {Object.entries(METRICS).map(([k, m]) => (
-                  <th key={k} className={metric === k ? "sorted" : ""} aria-sort={metric === k ? "descending" : "none"}>
-                    <button type="button" className="th-btn" onClick={() => setMetric(k)} title="Danach sortieren">{m.label}</button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.user_id} className={r.is_me ? "me" : ""}>
-                  <td>{r[metric] ? (MEDAL[r.rank[metric] - 1] || r.rank[metric]) : "–"}</td>
-                  <td>{r.display_name}{r.is_me ? " (du)" : ""}</td>
-                  {Object.entries(METRICS).map(([k, m]) => (
-                    <td key={k} className={`${metric === k ? "sorted" : ""} ${r[k] && r[k] === best(k) ? "best" : ""}`}>
-                      {r[k] ? m.cell(r[k]) : "–"}{k === metric && change(r)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {d?.not_sharing.length > 0 && <p className="muted small">Pausieren: {d.not_sharing.join(", ")}</p>}
-      {d?.rows.length > 0 && (
-        <>
-          <div className="log-head">
-            <h3>Kilometer im Verlauf: {d.label}</h3>
-            <label className="check"><input type="checkbox" checked={cumulative} onChange={(e) => setCumulative(e.target.checked)} /><span>Aufsummiert</span></label>
+    <>
+      <section className="panel">
+        <div className="log-head">
+          <h2>Gruppenstatistik</h2>
+          <div className="segmented" role="group" aria-label="Zeitraum">
+            {PERIODS.map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => { setPeriod(k); setOffset(0); }}>{label}</button>)}
           </div>
-          <SeriesChart data={d.series} cumulative={cumulative} />
-          <Extras rows={rows} />
-          <p className="muted small">Mehr Bereiche erscheinen, sobald Mitglieder sie unter „Meine Teilnahme“ freigeben. Orte, Strecken, Räder und Wartung werden nie geteilt.</p>
-        </>
-      )}
-    </section>
+        </div>
+        {d && (
+          <p className="group-period">
+            <button className="btn small" onClick={() => setOffset(offset - 1)} disabled={!d.can_prev} aria-label="Früherer Zeitraum">‹</button>
+            <strong>{d.label}</strong>
+            <button className="btn small" onClick={() => setOffset(offset + 1)} disabled={!d.can_next} aria-label="Späterer Zeitraum">›</button>
+          </p>
+        )}
+        {error && <p className="error" role="alert">{error}</p>}
+        {!d && !error && <Loading rows={3} />}
+        {d && d.rows.length === 0 && <p className="muted">Niemand in dieser Gruppe teilt gerade Kennzahlen.</p>}
+        {d?.not_sharing.length > 0 && <p className="muted small">Pausieren: {d.not_sharing.join(", ")}</p>}
+        {d?.rows.length > 0 && <p className="muted small">Mehr Bereiche (Rhythmus, Rekorde, Belastung, Wetter) erscheinen, sobald Mitglieder sie unter „Meine Teilnahme“ freigeben. Orte, Strecken, Räder und Wartung werden nie geteilt.</p>}
+      </section>
+      {d?.rows.length > 0 && <GroupStats d={d} />}
+    </>
   );
 }
 
