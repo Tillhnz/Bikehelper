@@ -65,6 +65,7 @@ def test_sync_imports_once_skips_strava_and_other_sports(monkeypatch):
             res = service.sync_user(db, db.get(User, uid), http=_fake(calls))
             # i1 importiert, i2 hat dieselbe Datei (Duplikat), i3 Strava und i4 Laufen werden übersprungen
             assert (res.imported, res.duplicates, res.skipped, res.remaining) == (1, 1, 2, 0)
+            assert (res.found, res.strava, res.other_sport) == (4, 1, 1) and "von Strava" in res.text()
             act = db.scalars(select(Activity).where(Activity.user_id == uid, Activity.source == "intervals")).one()
             assert act.gear_name == "Canyon" and act.bike_id is not None  # Rad über den Namen aus intervals.icu gefunden
             seen = {s.activity_id: s.status for s in db.scalars(select(IntervalsSeen).where(IntervalsSeen.user_id == uid))}

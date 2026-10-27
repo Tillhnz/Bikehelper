@@ -49,16 +49,26 @@ class SyncResult:
     imported: int = 0
     duplicates: int = 0
     skipped: int = 0
+    found: int = 0           # neue, noch nicht verarbeitete Aktivitäten laut intervals.icu
+    strava: int = 0          # von Strava stammend: gibt intervals.icu nicht heraus
+    no_file: int = 0         # ohne Originaldatei
+    other_sport: int = 0
     remaining: int = 0
     note: str = ""
     errors: list[str] = field(default_factory=list)
 
     def text(self) -> str:
-        parts = [f"{self.imported} neu importiert"]
+        parts = [f"{self.found} neue Aktivitäten bei intervals.icu gefunden", f"{self.imported} importiert"]
         if self.duplicates:
             parts.append(f"{self.duplicates} schon vorhanden")
-        if self.skipped:
-            parts.append(f"{self.skipped} übersprungen")
+        if self.strava:
+            parts.append(f"{self.strava} von Strava (nicht abrufbar)")
+        if self.no_file:
+            parts.append(f"{self.no_file} ohne Datei")
+        if self.other_sport:
+            parts.append(f"{self.other_sport} andere Sportart")
+        if self.errors:
+            parts.append(f"{len(self.errors)} Fehler (z. B. {self.errors[0][:80]})")
         if self.remaining:
             parts.append(f"{self.remaining} folgen im nächsten Lauf")
         if self.note:
@@ -140,10 +150,19 @@ def sync_user(db: Session, user: User, http: httpx.Client | None = None, max_dow
         new.sort(key=lambda a: a.get("start_date_local") or "", reverse=True)  # neueste zuerst
         bikes = db.scalars(select(Bike).where(Bike.user_id == user.id)).all()
         default = next((b for b in bikes if b.id == user.icu_bike_id), None)
+        result.found = len(new)
         todo = []
         for a in new:  # Aussortieren kostet keinen Abruf
-            if not downloadable(a) or (a.get("type") and not is_cycling(a["type"])):
+            if not downloadable(a):
+                if str(a.get("source") or "").upper() == "STRAVA" or a.get("_note"):
+                    result.strava += 1
+                else:
+                    result.no_file += 1
                 _mark(db, user, str(a.get("id") or ""), "skipped")
+                result.skipped += 1
+            elif a.get("type") and not is_cycling(a["type"]):
+                _mark(db, user, str(a.get("id") or ""), "skipped")
+                result.other_sport += 1
                 result.skipped += 1
             else:
                 todo.append(a)
@@ -184,6 +203,7 @@ def _import_one(db: Session, user: User, http: httpx.Client, a: dict, default: B
         if data is None:
             _mark(db, user, aid, "skipped")
             result.skipped += 1
+            result.no_file += 1
             return
         ext = str(a.get("file_type") or "fit").lower().lstrip(".")
         parsed = parse_activity_file(f"intervals.{ext}", data)
@@ -200,6 +220,7 @@ def _import_one(db: Session, user: User, http: httpx.Client, a: dict, default: B
     if not is_cycling(parsed.sport):
         _mark(db, user, aid, "skipped")
         result.skipped += 1
+        result.other_sport += 1
         return
     gear = ((a.get("gear") or {}).get("name") or "").strip() or None
     bike = default or (next((b for b in bikes if gear and b.name.strip().lower() == gear.lower()), None))
