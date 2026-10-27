@@ -257,6 +257,16 @@ Weitere Befehle im Projektordner:
 | `./install.sh url https://bike.example.de` | Öffentliche Adresse ändern |
 | `./install.sh logs` | Protokolle anzeigen |
 
+## Proxmox: als LXC-Container (ein Befehl)
+
+Auf dem Proxmox-Host (als root) legt dieser Befehl einen Debian-12-Container mit Docker-Unterstützung an und installiert BikeHelper darin:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/proxmox/bikehelper-lxc.sh)"
+```
+
+Standard sind 2 Kerne, 2 GB RAM und 16 GB Festplatte, unprivilegiert, mit DHCP und Start beim Hochfahren. Anpassen vor dem Befehl, zum Beispiel `CT_RAM=4096 CT_IP=192.168.178.50/24 CT_GW=192.168.178.1 bash -c "…"`; alle Optionen stehen im Kopf von `proxmox/bikehelper-lxc.sh`. Danach gelten die üblichen Befehle im Container: `pct exec <ID> -- bash -c 'cd ~/Bikehelper && ./install.sh update'`, `backup` und `lock`; der Update-Knopf im Admin-Bereich funktioniert ebenfalls. Der Container braucht die Optionen Nesting und keyctl (setzt das Skript). Auf ZFS-Speicher kann Docker auf einen langsameren Speichertreiber zurückfallen.
+
 ## Mit fertigen Docker-Images (ohne Bauen)
 
 Für alle, die ohnehin mit Docker arbeiten: GitHub baut bei jeder Änderung Images für amd64 und arm64 und legt sie in der GitHub Container Registry ab (`ghcr.io/tillhnz/bikehelper-backend` und `…-frontend`). Du brauchst nur Docker mit Compose, kein Git und keinen Build:
