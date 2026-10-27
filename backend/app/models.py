@@ -47,6 +47,7 @@ class User(Base):
     icu_last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     icu_synced_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     icu_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tour_pending: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True = Rundgang für neue Konten steht noch aus
     whatsnew_seen: Mapped[str | None] = mapped_column(String(32), nullable=True)  # zuletzt gezeigter Neuigkeiten-Hinweis
     wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
 

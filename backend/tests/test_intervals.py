@@ -135,6 +135,21 @@ def test_changelog_shows_only_newer_entries():
     assert len(changelog.unseen("unbekannt")) == min(5, len(ids))
 
 
+def test_tour_for_new_accounts_only_until_done():
+    with TestClient(app) as c:
+        h, uid = _user(c, "icu11@example.com")
+        assert c.get("/api/me", headers=h).json()["tour"] is True  # neues Konto
+        assert c.post("/api/me/tour/done", headers=h).status_code == 204
+        assert c.get("/api/me", headers=h).json()["tour"] is False
+        assert c.post("/api/me/tour/restart", headers=h).status_code == 204
+        assert c.get("/api/me", headers=h).json()["tour"] is True
+        with SessionLocal() as db:  # Bestandskonto von vor dem Update: kein Rundgang
+            u = db.get(User, uid)
+            u.tour_pending = None
+            db.commit()
+        assert c.get("/api/me", headers=h).json()["tour"] is False
+
+
 def test_full_resync_restores_a_ride_deleted_in_bikehelper(monkeypatch):
     monkeypatch.setattr(service, "parse_activity_file", lambda name, data: parse_activity_file("x.gpx", data))
     monkeypatch.setattr(service, "run_in_background", lambda uid: True)  # der Test ruft den Abgleich selbst auf

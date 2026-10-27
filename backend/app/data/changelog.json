@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-27.5",
+    "date": "2026-10-27",
+    "title": "Rundgang für neue Konten",
+    "changes": [
+      "Neue Konten werden nach dem ersten Anmelden durch BikeHelper geführt: wo was zu finden ist und wie man am besten anfängt. Du kannst ihn in den Einstellungen jederzeit selbst starten."
+    ]
+  },
+  {
     "id": "2026-10-27.4",
     "date": "2026-10-27",
     "title": "Aufgeräumt und Gruppenlinks",

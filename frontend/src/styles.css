@@ -1114,3 +1114,20 @@ ul.plain li{padding:.25rem 0}
 .update-hint{font-size:.82rem;font-weight:600;color:var(--celeste);text-decoration:none;border:1px solid var(--celeste);border-radius:999px;padding:.1rem .6rem}
 a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 @media (max-width:800px){.version-line .muted{display:none}}
+
+/* Rundgang */
+.tour-card{position:fixed;z-index:2400;right:1.5rem;bottom:1.5rem;width:min(24rem,calc(100vw - 2rem));background:var(--panel);border:1px solid var(--celeste);border-radius:12px;padding:1rem 1.1rem;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.tour-card h3{margin:.1rem 0 .4rem}
+.tour-card p{margin:.3rem 0}
+.tour-count{margin:0}
+.tour-card .actions{display:flex;gap:.6rem;justify-content:flex-end;align-items:center;margin-top:.8rem}
+.tour-card .actions .link:first-child{margin-right:auto}
+.tour-dots{display:flex;gap:.3rem;margin-top:.7rem}
+.tour-dots i{width:.45rem;height:.45rem;border-radius:50%;background:var(--line)}
+.tour-dots i.on{background:var(--celeste)}
+.tour-todo{list-style:none;padding:0;margin:.4rem 0}
+.tour-todo li{padding:.2rem 0}
+.sidebar nav a.tour-hl{outline:2px solid var(--celeste);outline-offset:2px;border-radius:8px;animation:tour-pulse 1.4s ease-in-out infinite}
+@keyframes tour-pulse{50%{outline-color:transparent}}
+@media (max-width:800px){.tour-card{right:.75rem;left:.75rem;width:auto;bottom:5rem}}
+@media (prefers-reduced-motion:reduce){.sidebar nav a.tour-hl{animation:none}}

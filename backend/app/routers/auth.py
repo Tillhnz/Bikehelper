@@ -28,6 +28,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         is_admin=admin,
         role="admin" if admin else "user",
         mechanic_enabled=bool(u.mechanic_enabled),
+        tour=bool(u.tour_pending),
         whatsnew=changelog.unseen(u.whatsnew_seen) or None,
     )
 
@@ -66,7 +67,7 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_409_CONFLICT, "E-Mail bereits vergeben")
     user = User(email=email, password_hash=hash_password(data.password), token_version=0,
                 role="admin" if first_user else "user", active=True,
-                whatsnew_seen=changelog.latest_id())  # neue Konten brauchen den Hinweis nicht
+                whatsnew_seen=changelog.latest_id(), tour_pending=True)  # neue Konten brauchen den Hinweis nicht
     db.add(user)
     if invite is not None:
         invite.used_by_email, invite.used_at = email, datetime.utcnow()
@@ -154,6 +155,18 @@ def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depen
     if is_admin(db, user) and _admin_count(db) <= 1 and db.scalar(select(func.count()).select_from(User)) > 1:
         raise HTTPException(status.HTTP_409_CONFLICT, "Du bist der letzte Administrator. Ernenne zuerst jemand anderen zum Administrator.")
     delete_user_data(db, user)
+
+
+@router.post("/me/tour/done", status_code=204)
+def tour_done(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.tour_pending = False
+    db.commit()
+
+
+@router.post("/me/tour/restart", status_code=204)
+def tour_restart(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.tour_pending = True
+    db.commit()
 
 
 @router.post("/me/whatsnew/seen", status_code=204)

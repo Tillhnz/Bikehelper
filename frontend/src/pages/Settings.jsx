@@ -594,6 +594,24 @@ function MechanicSettings({ user, onChange }) {
   );
 }
 
+function TourSettings({ user, onChange }) {
+  async function restart() {
+    try {
+      await api.post("/me/tour/restart", {});
+      onChange({ ...user, tour: true });
+    } catch (e) {
+      toast(e.message, "error");
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Rundgang</h2>
+      <p className="muted">Eine kurze Führung durch BikeHelper: wo was zu finden ist und wie du am besten anfängst.</p>
+      <button className="btn" onClick={restart}>Rundgang starten</button>
+    </section>
+  );
+}
+
 function AppearanceSettings() {
   const [mode, setMode] = useState(getTheme());
   function pick(m) { setMode(m); setTheme(m); }
@@ -649,6 +667,7 @@ export default function Settings({ user, onChange }) {
       <AppearanceSettings />
 
       <MechanicSettings user={user} onChange={onChange} />
+      <TourSettings user={user} onChange={onChange} />
 
       <NotifySettings />
 

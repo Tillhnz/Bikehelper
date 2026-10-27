@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate, useParams } from "react-router-do
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
 import WhatsNew from "./components/WhatsNew.jsx";
+import Tour from "./components/Tour.jsx";
 import Shell from "./components/Shell.jsx";
 import { ErrorBoundary, FeedbackHost } from "./components/feedback.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
@@ -78,6 +79,7 @@ export default function App() {
   return (
     <Shell user={user} onLogout={logout}>
       <FeedbackHost />
+      {user.tour && <Tour onClose={() => setUser((u) => ({ ...u, tour: false }))} />}
       <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
       <ErrorBoundary>
       <Routes>
