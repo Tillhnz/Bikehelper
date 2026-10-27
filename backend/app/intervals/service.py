@@ -186,6 +186,9 @@ def sync_user(db: Session, user: User, http: httpx.Client | None = None, max_dow
     user.icu_last_sync = datetime.utcnow()
     user.icu_status = result.text()
     db.commit()
+    if result.imported:  # Wetter für die neuen Fahrten gleich holen, nicht erst beim nächsten geplanten Lauf
+        from ..weather import service as weather_service
+        weather_service.trigger(user.id)
     return result
 
 

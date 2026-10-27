@@ -330,6 +330,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [unassigned, setUnassigned] = useState(false);
   const [source, setSource] = useState("");
   const [sources, setSources] = useState([]);
+  const [suggestions, setSuggestions] = useState({}); // Radvorschläge für Fahrten ohne Rad, nach Fahrt-ID
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [error, setError] = useState("");
@@ -369,11 +370,37 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
 
   useEffect(() => { load(0); }, [load, refreshKey]);
 
+  const loadSuggestions = useCallback(() => {
+    api.get("/activities/suggestions").then(setSuggestions).catch(() => setSuggestions({}));
+  }, []);
+  useEffect(() => { loadSuggestions(); }, [loadSuggestions, refreshKey]);
+
+  async function acceptSuggestions(list) {
+    // je Rad ein Aufruf; nur Fahrten, die noch kein Rad haben
+    const byBike = {};
+    for (const [id, s] of list) (byBike[s.bike_id] ||= []).push(Number(id));
+    setError("");
+    try {
+      let n = 0;
+      for (const [bikeId, ids] of Object.entries(byBike)) {
+        const res = await api.post("/activities/assign", { bike_id: Number(bikeId), activity_ids: ids, only_unassigned: true });
+        n += res.updated;
+      }
+      toast(`${n} ${n === 1 ? "Fahrt" : "Fahrten"} zugeordnet.`);
+      await load(0);
+      loadSuggestions();
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function changeBike(a, value) {
     const bikeId = value ? Number(value) : null;
     setItems((prev) => prev.map((x) => (x.id === a.id ? { ...x, bike_id: bikeId } : x)));
     try {
       await api.put(`/activities/${a.id}`, { bike_id: bikeId });
+      loadSuggestions();
       onChanged();
     } catch (err) {
       setError(err.message);
@@ -461,6 +488,13 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
 
       {error && <p className="error" role="alert">{error}</p>}
 
+      {Object.keys(suggestions).length > 0 && (
+        <p className="filter-chip">
+          Für <strong>{Object.keys(suggestions).length}</strong> Fahrten ohne Rad gibt es einen Vorschlag, abgeleitet aus deinen bisherigen Zuordnungen.
+          <button className="link small" onClick={() => acceptSuggestions(Object.entries(suggestions))}>Alle Vorschläge übernehmen</button>
+        </p>
+      )}
+
       {count > 0 && (
         <div className="select-bar" role="region" aria-label="Auswahl">
           <strong>{count} {count === 1 ? "Fahrt" : "Fahrten"} ausgewählt</strong>
@@ -517,6 +551,12 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                       <option value="">Kein Rad</option>
                       {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
+                    {!a.bike_id && suggestions[a.id] && (
+                      <span className="suggest" title={suggestions[a.id].reason}>
+                        Vorschlag: <strong>{suggestions[a.id].bike_name}</strong>{" "}
+                        <button className="link small" onClick={() => acceptSuggestions([[a.id, suggestions[a.id]]])}>Übernehmen</button>
+                      </span>
+                    )}
                   </td>
                   <td className="cell-wide"><button className="link small danger" onClick={() => remove(a)}>Löschen</button></td>
                 </tr>

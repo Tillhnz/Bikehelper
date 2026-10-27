@@ -142,3 +142,41 @@ def test_filter_activities_by_source():
         assert c.get("/api/activities?source=wahoo", headers=h).json()["total"] == 2
         assert c.get("/api/activities?source=unknown", headers=h).json()["total"] == 1
         assert {s["source"]: s["count"] for s in c.get("/api/activities/sources", headers=h).json()} == {"wahoo": 2, "intervals": 1, "unknown": 1}
+
+
+def test_bike_suggestions_from_gear_name_and_similar_rides():
+    from datetime import datetime, timedelta
+    with TestClient(app) as c:
+        h, uid = _user(c, "icu7@example.com")
+        with SessionLocal() as db:
+            bike = db.scalars(select(Bike).where(Bike.user_id == uid)).one()
+            other = Bike(user_id=uid, name="Gravel", type="gravel")
+            db.add(other)
+            db.flush()
+            t0 = datetime(2026, 5, 1, 7, 30)
+            for i in range(4):  # Pendeln mit dem Canyon: gleicher Start, ~20 km, morgens
+                db.add(Activity(user_id=uid, bike_id=bike.id, name=f"P{i}", start_date=t0 + timedelta(days=i), distance_km=20 + i,
+                                start_lat=50.1, start_lng=8.6, gear_name="Canyon Endurace"))
+            db.add(Activity(user_id=uid, bike_id=other.id, name="G", start_date=t0, distance_km=80, start_lat=50.5, start_lng=9.0))
+            a_gear = Activity(user_id=uid, name="Neu 1", start_date=datetime(2026, 6, 1, 18, 0), distance_km=5, gear_name="Canyon Endurace")
+            a_near = Activity(user_id=uid, name="Neu 2", start_date=datetime(2026, 6, 2, 7, 45), distance_km=21, start_lat=50.1004, start_lng=8.6004)
+            a_far = Activity(user_id=uid, name="Neu 3", start_date=datetime(2026, 6, 3, 7, 45), distance_km=21, start_lat=48.0, start_lng=11.0)
+            db.add_all([a_gear, a_near, a_far])
+            db.commit()
+            ids = (a_gear.id, a_near.id, a_far.id, bike.id)
+        s = c.get("/api/activities/suggestions", headers=h).json()
+        assert s[str(ids[0])]["bike_id"] == ids[3] and "Radnamen" in s[str(ids[0])]["reason"]
+        assert s[str(ids[1])]["bike_id"] == ids[3] and "ähnlichen" in s[str(ids[1])]["reason"]
+        assert str(ids[2]) not in s  # anderer Startort: kein Vorschlag
+
+
+def test_import_triggers_weather_for_new_rides(monkeypatch):
+    monkeypatch.setattr(service, "parse_activity_file", lambda name, data: parse_activity_file("x.gpx", data))
+    from app.weather import service as weather_service
+    calls = []
+    monkeypatch.setattr(weather_service, "trigger", lambda uid=None: calls.append(uid))
+    with TestClient(app) as c:
+        _, uid = _user(c, "icu8@example.com")
+        with SessionLocal() as db:
+            service.sync_user(db, db.get(User, uid), http=_fake([]))
+    assert calls == [uid]

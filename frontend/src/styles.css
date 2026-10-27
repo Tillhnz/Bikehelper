@@ -1071,3 +1071,5 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 /* Herkunft einer Fahrt */
 .source-tag{display:inline-block;margin-left:.6rem;padding:.05rem .5rem;border:1px solid var(--line);border-radius:999px;font-size:.72rem;line-height:1.5;color:var(--mute);white-space:nowrap;vertical-align:middle}
 @media (max-width:800px){.rides .source-tag{margin-left:0;margin-top:.2rem}}
+.suggest{display:block;margin-top:.3rem;font-size:.82rem;color:var(--mute)}
+.suggest strong{color:inherit}

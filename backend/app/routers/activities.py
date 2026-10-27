@@ -154,6 +154,17 @@ def list_activities(
     return ActivityPage(total=total, items=[_out(a, bool(t)) for a, t in rows])
 
 
+@router.get("/activities/suggestions")
+def bike_suggestions(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Radvorschläge für die neuesten Fahrten ohne Rad (höchstens 300)."""
+    from ..suggest import suggest_bikes
+    rows = db.scalars(
+        select(Activity).options(defer(Activity.polyline), defer(Activity.details), defer(Activity.tiles))
+        .where(Activity.user_id == user.id, Activity.bike_id.is_(None)).order_by(Activity.start_date.desc()).limit(300)
+    ).all()
+    return suggest_bikes(db, user.id, rows)
+
+
 @router.get("/activities/sources")
 def list_sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Herkünfte, aus denen der Nutzer Fahrten hat (mit Anzahl), für den Filter der Fahrtenliste."""
