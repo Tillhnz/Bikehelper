@@ -170,6 +170,41 @@ def test_bike_suggestions_from_gear_name_and_similar_rides():
         assert str(ids[2]) not in s  # anderer Startort: kein Vorschlag
 
 
+def test_bike_suggestions_from_power_source_terrain_and_speed():
+    from datetime import datetime, timedelta
+    with TestClient(app) as c:
+        h, uid = _user(c, "icu9@example.com")
+        with SessionLocal() as db:
+            road = db.scalars(select(Bike).where(Bike.user_id == uid)).one()
+            gravel = Bike(user_id=uid, name="Gravel", type="gravel")
+            db.add(gravel)
+            db.flush()
+            t0 = datetime(2026, 4, 1, 12, 0)
+            for i in range(10):  # Rennrad: immer mit Leistungsmesser, schnell, Wahoo
+                db.add(Activity(user_id=uid, bike_id=road.id, name=f"R{i}", start_date=t0 + timedelta(days=i), distance_km=60 + i,
+                                moving_time_s=int((60 + i) / 29 * 3600), avg_power=210 + i, avg_cadence=88, source="wahoo", terrain="road"))
+            for i in range(10):  # Gravel: ohne Leistung, langsamer, Fahrtart Gravel
+                db.add(Activity(user_id=uid, bike_id=gravel.id, name=f"G{i}", start_date=t0 + timedelta(days=i), distance_km=40 + i,
+                                moving_time_s=int((40 + i) / 20 * 3600), avg_power=0, avg_cadence=0, source="intervals", terrain="gravel"))
+            fast = Activity(user_id=uid, name="Neu schnell", start_date=datetime(2026, 6, 1, 9, 0), distance_km=70,
+                            moving_time_s=int(70 / 29.5 * 3600), avg_power=215, avg_cadence=90, source="wahoo", terrain="road")
+            unclear = Activity(user_id=uid, name="Neu unklar", start_date=datetime(2026, 6, 2, 9, 0), distance_km=50,
+                               moving_time_s=int(50 / 25 * 3600), avg_power=None, avg_cadence=None, source="upload", terrain="")
+            db.add_all([fast, unclear])
+            db.commit()
+            ids = (fast.id, unclear.id, road.id)
+        s = c.get("/api/activities/suggestions", headers=h).json()
+        assert s[str(ids[0])]["bike_id"] == ids[2] and "Leistungsdaten" in s[str(ids[0])]["reason"]
+        assert str(ids[1]) not in s  # keine unterscheidenden Merkmale: kein Vorschlag
+
+
+def test_terrain_of_and_features():
+    from app.suggest import features_from_details, terrain_of
+    assert terrain_of("Gravel Ride") == "gravel" and terrain_of("cycling gravel_cycling") == "gravel"
+    assert terrain_of("MountainBikeRide") == "mtb" and terrain_of("EBikeRide") == "ebike" and terrain_of("Ride") is None
+    assert features_from_details({"avg_power": 180.4, "avg_cadence": 85}) == (180.4, 85.0) and features_from_details(None) == (0.0, 0.0)
+
+
 def test_import_triggers_weather_for_new_rides(monkeypatch):
     monkeypatch.setattr(service, "parse_activity_file", lambda name, data: parse_activity_file("x.gpx", data))
     from app.weather import service as weather_service

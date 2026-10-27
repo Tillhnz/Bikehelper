@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
-from . import audit, notify
+from . import audit, notify, suggest
 from .database import Base, SessionLocal, ensure_columns, engine
 from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, wahoo as wahoo_router, weather as weather_router
 from . import server_settings
@@ -50,6 +50,7 @@ async def lifespan(app: FastAPI):
     geo_service.start_background()
     wahoo_service.start_background()
     intervals_service.start_background()
+    suggest.start_backfill()
     yield
 
 

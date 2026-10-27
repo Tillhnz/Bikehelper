@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..models import Activity, Bike
 from ..services import create_default_components
+from ..suggest import features_from_details, terrain_of
 from .parsers import ParsedActivity, ParseError, is_cycling, parse_activity_file
 from .strava_export import ExportEntry, clean_gear_name, gear_key, index_export
 
@@ -97,6 +98,7 @@ def backfill_existing(
         changed = True
     if details and not existing.details:
         existing.details = json.dumps(details, separators=(",", ":"))
+        existing.avg_power, existing.avg_cadence = features_from_details(details)
         changed = True
     return changed
 
@@ -134,6 +136,9 @@ def store_activity(
         start_lng=parsed.start_lng,
         gear_name=gear_name[:160] if gear_name else None,
         source=source,
+        avg_power=features_from_details(parsed.details)[0],
+        avg_cadence=features_from_details(parsed.details)[1],
+        terrain=terrain_of(sport_type) or terrain_of(parsed.sport) or "",
     )
     try:
         with db.begin_nested():

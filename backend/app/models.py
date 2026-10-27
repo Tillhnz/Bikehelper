@@ -226,6 +226,10 @@ class Activity(Base):
     wet_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Regen oder nasser Straße
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # WMO-Wettercode (höchster während der Fahrt)
     weather_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | prelim | none; leer = offen
+    # Merkmale für Radvorschläge (aus den Fahrdaten; NULL = noch nicht ausgewertet, 0 bzw. "" = nicht vorhanden)
+    avg_power: Mapped[float | None] = mapped_column(Float, nullable=True)
+    avg_cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    terrain: Mapped[str | None] = mapped_column(String(10), nullable=True)  # road | gravel | mtb | ebike | "" (unbekannt)
 
 
 class RuleNotice(Base):
