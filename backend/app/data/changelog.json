@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-10-27.7",
+    "date": "2026-10-27",
+    "title": "Gruppen: mehr Statistiken und Freigaben",
+    "changes": [
+      "Der Verlauf in der Gruppenansicht folgt jetzt dem gewählten Zeitraum (Tage, Monate oder Jahre) und lässt sich aufsummieren. Die Rangliste zeigt die Veränderung zum Zeitraum davor.",
+      "Neue Vergleiche: Fahrrhythmus (Wochentage, Tageszeiten, Streckenlängen), Rekorde, Belastung und Form sowie Wetter.",
+      "Jedes Mitglied wählt pro Gruppe selbst, welche dieser Bereiche es zusätzlich zu den Grundwerten freigibt. Orte, Strecken, Räder und Wartung werden nie geteilt."
+    ]
+  },
+  {
     "id": "2026-10-27.6",
     "date": "2026-10-27",
     "title": "Reifen: Zeiträume nachtragen",

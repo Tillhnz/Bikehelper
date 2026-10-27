@@ -19,11 +19,20 @@ from ..config import settings
 from ..database import get_db
 from ..models import Activity, Group, GroupInvite, GroupMember, User
 from ..security import current_user
-from ..stats.overview import get_tz, local
+from ..stats.extra import DAYPARTS, load_series, longest_week_streak, ride_load
+from ..stats.overview import DISTANCE_BUCKETS, Row, _bucket, get_tz, local, streaks
 
 log = logging.getLogger("bikehelper.groups")
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
+# Bereiche, die ein Mitglied zusätzlich zu den Grundwerten (Kilometer, Höhenmeter, Zeit, Fahrten, Tempo) freigeben kann.
+# Es sind nur Summen und Verteilungen. Nie geteilt werden Strecken, Orte, Karten, Räder, Wartung, Fahrtnamen oder Ziele.
+CATEGORIES = {
+    "rhythm": ("Fahrrhythmus", "Wochentage, Tageszeiten und Streckenlängen als Verteilung"),
+    "records": ("Rekorde", "längste Fahrt, meiste Höhenmeter, bester Tag, schnellster Schnitt und Serien, ohne Datum und Namen"),
+    "load": ("Belastung und Form", "geschätzt aus Fahrzeit, Höhenmetern und Tempo"),
+    "weather": ("Wetter", "Kilometer bei Regen, Durchschnittstemperatur, kälteste und wärmste Fahrt, ohne Orte"),
+}
 MAX_GROUPS_PER_USER = 10
 MAX_MEMBERS = 50
 MAX_PENDING_INVITES = 30
@@ -36,6 +45,7 @@ METRICS = ("km", "elev_m", "time_s", "rides", "avg_speed", "longest_km", "active
 class GroupIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     display_name: str = Field(min_length=1, max_length=60)
+    shared: list[str] = []
 
 
 class RenameIn(BaseModel):
@@ -50,11 +60,13 @@ class JoinIn(BaseModel):
     token: str
     display_name: str = Field(min_length=1, max_length=60)
     share: bool = True
+    shared: list[str] = []
 
 
 class MeIn(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=60)
     share: bool | None = None
+    shared: list[str] | None = None
 
 
 class RoleIn(BaseModel):
@@ -73,6 +85,17 @@ def _admin(db: Session, group_id: int, user: User) -> GroupMember:
     if m.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Das dürfen nur Gruppenadministratoren")
     return m
+
+
+def _cats(values: list[str]) -> str:
+    bad = [v for v in values if v not in CATEGORIES]
+    if bad:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unbekannter Bereich zum Teilen")
+    return ",".join(c for c in CATEGORIES if c in values)  # feste Reihenfolge, keine Doppelten
+
+
+def _shared(m: GroupMember) -> list[str]:
+    return [c for c in (m.shared or "").split(",") if c in CATEGORIES]
 
 
 def _clean(name: str) -> str:
@@ -151,7 +174,7 @@ def create_group(data: GroupIn, user: User = Depends(current_user), db: Session 
     g = Group(name=_clean(data.name))
     db.add(g)
     db.flush()
-    db.add(GroupMember(group_id=g.id, user_id=user.id, role="admin", display_name=_clean(data.display_name), share=True))
+    db.add(GroupMember(group_id=g.id, user_id=user.id, role="admin", display_name=_clean(data.display_name), share=True, shared=_cats(data.shared)))
     db.commit()
     return {"id": g.id}
 
@@ -162,7 +185,8 @@ def preview_invite(token: str, user: User = Depends(current_user), db: Session =
     if inv is None or not _fresh(inv):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Die Einladung ist ungültig oder abgelaufen")
     g = db.get(Group, inv.group_id)
-    return {"group": g.name, "already_member": db.get(GroupMember, (g.id, user.id)) is not None}
+    return {"group": g.name, "already_member": db.get(GroupMember, (g.id, user.id)) is not None,
+            "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()]}
 
 
 @router.post("/join")
@@ -181,8 +205,9 @@ def join(data: JoinIn, user: User = Depends(current_user), db: Session = Depends
     if db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.user_id == user.id)) >= MAX_GROUPS_PER_USER:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Mehr als {MAX_GROUPS_PER_USER} Gruppen sind nicht möglich")
     name = _clean(data.display_name)
+    cats = _cats(data.shared)
     _unique_name(db, gid, name)
-    db.add(GroupMember(group_id=gid, user_id=user.id, role="member", display_name=name, share=data.share))
+    db.add(GroupMember(group_id=gid, user_id=user.id, role="member", display_name=name, share=data.share, shared=cats))
     if not inv.multi:
         db.delete(inv)  # persönliche Einladungen sind einmal gültig, der Gruppenlink bleibt
     db.commit()
@@ -195,8 +220,9 @@ def group_info(group_id: int, user: User = Depends(current_user), db: Session = 
     g = db.get(Group, group_id)
     members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id).order_by(GroupMember.display_name)).all()
     out = {
-        "id": g.id, "name": g.name, "role": me.role, "display_name": me.display_name, "share": me.share,
-        "members": [{"user_id": m.user_id, "display_name": m.display_name, "role": m.role, "share": m.share, "is_me": m.user_id == user.id} for m in members],
+        "id": g.id, "name": g.name, "role": me.role, "display_name": me.display_name, "share": me.share, "shared": _shared(me),
+        "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()],
+        "members": [{"user_id": m.user_id, "display_name": m.display_name, "role": m.role, "share": m.share, "shared": _shared(m), "is_me": m.user_id == user.id} for m in members],
         "invites": [],
         "mail_enabled": notify.smtp_configured(),
     }
@@ -297,6 +323,8 @@ def update_me(group_id: int, data: MeIn, user: User = Depends(current_user), db:
         m.display_name = name
     if data.share is not None:
         m.share = data.share
+    if data.shared is not None:
+        m.shared = _cats(data.shared)
     db.commit()
     return {"ok": True}
 
@@ -341,6 +369,10 @@ def remove_member(group_id: int, member_id: int, user: User = Depends(current_us
 
 # ---------- Ranglisten ----------
 
+MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
+MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+
+
 def _bounds(period: str, offset: int, today: date) -> tuple[date | None, date | None, str]:
     """Zeitraum als lokale Daten [von, bis) und Beschriftung; offset 0 = aktuell, -1 = davor …"""
     if period == "week":
@@ -351,16 +383,79 @@ def _bounds(period: str, offset: int, today: date) -> tuple[date | None, date | 
         y, m = divmod(idx, 12)
         start = date(y, m + 1, 1)
         end = date(y + (m + 1) // 12, (m + 1) % 12 + 1, 1)
-        names = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
-        return start, end, f"{names[m]} {y}"
+        return start, end, f"{MONTH_NAMES[m]} {y}"
     if period == "year":
         y = today.year + offset
         return date(y, 1, 1), date(y + 1, 1, 1), str(y)
     return None, None, "Gesamt"
 
 
-def _empty() -> dict:
-    return {"km": 0.0, "elev_m": 0.0, "time_s": 0, "rides": 0, "avg_speed": None, "longest_km": 0.0, "active_days": 0}
+def _totals(rs: list[Row]) -> dict:
+    km = sum(r.km for r in rs)
+    secs = sum(r.time_s for r in rs)
+    days = {r.day for r in rs}
+    return {
+        "km": round(km, 1), "elev_m": round(sum(r.elev_m or 0 for r in rs)), "time_s": secs, "rides": len(rs),
+        "avg_speed": round(km / (secs / 3600), 1) if secs >= 600 and km > 0 else None,
+        "longest_km": round(max((r.km for r in rs), default=0.0), 1), "active_days": len(days),
+    }
+
+
+class _R(Row):
+    """Row mit lokalem Tag und lokaler Uhrzeit (day, hour, start_local), damit nicht überall neu umgerechnet wird."""
+
+
+def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -> dict:
+    """Nur die Bereiche, die das Mitglied freigegeben hat. Summen und Verteilungen, keine einzelnen Fahrten."""
+    out: dict = {}
+    if "rhythm" in cats:
+        wd = [0.0] * 7
+        dp = {label: 0.0 for _, _, label in DAYPARTS}
+        dist = {label: 0 for _, _, label in DISTANCE_BUCKETS}
+        for r in period_rows:
+            wd[r.day.weekday()] += r.km
+            for lo, hi, label in DAYPARTS:
+                if lo <= r.hour < hi:
+                    dp[label] += r.time_s / 3600
+                    break
+            b = _bucket(r.km, DISTANCE_BUCKETS)
+            if b:
+                dist[b] += 1
+        out["rhythm"] = {"weekdays": [round(v, 1) for v in wd], "dayparts": [{"label": k, "hours": round(v, 1)} for k, v in dp.items()],
+                         "distances": [{"label": k, "rides": v} for k, v in dist.items()]}
+    if "records" in cats:
+        days = {r.day for r in period_rows}
+        per_day: dict[date, float] = {}
+        for r in period_rows:
+            per_day[r.day] = per_day.get(r.day, 0.0) + r.km
+        fast = [r for r in period_rows if r.time_s > 600 and r.km >= 10]
+        out["records"] = {
+            "longest_km": round(max((r.km for r in period_rows), default=0.0), 1),
+            "most_climb_m": round(max((r.elev_m or 0 for r in period_rows), default=0)),
+            "best_day_km": round(max(per_day.values(), default=0.0), 1),
+            "fastest_avg": round(max((r.km / (r.time_s / 3600) for r in fast), default=0.0), 1) or None,
+            "day_streak": streaks(days, end)[0],
+            "week_streak": longest_week_streak(days),
+        }
+    if "load" in cats:
+        series = load_series([(r.start_local, r) for r in all_rows if r.day <= end], end)
+        now = series[-1] if series else None
+        out["load"] = {
+            "fitness": now["fitness"] if now else None, "fatigue": now["fatigue"] if now else None, "form": now["form"] if now else None,
+            "period_load": round(sum(ride_load(r) for r in period_rows)),
+        }
+    if "weather" in cats:
+        wx = [r for r in period_rows if r.weather_status in ("ok", "prelim") and r.temp_c is not None]
+        wet = [r for r in period_rows if r.wet_minutes is not None and r.time_s > 0]
+        wet_km = sum(r.km * min(1.0, r.wet_minutes * 60 / r.time_s) for r in wet)
+        base = sum(r.km for r in wet)
+        out["weather"] = {
+            "avg_temp": round(sum(r.temp_c for r in wx) / len(wx), 1) if wx else None,
+            "wet_km": round(wet_km, 1), "wet_share": round(wet_km / base * 100) if base else None,
+            "rainy_rides": sum(1 for r in wet if r.wet_minutes >= 5),
+            "coldest": min((r.temp_c for r in wx), default=None), "hottest": max((r.temp_c for r in wx), default=None),
+        }
+    return out
 
 
 @router.get("/{group_id}/stats")
@@ -371,50 +466,82 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
     offset = min(0, max(-520, offset))
     tz = get_tz(settings.timezone)
     today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
-    lo, hi, label = _bounds(period, offset if period != "all" else 0, today)
+    lo, hi, label = _bounds(period, offset, today)
+    plo, phi, _ = _bounds(period, offset - 1, today) if period != "all" else (None, None, "")
     members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id)).all()
     sharing = {m.user_id: m for m in members if m.share}
-    totals = {uid: _empty() for uid in sharing}
-    days: dict[int, set[date]] = {uid: set() for uid in sharing}
-    weekly: dict[int, dict[date, float]] = {uid: {} for uid in sharing}
-    week0 = today - timedelta(days=today.weekday())
-    first_week = week0 - timedelta(weeks=11)
+
+    # Beschriftung und Zuordnung der Verlaufspunkte (Tage, Monate oder Jahre, je nach Zeitraum)
+    if period == "week":
+        labels = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+    elif period == "month":
+        labels = [str(i + 1) for i in range((hi - lo).days)]
+    elif period == "year":
+        labels = MONTHS
+    else:
+        labels = []
+
+    def slot(d: date) -> int | None:
+        if period == "week":
+            return (d - lo).days
+        if period == "month":
+            return (d - lo).days
+        if period == "year":
+            return d.month - 1
+        return d.year
+
+    rows_by_user: dict[int, list[_R]] = {uid: [] for uid in sharing}
     if sharing:
-        # nur die nötigen Spalten, keine Strecken oder Namen
-        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.moving_time_s, Activity.elevation_m).where(Activity.user_id.in_(sharing))
-        for uid, start, km, secs, elev in db.execute(q):
-            d = local(start, tz).date()
-            km, secs, elev = km or 0.0, secs or 0, elev or 0.0
-            if d >= first_week:
-                w = d - timedelta(days=d.weekday())
-                weekly[uid][w] = weekly[uid].get(w, 0.0) + km
-            if (lo and d < lo) or (hi and d >= hi):
-                continue
-            t = totals[uid]
-            t["km"] += km
-            t["elev_m"] += elev
-            t["time_s"] += secs
-            t["rides"] += 1
-            t["longest_km"] = max(t["longest_km"], km)
-            days[uid].add(d)
-    for uid, t in totals.items():
-        t["active_days"] = len(days[uid])
-        t["avg_speed"] = round(t["km"] / (t["time_s"] / 3600), 1) if t["time_s"] >= 600 and t["km"] > 0 else None
-        t["km"], t["elev_m"], t["longest_km"] = round(t["km"], 1), round(t["elev_m"]), round(t["longest_km"], 1)
-    rows = [{"user_id": uid, "display_name": sharing[uid].display_name, "is_me": uid == user.id, **t} for uid, t in totals.items()]
-    ranks: dict[str, list[int]] = {}
-    for metric in METRICS:  # Rang je Kennzahl, 1 = bester; gleiche Werte teilen sich den Rang; leere Werte zählen nicht
-        vals = sorted({r[metric] for r in rows if r[metric]}, reverse=True)
-        for r in rows:
-            r.setdefault("rank", {})[metric] = vals.index(r[metric]) + 1 if r[metric] else None
-        ranks[metric] = vals
-    rows.sort(key=lambda r: (-(r["km"] or 0), r["display_name"].lower()))
-    weeks = [first_week + timedelta(weeks=i) for i in range(12)]
+        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.moving_time_s, Activity.elevation_m,
+                   Activity.temp_c, Activity.precip_mm, Activity.wet_minutes, Activity.weather_status).where(Activity.user_id.in_(sharing))
+        for uid, start, km, secs, elev, temp, precip, wetm, wstat in db.execute(q):
+            ldt = local(start, tz)
+            r = _R(id=0, name="", bike_id=None, start=start, km=km or 0.0, time_s=secs or 0, elev_m=elev or 0.0,
+                   temp_c=temp, precip_mm=precip, wet_minutes=wetm, weather_status=wstat)
+            r.day, r.hour, r.start_local = ldt.date(), ldt.hour, ldt
+            rows_by_user[uid].append(r)
+
+    def within(rs, a, b):
+        return [r for r in rs if (a is None or r.day >= a) and (b is None or r.day < b)]
+
+    result, series_raw, all_years = [], {}, set()
+    for uid, m in sharing.items():
+        rs = rows_by_user[uid]
+        cur = within(rs, lo, hi)
+        row = {"user_id": uid, "display_name": m.display_name, "is_me": uid == user.id, **_totals(cur), "shared": _shared(m)}
+        if period != "all":
+            row["prev"] = {k: v for k, v in _totals(within(rs, plo, phi)).items() if k in ("km", "elev_m", "time_s", "rides")}
+        row["extras"] = _extras(_shared(m), cur, rs, min(today, (hi - timedelta(days=1)) if hi else today), tz)
+        result.append(row)
+        pts: dict[int, float] = {}
+        for r in cur:
+            k = slot(r.day)
+            pts[k] = pts.get(k, 0.0) + r.km
+        series_raw[uid] = pts
+        all_years |= set(pts) if period == "all" else set()
+
+    if period == "all":
+        first = min(all_years, default=today.year)
+        years = list(range(max(first, today.year - 11), today.year + 1))
+        labels = [str(y) for y in years]
+        slots = years
+    else:
+        slots = list(range(len(labels)))
+
+    for r in result:  # Rang je Kennzahl, 1 = bester; gleiche Werte teilen sich den Rang; leere Werte zählen nicht
+        r["rank"] = {}
+    for metric in METRICS:
+        vals = sorted({r[metric] for r in result if r[metric]}, reverse=True)
+        for r in result:
+            r["rank"][metric] = vals.index(r[metric]) + 1 if r[metric] else None
+    result.sort(key=lambda r: (-(r["km"] or 0), r["display_name"].lower()))
     return {
         "period": period, "offset": offset, "label": label,
         "can_next": period != "all" and offset < 0, "can_prev": period != "all",
-        "rows": rows,
+        "rows": result,
+        "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()],
         "not_sharing": sorted(m.display_name for m in members if not m.share),
-        "weekly": {"weeks": [w.isoformat() for w in weeks],
-                   "series": [{"display_name": sharing[uid].display_name, "is_me": uid == user.id, "km": [round(weekly[uid].get(w, 0.0), 1) for w in weeks]} for uid in sharing]},
+        "series": {"labels": labels,
+                   "members": [{"display_name": r["display_name"], "is_me": r["is_me"],
+                                "km": [round(series_raw[r["user_id"]].get(k, 0.0), 1) for k in slots]} for r in result]},
     }

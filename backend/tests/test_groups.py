@@ -113,3 +113,36 @@ def test_group_invite_link_lets_new_people_register_and_join(monkeypatch):
         assert c.delete(f"/api/groups/{gid}/invite-link", headers=a).status_code == 204
         assert c.get(f"/api/groups/{gid}", headers=a).json()["invite_link"] is None
         assert c.post(f"/api/groups/{gid}/invite-link", headers=b).status_code == 403  # nur Admins
+
+
+def test_group_series_follows_period_and_extras_need_consent():
+    with TestClient(app) as c:
+        a = _user(c, "gs1@example.com")
+        b = _user(c, "gs2@example.com")
+        _rides(_uid("gs1@example.com"), [40, 25])
+        _rides(_uid("gs2@example.com"), [60])
+        gid = c.post("/api/groups", headers=a, json={"name": "Reihe", "display_name": "Anna", "shared": ["records", "weather"]}).json()["id"]
+        token = c.post(f"/api/groups/{gid}/invite-link", headers=a).json()["link"].rsplit("/", 1)[1]
+        assert c.get(f"/api/groups/join/{token}", headers=b).json()["categories"][0]["key"] == "rhythm"
+        assert c.post("/api/groups/join", headers=b, json={"token": token, "display_name": "Ben", "shared": ["quatsch"]}).status_code == 422
+        assert c.post("/api/groups/join", headers=b, json={"token": token, "display_name": "Ben"}).status_code == 200
+
+        info = c.get(f"/api/groups/{gid}", headers=a).json()
+        assert info["shared"] == ["records", "weather"] and [m["shared"] for m in info["members"]] == [["records", "weather"], []]
+
+        year = c.get(f"/api/groups/{gid}/stats?period=year", headers=a).json()
+        week = c.get(f"/api/groups/{gid}/stats?period=week", headers=a).json()
+        allp = c.get(f"/api/groups/{gid}/stats?period=all", headers=a).json()
+        assert len(year["series"]["labels"]) == 12 and len(week["series"]["labels"]) == 7  # Verlauf passt zum Zeitraum
+        assert year["series"]["labels"] != week["series"]["labels"] and allp["series"]["labels"][-1] == str(datetime.utcnow().year)
+        by = {r["display_name"]: r for r in allp["rows"]}
+        assert abs(sum(by["Anna"] and next(m["km"] for m in allp["series"]["members"] if m["display_name"] == "Anna")) - 65) < 0.1
+        # Bereiche nur bei Freigabe
+        assert set(by["Anna"]["extras"]) == {"records", "weather"} and by["Ben"]["extras"] == {}
+        assert by["Anna"]["extras"]["records"]["longest_km"] == 40
+        assert "prev" in year["rows"][0] and "prev" not in allp["rows"][0]
+
+        # Freigabe später ändern
+        assert c.put(f"/api/groups/{gid}/me", headers=b, json={"shared": ["rhythm", "load"]}).status_code == 200
+        by = {r["display_name"]: r for r in c.get(f"/api/groups/{gid}/stats?period=all", headers=a).json()["rows"]}
+        assert set(by["Ben"]["extras"]) == {"rhythm", "load"} and sum(by["Ben"]["extras"]["rhythm"]["weekdays"]) == 60

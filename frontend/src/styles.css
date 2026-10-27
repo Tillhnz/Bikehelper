@@ -1131,3 +1131,10 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 @keyframes tour-pulse{50%{outline-color:transparent}}
 @media (max-width:800px){.tour-card{right:.75rem;left:.75rem;width:auto;bottom:5rem}}
 @media (prefers-reduced-motion:reduce){.sidebar nav a.tour-hl{animation:none}}
+
+.share-choices{border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;margin:.7rem 0}
+.share-choices legend{font-weight:600;padding:0 .3rem}
+.share-choices .check{align-items:flex-start;margin:.35rem 0}
+.delta{margin-left:.4rem;font-size:.8rem}
+.delta.up{color:var(--celeste)}
+.delta.down{color:#ff6b6b}

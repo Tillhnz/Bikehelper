@@ -427,6 +427,7 @@ class GroupMember(Base):
     role: Mapped[str] = mapped_column(String(10), default="member")  # admin | member
     display_name: Mapped[str] = mapped_column(String(60))  # Anzeigename nur in dieser Gruppe, nie die E-Mail-Adresse
     share: Mapped[bool] = mapped_column(Boolean, default=True)  # Kennzahlen in dieser Gruppe zeigen
+    shared: Mapped[str | None] = mapped_column(String(80), nullable=True)  # zusätzlich freigegebene Bereiche, kommagetrennt (leer = nur Grundwerte)
     joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

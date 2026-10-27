@@ -164,6 +164,8 @@ Unter „Gruppen“ gründest du eine Gruppe und lädst Freunde per E-Mail ein (
 
 Neben der Einladung per E-Mail gibt es einen **Einladungslink** für mehrere Personen (30 Tage gültig, ein neuer Link ersetzt den alten, jederzeit abschaltbar). Er enthält einen Schlüssel: Wer noch kein BikeHelper-Konto hat, kann sich darüber auch bei geschlossener Registrierung ein Konto anlegen und tritt danach der Gruppe bei. Dasselbe gilt für Links aus der E-Mail-Einladung.
 
+Zusätzlich zu den Grundwerten gibt jedes Mitglied pro Gruppe selbst frei (beim Beitritt und später unter „Meine Teilnahme“): **Fahrrhythmus** (Wochentage, Tageszeiten, Streckenlängen), **Rekorde**, **Belastung und Form** (geschätzt) und **Wetter** (Kilometer bei Regen, Temperaturen). Wer einen Bereich nicht freigibt, erscheint dort mit „–“. Der Verlauf im Diagramm folgt dem gewählten Zeitraum (Wochentage, Tage, Monate oder Jahre) und lässt sich aufsummieren.
+
 Datenschutz: Geteilt werden nur diese Summen unter einem Anzeigenamen, den jedes Mitglied pro Gruppe selbst wählt. Keine Strecken, Karten, Räder, Wartung, Fahrtnamen oder E-Mail-Adressen. Jedes Mitglied kann seine Teilnahme je Gruppe pausieren oder die Gruppe verlassen; auch der Server-Administrator sieht keine Gruppeninhalte.
 
 ### Reifenkatalog
