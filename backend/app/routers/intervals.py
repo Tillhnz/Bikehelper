@@ -2,7 +2,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -69,10 +69,20 @@ def save_intervals(data: IntervalsSettingsIn, user: User = Depends(current_user)
     return _out(db, user)
 
 
+class SyncIn(BaseModel):
+    full: bool = False  # alles neu abgleichen
+
+
 @router.post("/intervals/sync", status_code=202)
-def intervals_sync(user: User = Depends(current_user)):
+def intervals_sync(data: SyncIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Holt neue Fahrten. Mit `full` werden auch bisher als „schon vorhanden“ oder „übersprungen“ gemerkte Fahrten noch
+    einmal geprüft, etwa nachdem du eine Fahrt in BikeHelper gelöscht hast. Doppelte erkennt BikeHelper weiterhin."""
     if not service.is_connected(user):
         raise HTTPException(422, "intervals.icu ist nicht verbunden")
+    if data is not None and data.full and not service.is_running(user.id):
+        db.execute(delete(IntervalsSeen).where(IntervalsSeen.user_id == user.id, IntervalsSeen.status.in_(("duplicate", "skipped"))))
+        user.icu_synced_until = None
+        db.commit()
     return {"started": service.run_in_background(user.id)}
 
 

@@ -453,8 +453,12 @@ function IntervalsSettings() {
           </label>
           <div className="actions">
             <button className="btn primary" disabled={st.running} onClick={() => run(() => api.post("/intervals/sync", {}), "Import gestartet.")}>{st.running ? "Läuft …" : "Jetzt abholen"}</button>
+            <button className="btn" disabled={st.running} onClick={() => run(() => api.post("/intervals/sync", { full: true }), "Neuer Abgleich gestartet.")}>Neu abgleichen</button>
             <button className="btn" onClick={() => run(() => api.del("/intervals/connection"), "Verbindung getrennt.")}>Trennen</button>
           </div>
+          <p className="muted small">
+            „Neu abgleichen“ prüft auch Fahrten noch einmal, die BikeHelper schon als vorhanden gemerkt hat, zum Beispiel nach dem Löschen einer Fahrt. Doppelte werden weiter erkannt.
+          </p>
           <p className="muted small">
             {st.imported} Fahrten importiert{st.last_sync ? `, letzter Lauf ${fmtDateTime(st.last_sync)}` : ""}.{st.status ? ` ${st.status}.` : ""}
           </p>

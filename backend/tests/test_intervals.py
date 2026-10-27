@@ -112,3 +112,19 @@ def test_whatsnew_popup_shows_once_for_existing_accounts_only():
         assert c.get("/api/me", headers=h).json()["whatsnew"] == "intervals-2026-10"
         assert c.post("/api/me/whatsnew/seen", headers=h).status_code == 204
         assert c.get("/api/me", headers=h).json()["whatsnew"] is None
+
+
+def test_full_resync_restores_a_ride_deleted_in_bikehelper(monkeypatch):
+    monkeypatch.setattr(service, "parse_activity_file", lambda name, data: parse_activity_file("x.gpx", data))
+    monkeypatch.setattr(service, "run_in_background", lambda uid: True)  # der Test ruft den Abgleich selbst auf
+    with TestClient(app) as c:
+        h, uid = _user(c, "icu5@example.com")
+        with SessionLocal() as db:
+            # Fahrt war per Datei da, intervals.icu hat sie als Duplikat gemerkt, danach wurde sie gelöscht
+            service.sync_user(db, db.get(User, uid), http=_fake([]))
+            db.query(Activity).filter(Activity.user_id == uid).delete()
+            db.commit()
+            assert service.sync_user(db, db.get(User, uid), http=_fake([])).imported == 0  # bleibt ohne neuen Abgleich weg
+        assert c.post("/api/intervals/sync", headers=h, json={"full": True}).status_code == 202
+        with SessionLocal() as db:
+            assert service.sync_user(db, db.get(User, uid), http=_fake([])).imported == 1
