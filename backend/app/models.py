@@ -439,3 +439,4 @@ class GroupInvite(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     invited_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    multi: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True = Einladungslink für mehrere Personen (30 Tage), sonst einmalig

@@ -10,13 +10,11 @@ import Admin from "./pages/Admin.jsx";
 import Login from "./pages/Login.jsx";
 import Home from "./pages/Home.jsx";
 import Garage from "./pages/Garage.jsx";
-import Mechanic from "./pages/Mechanic.jsx";
 import BikeDetail from "./pages/BikeDetail.jsx";
 import Inventory from "./pages/Inventory.jsx";
 import Rides from "./pages/Rides.jsx";
 import Advisor from "./pages/Advisor.jsx";
 import RideDetail from "./pages/RideDetail.jsx";
-import Heatmap from "./pages/Heatmap.jsx";
 import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
 import Groups, { GroupDetail, GroupJoin, pendingGroupToken } from "./pages/Groups.jsx";
@@ -84,14 +82,14 @@ export default function App() {
       <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/garage" element={<Garage />} />
-        {user.mechanic_enabled && <Route path="/mechanic" element={<Mechanic />} />}
+        <Route path="/garage" element={<Garage user={user} />} />
+        <Route path="/mechanic" element={<Navigate to="/garage" replace />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/bikes/:id" element={<BikeDetail />} />
         <Route path="/advisor" element={<Advisor />} />
         <Route path="/rides" element={<Rides />} />
         <Route path="/rides/:id" element={<RideDetail />} />
-        <Route path="/heatmap" element={<Heatmap />} />
+        <Route path="/heatmap" element={<Navigate to="/stats?tab=heatmap" replace />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/groups" element={<Groups />} />
         <Route path="/groups/join/:token" element={<GroupJoin />} />

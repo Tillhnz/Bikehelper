@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setToken } from "../api.js";
 import ThemeToggle from "../components/ThemeToggle.jsx";
+import { pendingGroupToken } from "./Groups.jsx";
 
 export default function Login({ onLoggedIn }) {
   const navigate = useNavigate();
   const query = new URLSearchParams(window.location.search);
   const inviteParam = query.get("invite") || "";
   const resetToken = query.get("reset") || "";
-  const [mode, setMode] = useState(resetToken ? "reset" : inviteParam ? "register" : "login"); // login | register | forgot | reset
+  const groupToken = pendingGroupToken.get() || "";
+  const [groupName, setGroupName] = useState("");
+  const [mode, setMode] = useState(resetToken ? "reset" : inviteParam || groupToken ? "register" : "login"); // login | register | forgot | reset
   const [resetAvailable, setResetAvailable] = useState(false);
   const [info, setInfo] = useState("");
   const [allowRegistration, setAllowRegistration] = useState(true);
@@ -17,6 +20,11 @@ export default function Login({ onLoggedIn }) {
   const [invite, setInvite] = useState(inviteParam);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!groupToken) return;
+    api.get(`/groups/invite-info/${encodeURIComponent(groupToken)}`).then((r) => setGroupName(r.group)).catch(() => pendingGroupToken.clear());
+  }, [groupToken]);
 
   useEffect(() => {
     api.get("/config").then((c) => { setAllowRegistration(c.allow_registration); setResetAvailable(!!c.password_reset); }).catch(() => {});
@@ -42,7 +50,7 @@ export default function Login({ onLoggedIn }) {
         return;
       }
       const path = mode === "login" ? "/auth/login" : "/auth/register";
-      const { access_token } = await api.post(path, mode === "login" ? { email, password } : { email, password, invite: invite.trim() || null });
+      const { access_token } = await api.post(path, mode === "login" ? { email, password } : { email, password, invite: invite.trim() || null, group_invite: groupName ? groupToken : null });
       setToken(access_token);
       await onLoggedIn();
       navigate("/");
@@ -86,7 +94,10 @@ export default function Login({ onLoggedIn }) {
             {(mode === "register" || mode === "reset") && <span className="hint">Mindestens 8 Zeichen.</span>}
           </label>
         )}
-        {mode === "register" && !allowRegistration && (
+        {groupName && mode !== "forgot" && mode !== "reset" && (
+          <p className="ok" role="status">Du wurdest in die Gruppe „{groupName}“ eingeladen. {mode === "register" ? "Lege ein Konto an" : "Melde dich an"}, danach wählst du deinen Anzeigenamen und trittst bei.</p>
+        )}
+        {mode === "register" && !allowRegistration && !groupName && (
           <label>
             Einladungscode
             <input value={invite} onChange={(e) => setInvite(e.target.value)} maxLength={32} autoComplete="off" />

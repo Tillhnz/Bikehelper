@@ -28,6 +28,7 @@ MAX_GROUPS_PER_USER = 10
 MAX_MEMBERS = 50
 MAX_PENDING_INVITES = 30
 INVITE_DAYS = 14
+LINK_DAYS = 30
 PERIODS = ("week", "month", "year", "all")
 METRICS = ("km", "elev_m", "time_s", "rides", "avg_speed", "longest_km", "active_days")
 
@@ -94,7 +95,16 @@ def _admin_count(db: Session, group_id: int) -> int:
 
 
 def _fresh(inv: GroupInvite) -> bool:
-    return inv.created_at is not None and inv.created_at > datetime.utcnow() - timedelta(days=INVITE_DAYS)
+    days = LINK_DAYS if inv.multi else INVITE_DAYS
+    return inv.created_at is not None and inv.created_at > datetime.utcnow() - timedelta(days=days)
+
+
+def find_invite(db: Session, token: str | None) -> GroupInvite | None:
+    """Gültige Gruppeneinladung zu diesem Schlüssel (auch zum Anlegen eines Kontos nutzbar), sonst None."""
+    if not token:
+        return None
+    inv = db.scalar(select(GroupInvite).where(GroupInvite.token == token.strip()))
+    return inv if inv is not None and _fresh(inv) else None
 
 
 def leave_all(db: Session, user_id: int) -> None:
@@ -162,7 +172,8 @@ def join(data: JoinIn, user: User = Depends(current_user), db: Session = Depends
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Die Einladung ist ungültig oder abgelaufen")
     gid = inv.group_id
     if db.get(GroupMember, (gid, user.id)) is not None:
-        db.delete(inv)
+        if not inv.multi:
+            db.delete(inv)
         db.commit()
         return {"id": gid}
     if db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == gid)) >= MAX_MEMBERS:
@@ -172,7 +183,8 @@ def join(data: JoinIn, user: User = Depends(current_user), db: Session = Depends
     name = _clean(data.display_name)
     _unique_name(db, gid, name)
     db.add(GroupMember(group_id=gid, user_id=user.id, role="member", display_name=name, share=data.share))
-    db.delete(inv)  # einmal gültig
+    if not inv.multi:
+        db.delete(inv)  # persönliche Einladungen sind einmal gültig, der Gruppenlink bleibt
     db.commit()
     return {"id": gid}
 
@@ -190,7 +202,9 @@ def group_info(group_id: int, user: User = Depends(current_user), db: Session = 
     }
     if me.role == "admin":
         invs = db.scalars(select(GroupInvite).where(GroupInvite.group_id == group_id).order_by(GroupInvite.id.desc())).all()
-        out["invites"] = [{"id": i.id, "email": i.email, "expired": not _fresh(i)} for i in invs]
+        out["invites"] = [{"id": i.id, "email": i.email, "expired": not _fresh(i)} for i in invs if not i.multi]
+        shared = next((i for i in invs if i.multi and _fresh(i)), None)
+        out["invite_link"] = f"{settings.public_url.rstrip('/')}/groups/join/{shared.token}" if shared else None
     return out
 
 
@@ -236,6 +250,33 @@ def invite(group_id: int, data: InviteIn, user: User = Depends(current_user), db
         except Exception:
             log.exception("Gruppeneinladung konnte nicht per Mail verschickt werden")
     return {"id": inv.id, "link": link, "mailed": mailed}
+
+
+@router.post("/{group_id}/invite-link")
+def create_invite_link(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Einladungslink für mehrere Personen (30 Tage). Ein neuer Link ersetzt den alten; auch Personen ohne Konto können sich darüber registrieren."""
+    _admin(db, group_id, user)
+    db.execute(delete(GroupInvite).where(GroupInvite.group_id == group_id, GroupInvite.multi.is_(True)))
+    inv = GroupInvite(group_id=group_id, email="", token=secrets.token_urlsafe(24), invited_by=user.id, multi=True)
+    db.add(inv)
+    db.commit()
+    return {"link": f"{settings.public_url.rstrip('/')}/groups/join/{inv.token}"}
+
+
+@router.delete("/{group_id}/invite-link", status_code=204)
+def delete_invite_link(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _admin(db, group_id, user)
+    db.execute(delete(GroupInvite).where(GroupInvite.group_id == group_id, GroupInvite.multi.is_(True)))
+    db.commit()
+
+
+@router.get("/invite-info/{token}")
+def invite_info(token: str, db: Session = Depends(get_db)):
+    """Ohne Anmeldung: Name der Gruppe zu einem gültigen Einladungsschlüssel, damit die Anmeldeseite sagen kann, wohin es geht."""
+    inv = find_invite(db, token)
+    if inv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Die Einladung ist ungültig oder abgelaufen")
+    return {"group": db.get(Group, inv.group_id).name}
 
 
 @router.delete("/{group_id}/invites/{invite_id}", status_code=204)

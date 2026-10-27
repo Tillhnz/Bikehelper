@@ -41,7 +41,7 @@ function bboxOf(line) {
   return [x0, y0, x1, y1];
 }
 
-export default function Heatmap() {
+export default function Heatmap({ embedded = false }) {
   const [filters, setFilters] = useState({ year: "", bike_id: "" });
   const [options, setOptions] = useState({ years: [], bikes: [] });
   const [data, setData] = useState(null);
@@ -274,7 +274,7 @@ export default function Heatmap() {
   return (
     <>
       <header className="page-head">
-        <h1>Heatmap</h1>
+        {embedded ? <h2>Heatmap</h2> : <h1>Heatmap</h1>}
         <div className="filter-bar">
           <select value={filters.year} onChange={set("year")} aria-label="Jahr">
             <option value="">Alle Jahre</option>

@@ -572,10 +572,10 @@ function MechanicSettings({ user, onChange }) {
   return (
     <section className="panel">
       <h2>Mechanics-Modus</h2>
-      <p className="muted">Mit dem Mechanics-Modus bekommst du den Tab „Werkstatt“. Dort siehst und bearbeitest du deine Räder und die Räder von Partnern, die dir den Zugriff erlaubt haben.</p>
+      <p className="muted">Mit dem Mechanics-Modus erscheint in der Garage der Bereich „Werkstatt“. Dort siehst und bearbeitest du die Räder von Partnern, die dir den Zugriff erlaubt haben.</p>
       <label className="check">
         <input type="checkbox" checked={!!user.mechanic_enabled} onChange={(e) => toggle(e.target.checked)} />
-        Tab „Werkstatt“ anzeigen
+        Werkstatt in der Garage anzeigen
       </label>
       <h3>Wer auf meine Räder zugreifen darf</h3>
       {error && <p className="error" role="alert">{error}</p>}

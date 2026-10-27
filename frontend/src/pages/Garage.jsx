@@ -6,6 +6,7 @@ import BikeIllustration from "../components/BikeIllustration.jsx";
 import { EmptyState, Odometer, StatusPill } from "../components/ui.jsx";
 import { Loading } from "../components/feedback.jsx";
 import ShoppingList from "../components/ShoppingList.jsx";
+import PartnerBikes from "./Mechanic.jsx";
 
 function BikeForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ name: "", type: "road", brand: "", model: "", start_km: 0, with_defaults: true, purchased_at: "", chain_lube: "oil", tubeless: true, hookless: false });
@@ -69,7 +70,7 @@ function BikeForm({ onCreated, onCancel }) {
   );
 }
 
-export default function Garage() {
+export default function Garage({ user }) {
   const [bikes, setBikes] = useState(null);
   const [overview, setOverview] = useState({ items: [] });
   const [adding, setAdding] = useState(false);
@@ -169,6 +170,7 @@ export default function Garage() {
           </div>
         </>
       )}
+      {user?.mechanic_enabled && <PartnerBikes />}
     </>
   );
 }

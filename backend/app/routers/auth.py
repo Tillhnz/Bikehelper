@@ -53,10 +53,13 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
     ratelimit.check_register(ratelimit.client_ip(request))
     first_user = db.scalar(select(User.id).limit(1)) is None
     invite = None
+    via_group = False
     if not first_user and not settings.allow_registration:
+        from .groups import find_invite
         code = (data.invite or "").strip().upper()
         invite = db.scalar(select(Invite).where(Invite.code == code, Invite.used_at.is_(None))) if code else None
-        if invite is None:
+        via_group = invite is None and find_invite(db, data.group_invite) is not None
+        if invite is None and not via_group:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Registrierung nur mit gültigem Einladungscode")
     email = data.email.lower()
     if db.scalar(select(User).where(User.email == email)):
@@ -70,6 +73,8 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
     db.commit()
     if invite is not None:
         audit.record(db, email, "user.register", f"Einladung {invite.code}")
+    elif via_group:
+        audit.record(db, email, "user.register", "Gruppeneinladung")
     return TokenOut(access_token=create_token(user))
 
 

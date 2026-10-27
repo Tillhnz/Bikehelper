@@ -285,7 +285,19 @@ function Members({ g, reload }) {
 
       {isAdmin && (
         <>
-          <h3>Einladen</h3>
+          <h3>Einladungslink</h3>
+          <p className="muted small">Ein Link für alle, die du einladen willst, zum Beispiel in einer Messenger-Gruppe. Wer ihn öffnet, kann sich dort auch ein BikeHelper-Konto anlegen, falls er noch keines hat, und tritt danach bei. Der Link gilt 30 Tage. Ein neuer Link ersetzt den alten.</p>
+          {g.invite_link ? (
+            <p className="group-link">
+              <code>{g.invite_link}</code>{" "}
+              <button className="btn small" onClick={async () => toast((await copyText(g.invite_link)) ? "Link kopiert." : "Bitte den Link markieren und selbst kopieren.")}>Kopieren</button>{" "}
+              <button className="link small" onClick={async () => { if (await confirmDialog("Neuen Link erzeugen? Der alte funktioniert dann nicht mehr.")) run(() => api.post(`/groups/${g.id}/invite-link`), "Neuer Link erstellt."); }}>Neuer Link</button>{" "}
+              <button className="link small danger" onClick={() => run(() => api.del(`/groups/${g.id}/invite-link`), "Link abgeschaltet.")}>Abschalten</button>
+            </p>
+          ) : (
+            <p><button className="btn" onClick={() => run(() => api.post(`/groups/${g.id}/invite-link`), "Link erstellt.")}>Einladungslink erstellen</button></p>
+          )}
+          <h3>Per E-Mail einladen</h3>
           <form className="inline-form" onSubmit={invite}>
             <label className="grow">E-Mail-Adresse<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
             <button className="btn primary">Einladen</button>

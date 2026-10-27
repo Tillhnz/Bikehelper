@@ -4,8 +4,8 @@ import { EmptyState } from "../components/ui.jsx";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
 import { BikeCard } from "./Garage.jsx";
 
-/** Werkstatt (Mechanics-Modus): eigene Räder und die Räder von Partnern, die den Zugriff erlaubt haben. */
-export default function Mechanic() {
+/** Mechanics-Modus in der Garage: Räder von Partnern, die den Zugriff erlaubt haben, und Zugriffsanfragen. */
+export default function PartnerBikes() {
   const [groups, setGroups] = useState(null);
   const [state, setState] = useState(null);
   const [email, setEmail] = useState("");
@@ -54,20 +54,18 @@ export default function Mechanic() {
 
   return (
     <>
-      <header className="page-head">
-        <h1>Werkstatt</h1>
-        <p className="muted">Deine Räder und die Räder deiner Partner an einem Ort. Bei Partnerrädern darfst du Teile, Wartung und Reifen eintragen und ändern.</p>
-      </header>
+      <h2 className="section-title">Werkstatt: Räder von Partnern</h2>
+      <p className="muted">Bei Partnerrädern darfst du Teile, Wartung und Reifen eintragen und ändern.</p>
 
-      {groups.map((g) => (
+      {groups.filter((g) => !g.own).map((g) => (
         <section key={g.owner} className="panel">
-          <h2>{g.own ? "Meine Räder" : `Räder von ${g.owner}`}</h2>
+          <h2>{`Räder von ${g.owner}`}</h2>
           {g.bikes.length === 0 ? <p className="muted">Keine aktiven Räder.</p> : (
             <div className="bike-grid">{g.bikes.map((b, i) => <BikeCard key={b.id} bike={b} index={i} />)}</div>
           )}
         </section>
       ))}
-      {groups.length === 1 && state.partners.length === 0 && (
+      {groups.filter((g) => !g.own).length === 0 && state.partners.length === 0 && (
         <EmptyState title="Noch keine Partner" text="Frage den Zugriff mit der E-Mail-Adresse des Partner-Kontos an. Er bestätigt die Anfrage auf seiner Startseite." />
       )}
 

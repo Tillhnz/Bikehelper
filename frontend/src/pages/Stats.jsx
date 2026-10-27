@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import Heatmap from "./Heatmap.jsx";
 import { api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import { Bars, CalendarHeat, CumulativeLines, HBars } from "../components/charts.jsx";
 import { EmptyState } from "../components/ui.jsx";
@@ -7,7 +8,7 @@ import { Kpi, Panel } from "../components/statsui.jsx";
 import { CompareView, GoalsView, LoadView, PlacesView, ReviewView } from "../components/StatsExtra.jsx";
 import { Loading } from "../components/feedback.jsx";
 
-const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"]];
+const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"], ["heatmap", "Heatmap"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
 export default function Stats() {
@@ -16,7 +17,9 @@ export default function Stats() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [calYear, setCalYear] = useState(null);
-  const [tab, setTab] = useState("overview");
+  const [params, setParams] = useSearchParams();
+  const tab = TABS.some(([k]) => k === params.get("tab")) ? params.get("tab") : "overview";
+  const setTab = (k) => setParams(k === "overview" ? {} : { tab: k }, { replace: true });
 
   useEffect(() => {
     const qs = new URLSearchParams();
@@ -67,6 +70,7 @@ export default function Stats() {
   if (tab === "review") return <>{header}{tabs}<ReviewView bikeId={filters.bike_id} years={years} /></>;
   if (tab === "goals") return <>{header}{tabs}<GoalsView /></>;
   if (tab === "places") return <>{header}{tabs}<PlacesView /></>;
+  if (tab === "heatmap") return <>{header}{tabs}<Heatmap embedded /></>;
   if (tab === "compare") return <>{header}{tabs}<CompareView bikeId={filters.bike_id} /></>;
 
   if (d.empty) {
@@ -141,7 +145,7 @@ export default function Stats() {
               <Bars data={Object.entries(tl.by_year_new).map(([y, n]) => ({ label: y, value: n }))} />
             </>
           )}
-          <p style={{ marginTop: "1rem" }}><Link to="/heatmap" className="link">Auf der Karte ansehen →</Link></p>
+          <p style={{ marginTop: "1rem" }}><Link to="/stats?tab=heatmap" className="link">Auf der Karte ansehen →</Link></p>
         </Panel>
         <Panel title="Rekorde">
           <ul className="record-list">

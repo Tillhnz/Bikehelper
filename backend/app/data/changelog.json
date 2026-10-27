@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-27.4",
+    "date": "2026-10-27",
+    "title": "Aufgeräumt und Gruppenlinks",
+    "changes": [
+      "Die Werkstatt (Mechanics-Modus) steckt jetzt in der Garage, die Heatmap in der Statistik. Beide haben keinen eigenen Tab mehr.",
+      "Gruppen lassen sich per Einladungslink füllen. Wer noch kein Konto hat, kann sich über den Link direkt registrieren und tritt danach der Gruppe bei."
+    ]
+  },
+  {
     "id": "2026-10-27.3",
     "date": "2026-10-27",
     "title": "Versionsanzeige und Update-Hinweis",

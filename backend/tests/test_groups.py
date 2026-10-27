@@ -80,3 +80,36 @@ def test_deleting_account_promotes_next_admin():
         c.post("/api/groups/join", headers=b, json={"token": token, "display_name": "Zwei"})
         assert c.post("/api/me/delete", headers=a, json={"password": "geheim1234"}).status_code == 204
         assert c.get(f"/api/groups/{gid}", headers=b).json()["role"] == "admin"
+
+
+def test_group_invite_link_lets_new_people_register_and_join(monkeypatch):
+    from app.config import settings
+    with TestClient(app) as c:
+        a = _user(c, "gl1@example.com")  # erstes Konto
+        monkeypatch.setattr(settings, "allow_registration", False)
+        gid = c.post("/api/groups", headers=a, json={"name": "Link", "display_name": "Lena"}).json()["id"]
+        assert c.get(f"/api/groups/{gid}", headers=a).json()["invite_link"] is None
+        link = c.post(f"/api/groups/{gid}/invite-link", headers=a).json()["link"]
+        token = link.rsplit("/", 1)[1]
+        assert c.get(f"/api/groups/{gid}", headers=a).json()["invite_link"] == link
+        # ohne Anmeldung: Gruppenname, und Registrierung trotz geschlossener Anmeldung
+        assert c.get(f"/api/groups/invite-info/{token}").json() == {"group": "Link"}
+        assert c.get("/api/groups/invite-info/falsch").status_code == 404
+        body = {"email": "gl2@example.com", "password": "geheim1234"}
+        assert c.post("/api/auth/register", json=body).status_code == 403
+        assert c.post("/api/auth/register", json={**body, "group_invite": "falsch"}).status_code == 403
+        r = c.post("/api/auth/register", json={**body, "group_invite": token})
+        assert r.status_code == 201
+        b = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        assert c.post("/api/groups/join", headers=b, json={"token": token, "display_name": "Max"}).status_code == 200
+        # der Link gilt für mehrere Personen
+        r3 = c.post("/api/auth/register", json={"email": "gl3@example.com", "password": "geheim1234", "group_invite": token})
+        c3 = {"Authorization": f"Bearer {r3.json()['access_token']}"}
+        assert c.post("/api/groups/join", headers=c3, json={"token": token, "display_name": "Mia"}).status_code == 200
+        assert len(c.get(f"/api/groups/{gid}", headers=a).json()["members"]) == 3
+        # neuer Link ersetzt den alten, Abschalten sperrt
+        new = c.post(f"/api/groups/{gid}/invite-link", headers=a).json()["link"]
+        assert new != link and c.get(f"/api/groups/invite-info/{token}").status_code == 404
+        assert c.delete(f"/api/groups/{gid}/invite-link", headers=a).status_code == 204
+        assert c.get(f"/api/groups/{gid}", headers=a).json()["invite_link"] is None
+        assert c.post(f"/api/groups/{gid}/invite-link", headers=b).status_code == 403  # nur Admins

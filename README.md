@@ -158,6 +158,8 @@ Meldet sich ein Konto nach einem Update zum ersten Mal an, erscheint ein kleines
 
 Unter „Gruppen“ gründest du eine Gruppe und lädst Freunde per E-Mail ein (ohne eingerichteten Mailversand bekommst du einen Link zum Weitergeben; die Einladung gilt 14 Tage und einmal). Es gibt Gruppenadministratoren (laden ein, ernennen weitere, entfernen Mitglieder, benennen oder löschen die Gruppe) und Mitglieder. Die Gruppenansicht zeigt die Rangliste für Woche, Monat, Jahr und gesamt (mit Blättern in frühere Zeiträume) mit allen Kennzahlen nebeneinander: Kilometer, Höhenmeter, Fahrzeit, Fahrten, Ø Tempo, längste Fahrt und aktive Tage, sortierbar nach jeder Spalte, dazu die Kilometer pro Woche der letzten 12 Wochen.
 
+Neben der Einladung per E-Mail gibt es einen **Einladungslink** für mehrere Personen (30 Tage gültig, ein neuer Link ersetzt den alten, jederzeit abschaltbar). Er enthält einen Schlüssel: Wer noch kein BikeHelper-Konto hat, kann sich darüber auch bei geschlossener Registrierung ein Konto anlegen und tritt danach der Gruppe bei. Dasselbe gilt für Links aus der E-Mail-Einladung.
+
 Datenschutz: Geteilt werden nur diese Summen unter einem Anzeigenamen, den jedes Mitglied pro Gruppe selbst wählt. Keine Strecken, Karten, Räder, Wartung, Fahrtnamen oder E-Mail-Adressen. Jedes Mitglied kann seine Teilnahme je Gruppe pausieren oder die Gruppe verlassen; auch der Server-Administrator sieht keine Gruppeninhalte.
 
 ### Reifenkatalog
@@ -174,7 +176,7 @@ Jeder Reifensatz zeigt, wie viele Kilometer er gefahren ist und (wenn du eine er
 
 **Einkaufslink:** Bei jeder Komponente und jedem Reifensatz kannst du einen Link hinterlegen, wo du das Teil nachkaufst (nur `http`/`https`). Er gehört zu deinem Rad, erscheint als „Nachkaufen“, steht in der Einkaufsliste und wird bei „Teil gewechselt“ ans neue Teil übernommen.
 
-**Mechanics-Modus:** In den Einstellungen schaltest du den Tab „Werkstatt“ frei. Dort fragst du mit der E-Mail-Adresse eines Partner-Kontos den Zugriff an. Die Antwort verrät nicht, ob es das Konto gibt; ist der E-Mail-Versand eingerichtet, bekommt der Partner zusätzlich eine Mail. Er sieht die Anfrage auf seiner Startseite und lässt sie zu oder lehnt sie ab. Entziehen kann er den Zugriff jederzeit in den Einstellungen, der Mechaniker kann ihn zurückgeben.
+**Mechanics-Modus:** In den Einstellungen schaltest du den Bereich „Werkstatt“ in der Garage frei. Dort fragst du mit der E-Mail-Adresse eines Partner-Kontos den Zugriff an. Die Antwort verrät nicht, ob es das Konto gibt; ist der E-Mail-Versand eingerichtet, bekommt der Partner zusätzlich eine Mail. Er sieht die Anfrage auf seiner Startseite und lässt sie zu oder lehnt sie ab. Entziehen kann er den Zugriff jederzeit in den Einstellungen, der Mechaniker kann ihn zurückgeben.
 
 Mit Zugriff darf der Mechaniker Räder, Komponenten, Wartungsregeln und -einträge, Messwerte und Reifensätze des Partners ansehen und ändern; neue Teile gehören dem Besitzer, Wartungseinträge tragen „durch <Mechaniker>“. Nicht möglich: ein Rad löschen sowie Zugriff auf Fahrten, Lager, Ziele, Orte, Gewicht und Einstellungen. Die Kilometer einer Komponente sind sichtbar, weil sie aus den Fahrten des Besitzers berechnet werden, die Fahrten selbst nicht. Pro Nutzer sind höchstens 5 Anfragen am Tag möglich.
 
@@ -216,7 +218,7 @@ Nach jedem Import holt BikeHelper im Hintergrund das Wetter zu den Fahrten von [
 
 ## Heatmap und Statistik
 
-- **Heatmap:** alle Strecken auf dunkler Karte, oft gefahrene Wege leuchten heller. Filter nach Jahr und Rad, optional mit den erkundeten Kacheln und dem größten Quadrat. Die Kartenkacheln lädt dein Browser vom Kartenanbieter (siehe unten).
+- **Heatmap** (in der Statistik als Tab): alle Strecken auf dunkler Karte, oft gefahrene Wege leuchten heller. Filter nach Jahr und Rad, optional mit den erkundeten Kacheln und dem größten Quadrat. Die Kartenkacheln lädt dein Browser vom Kartenanbieter (siehe unten).
 - **Statistik:** Kennzahlen, Jahre und Monate, Kalender der Fahrtage, Wochentage, Startzeiten, Fahrtlängen, Rekorde, Serien, Räder, Temperatur und Nässe.
 - **Kacheln:** Zoomstufe 14 (rund 1,5 km). Das größte Quadrat zählt nur vollständig erkundete Kacheln; ein „Gebiet“ umfasst auch diagonal verbundene Kacheln. Das kann von Statshunters leicht abweichen.
 - Zeiten werden in der Zeitzone `TIMEZONE` ausgewertet (Standard `Europe/Berlin`).

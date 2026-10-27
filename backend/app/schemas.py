@@ -20,6 +20,7 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     invite: str | None = Field(default=None, max_length=32)  # Einladungscode, wenn die Registrierung geschlossen ist
+    group_invite: str | None = Field(default=None, max_length=64)  # Schlüssel aus einem Gruppen-Einladungslink; erlaubt ebenfalls die Registrierung
 
 
 class PasswordChangeIn(BaseModel):
