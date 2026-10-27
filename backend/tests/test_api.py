@@ -115,17 +115,8 @@ def test_map_settings():
         assert c.get("/api/map-config").status_code == 401
         assert c.get("/api/map-config", headers=h).json()["provider"] == "osm"
 
-        bad = c.put("/api/settings/map", headers=h, json={"carto_api_key": "x?y=1&z"})
-        assert bad.status_code == 422
-
-        ok = c.put("/api/settings/map", headers=h, json={"carto_api_key": "abc123DEF-_456"}).json()
-        assert ok["provider"] == "carto" and ok["has_user_key"] and ok["key_hint"] == "…_456"
-        assert "abc123DEF" not in str(ok)  # Schlüssel nie zurückgeben
-        cfg = c.get("/api/map-config", headers=h).json()
-        assert cfg["dark"] and cfg["url"].endswith("?key=abc123DEF-_456")
-
-        gone = c.put("/api/settings/map", headers=h, json={"carto_api_key": ""}).json()
-        assert gone["provider"] == "osm" and not gone["has_user_key"]
+        # Einstellungen für Nutzer gibt es nicht mehr: Der Schlüssel gehört dem Administrator
+        assert c.put("/api/settings/map", headers=h, json={"carto_api_key": "abc123DEF-_456"}).status_code in (404, 405)
 
 
 def test_active_import_route_is_not_taken_for_a_job_id():
