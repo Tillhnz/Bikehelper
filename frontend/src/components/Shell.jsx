@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { api } from "../api.js";
 import Search from "./Search.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import UploadBanner from "./UploadBanner.jsx";
@@ -19,6 +20,14 @@ const NAV = [
 /** Rahmen der App: Seitenleiste am Computer, schmale Kopfzeile und Tabs am unteren Rand auf dem Handy. */
 export default function Shell({ user, onLogout, children }) {
   const { pathname } = useLocation();
+  const [ver, setVer] = useState(null);
+  useEffect(() => {
+    let stop = false;
+    const load = () => api.get("/version").then((v) => { if (!stop) setVer(v); }).catch(() => {});
+    load();
+    const id = setInterval(load, 30 * 60 * 1000);
+    return () => { stop = true; clearInterval(id); };
+  }, []);
   // Seitentitel für Browser-Tab und Screenreader; Fokus springt beim Seitenwechsel zum Inhalt
   useEffect(() => {
     const hit = [...NAV].reverse().find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)));
@@ -49,6 +58,16 @@ export default function Shell({ user, onLogout, children }) {
           <span className="muted small">{user.email}</span>
           {user.role === "admin" && <NavLink className="link" to="/admin">Administration</NavLink>}
           <button className="link" onClick={onLogout}>Abmelden</button>
+          {ver && (
+            <div className="version-line">
+              <span className="muted small">Version {ver.version}</span>
+              {ver.update_available && (
+                user.role === "admin"
+                  ? <NavLink className="update-hint" to="/admin">Update verfügbar</NavLink>
+                  : <span className="update-hint" title="Bitte den Administrator, BikeHelper zu aktualisieren">Update verfügbar</span>
+              )}
+            </div>
+          )}
         </div>
       </aside>
       <main className="main" id="inhalt" tabIndex={-1}>

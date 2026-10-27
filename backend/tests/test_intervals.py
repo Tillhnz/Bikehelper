@@ -117,6 +117,14 @@ def test_whatsnew_popup_shows_once_for_existing_accounts_only():
         assert c.get("/api/me", headers=h).json()["whatsnew"] is None
 
 
+def test_version_endpoint_reports_installed_version():
+    with TestClient(app) as c:
+        h, _ = _user(c, "icu10@example.com")
+        r = c.get("/api/version", headers=h).json()
+        assert r["version"] == changelog.latest_id() and r["update_available"] in (None, True, False)
+        assert c.get("/api/version").status_code == 401
+
+
 def test_changelog_shows_only_newer_entries():
     items = changelog.entries()
     ids = [e["id"] for e in items]

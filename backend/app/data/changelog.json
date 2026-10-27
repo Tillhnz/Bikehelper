@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-27.3",
+    "date": "2026-10-27",
+    "title": "Versionsanzeige und Update-Hinweis",
+    "changes": [
+      "In der Seitenleiste unten steht jetzt die installierte Version.",
+      "Gibt es eine neuere Version, erscheint dort „Update verfügbar“. Administratoren kommen damit direkt zur Update-Seite."
+    ]
+  },
+  {
     "id": "2026-10-27.2",
     "date": "2026-10-27",
     "title": "Gruppen, bessere Radvorschläge und mehr Übersicht",
@@ -19,7 +28,10 @@
       "Jede Fahrt zeigt ihre Herkunft, und die Fahrtenliste lässt sich danach filtern.",
       "Fahrten ohne Rad bekommen einen Vorschlag aus deinen bisherigen Zuordnungen. Das Wetter wird nach jedem Import sofort geholt."
     ],
-    "action": {"label": "Jetzt einrichten", "to": "/settings#intervals"}
+    "action": {
+      "label": "Jetzt einrichten",
+      "to": "/settings#intervals"
+    }
   },
   {
     "id": "2026-10-25",

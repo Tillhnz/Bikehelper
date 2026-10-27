@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import audit, notify, suggest
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, wahoo as wahoo_router, weather as weather_router
+from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, wahoo as wahoo_router, weather as weather_router
 from . import server_settings
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
@@ -151,6 +151,7 @@ app.include_router(places_router.router)
 app.include_router(wahoo_router.router)
 app.include_router(intervals_router.router)
 app.include_router(groups_router.router)
+app.include_router(version_router.router)
 
 
 @app.get("/api/health")
