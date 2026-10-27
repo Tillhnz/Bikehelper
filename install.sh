@@ -10,8 +10,10 @@
 #   ./install.sh lock            Neue Registrierungen sperren
 #   ./install.sh unlock          Neue Registrierungen wieder erlauben
 #   ./install.sh url <adresse>   Öffentliche Adresse ändern (z. B. https://bike.example.de)
-#   ./install.sh backup          Datenbank in den Ordner backups/ sichern
+#   ./install.sh backup          Datenbank sichern (Ordner backups/ oder BACKUP_DIR, verschlüsselt wenn eingerichtet)
 #   ./install.sh restore <datei> Eine Sicherung zurückspielen (ersetzt alle aktuellen Daten)
+#   ./install.sh backup-dir <pfad>  Sicherungen in einen anderen Ordner legen (z. B. NFS-Freigabe)
+#   ./install.sh backup-key      Schlüsselpaar für verschlüsselte Sicherungen erzeugen (privater Teil wird einmal angezeigt)
 #   ./install.sh logs            Protokolle anzeigen
 #
 # Umgebungsvariablen (optional):
@@ -264,26 +266,93 @@ cmd_logs() {
   (cd "$APP_DIR" && "${DOCKER[@]}" compose logs --tail 100 -f)
 }
 
+backup_dir() { local d; d="$(get_env BACKUP_DIR)"; d="${d:-./backups}"; case "$d" in /*) printf '%s' "$d" ;; *) printf '%s' "$APP_DIR/${d#./}" ;; esac; }
+
+ensure_age() {
+  command -v age >/dev/null 2>&1 && return 0
+  command -v apt-get >/dev/null 2>&1 || die "Bitte installiere das Programm „age“ und starte erneut."
+  info "Installiere age …"
+  as_root apt-get update -qq
+  as_root apt-get install -y -qq age
+}
+
+apply_backup_env() { (cd "$APP_DIR" && "${DOCKER[@]}" compose up -d --build updater); }
+
+cmd_backup_dir() {
+  [ -n "${1:-}" ] || die "Bitte einen Ordner angeben, z. B.: ./install.sh backup-dir /mnt/nas/bikehelper"
+  require_install
+  case "$1" in /*) ;; *) die "Bitte einen absoluten Pfad angeben (beginnt mit /)." ;; esac
+  mkdir -p "$1" 2>/dev/null || die "Der Ordner $1 lässt sich nicht anlegen."
+  local t="$1/.bikehelper-test.$$"
+  ( : > "$t" ) 2>/dev/null || die "In $1 kann nicht geschrieben werden. Bei NFS: Rechte der Freigabe und root_squash prüfen."
+  rm -f "$t"
+  set_env BACKUP_DIR "$1"
+  apply_backup_env
+  ok "Sicherungen landen jetzt in $1"
+}
+
+cmd_backup_key() {
+  require_install
+  ensure_age
+  if [ -n "$(get_env BACKUP_AGE_RECIPIENT)" ]; then
+    warn "Es gibt schon einen Schlüssel. Ein neuer macht künftige Sicherungen mit dem alten Schlüssel unlesbar für den neuen."
+    read -r -p "Trotzdem neu erzeugen? „ja“ eingeben: " answer </dev/tty
+    [ "$answer" = "ja" ] || die "Abgebrochen."
+  fi
+  local tmp; tmp="$(mktemp)"
+  age-keygen -o "$tmp" 2>/dev/null
+  local pub; pub="$(grep -o 'age1[0-9a-z]*' "$tmp" | head -n 1)"
+  [ -n "$pub" ] || { rm -f "$tmp"; die "Der Schlüssel konnte nicht erzeugt werden."; }
+  set_env BACKUP_AGE_RECIPIENT "$pub"
+  apply_backup_env
+  echo
+  warn "Das ist der PRIVATE Schlüssel. Speichere ihn jetzt im Passwortmanager. Er wird nie wieder angezeigt und nirgends gespeichert."
+  warn "Ohne ihn lassen sich die Sicherungen nicht zurückspielen."
+  echo
+  grep '^AGE-SECRET-KEY' "$tmp"
+  echo
+  shred -u "$tmp" 2>/dev/null || rm -f "$tmp"
+  ok "Neue Sicherungen werden ab sofort verschlüsselt."
+}
+
 cmd_backup() {
   require_install
-  mkdir -p "$APP_DIR/backups"
-  local f="$APP_DIR/backups/bikehelper-$(date +%Y%m%d-%H%M%S).sql.gz"
-  (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$f")
-  chmod 600 "$f"
-  [ "$(stat -c %s "$f")" -gt 200 ] || { rm -f "$f"; die "Die Sicherung ist leer, bitte Protokolle prüfen."; }
-  ok "Gesichert: $f"
+  local dir rcp f; dir="$(backup_dir)"; rcp="$(get_env BACKUP_AGE_RECIPIENT)"
+  mkdir -p "$dir"
+  f="$dir/bikehelper-$(date +%Y%m%d-%H%M%S).sql.gz"
+  if [ -n "$rcp" ]; then
+    ensure_age
+    f="$f.age"
+    (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip | age -r "$rcp" > "$f")
+  else
+    (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$f")
+  fi
+  chmod 600 "$f" 2>/dev/null || true
+  [ "$(stat -c %s "$f")" -gt 100 ] || { rm -f "$f"; die "Die Sicherung ist leer, bitte Protokolle prüfen."; }
+  ok "Gesichert: $f$([ -n "$rcp" ] && echo ' (verschlüsselt)')"
 }
 
 cmd_restore() {
   [ -n "${1:-}" ] && [ -f "$1" ] || die "Bitte eine Sicherungsdatei angeben, z. B.: ./install.sh restore backups/bikehelper-20261024-120000.sql.gz"
   require_install
-  local file; file="$(readlink -f "$1")"
+  local file key; file="$(readlink -f "$1")"
+  if [[ "$file" == *.age ]]; then
+    ensure_age
+    read -r -s -p "Privater Schlüssel (beginnt mit AGE-SECRET-KEY-): " key </dev/tty; echo
+    [[ "$key" == AGE-SECRET-KEY-* ]] || die "Das ist kein privater Schlüssel."
+    # vorab prüfen, damit bei falschem Schlüssel nichts gelöscht wird
+    age -d -i <(printf '%s\n' "$key") "$file" 2>/dev/null | gunzip -t 2>/dev/null || die "Entschlüsseln fehlgeschlagen: falscher Schlüssel oder beschädigte Datei."
+  fi
   warn "Das ersetzt ALLE aktuellen Daten durch den Stand der Sicherung."
   read -r -p "Zum Fortfahren „ja“ eingeben: " answer </dev/tty
   [ "$answer" = "ja" ] || die "Abgebrochen."
   (cd "$APP_DIR" && "${DOCKER[@]}" compose stop backend)
   (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS \"$POSTGRES_DB\"" -c "CREATE DATABASE \"$POSTGRES_DB\""')
-  gunzip -c "$file" | (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -q -U "$POSTGRES_USER" "$POSTGRES_DB"')
+  if [[ "$file" == *.age ]]; then
+    age -d -i <(printf '%s\n' "$key") "$file" | gunzip | (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -q -U "$POSTGRES_USER" "$POSTGRES_DB"')
+  else
+    gunzip -c "$file" | (cd "$APP_DIR" && "${DOCKER[@]}" compose exec -T db sh -c 'psql -q -U "$POSTGRES_USER" "$POSTGRES_DB"')
+  fi
   (cd "$APP_DIR" && "${DOCKER[@]}" compose start backend)
   ok "Sicherung zurückgespielt."
 }
@@ -296,7 +365,9 @@ case "${1:-install}" in
   url)      cmd_url "${2:-}" ;;
   backup)   cmd_backup ;;
   restore)  cmd_restore "${2:-}" ;;
+  backup-dir) cmd_backup_dir "${2:-}" ;;
+  backup-key) cmd_backup_key ;;
   logs)     cmd_logs ;;
-  -h|--help|help) sed -n '2,23p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//' ;;
-  *) die "Unbekannter Befehl: $1 (erlaubt: install, update, lock, unlock, url, backup, restore, logs)" ;;
+  -h|--help|help) sed -n '2,25p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//' ;;
+  *) die "Unbekannter Befehl: $1 (erlaubt: install, update, lock, unlock, url, backup, restore, backup-dir, backup-key, logs)" ;;
 esac

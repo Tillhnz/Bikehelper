@@ -356,8 +356,8 @@ function Backups() {
     <section className="panel">
       <h2>Sicherungen</h2>
       <p className="muted small">
-        Eine Sicherung enthält die Daten aller Konten. Sie liegt deshalb nur im Ordner <code>backups</code> auf dem Server und lässt sich hier nicht herunterladen.
-        Vor jedem Update entsteht automatisch eine. Die letzten 14 bleiben erhalten. Zurückspielen: <code>./install.sh restore backups/DATEI</code>.
+        Eine Sicherung enthält die Daten aller Konten. Sie liegt deshalb nur im Sicherungsordner auf dem Server (Standard <code>backups</code>, änderbar mit <code>./install.sh backup-dir</code>) und lässt sich hier nicht herunterladen.
+        Vor jedem Update entsteht automatisch eine. Die letzten 14 bleiben erhalten. Endet der Name auf <code>.age</code>, ist sie verschlüsselt (<code>./install.sh backup-key</code>). Zurückspielen: <code>./install.sh restore DATEI</code>.
       </p>
       <div className="actions"><button className="btn" onClick={create} disabled={busy}>{busy ? "Sichere …" : "Jetzt sichern"}</button></div>
       {error && <p className="error" role="alert">{error}</p>}

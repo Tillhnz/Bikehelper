@@ -52,8 +52,10 @@ services:
     restart: unless-stopped
     environment:
       SECRET_KEY: ${SECRET_KEY}
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
     volumes:
       - .:/project
+      - ${BACKUP_DIR:-./backups}:/project/backups
       - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:

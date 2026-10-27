@@ -20,7 +20,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROJECT = "/project"
 TOKEN = hashlib.sha256(("updater:" + os.environ.get("SECRET_KEY", "")).encode()).hexdigest()
-BACKUPS = os.path.join(PROJECT, "backups")
+BACKUPS = os.path.join(PROJECT, "backups")  # per Compose auf BACKUP_DIR gelegt (z. B. NFS-Ordner)
+AGE_RECIPIENT = os.environ.get("BACKUP_AGE_RECIPIENT", "").strip()  # öffentlicher Schlüssel; der private liegt nur beim Besitzer
+BACKUP_RE = r"bikehelper-\d{8}-\d{6}\.sql\.gz(\.age)?"
 KEEP_BACKUPS = 14
 HEALTH_URL = "http://backend:8000/api/health"
 SERVICES = ["backend", "frontend"]  # der Update-Dienst baut sich nicht selbst neu, das macht ./install.sh update
@@ -50,26 +52,41 @@ def compose_base():
 
 
 def make_backup():
-    """Sichert die Postgres-Datenbank als komprimierte SQL-Datei in backups/ und räumt alte Sicherungen auf."""
+    """Sichert die Postgres-Datenbank als komprimierte SQL-Datei in backups/ und räumt alte Sicherungen auf.
+    Mit BACKUP_AGE_RECIPIENT wird sie mit age verschlüsselt; entschlüsseln kann nur, wer den privaten Schlüssel hat."""
     os.makedirs(BACKUPS, exist_ok=True)
-    name = datetime.now().strftime("bikehelper-%Y%m%d-%H%M%S.sql.gz")
+    name = datetime.now().strftime("bikehelper-%Y%m%d-%H%M%S.sql.gz") + (".age" if AGE_RECIPIENT else "")
     path = os.path.join(BACKUPS, name)
     cmd = compose_base() + ["exec", "-T", "db", "sh", "-c", 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"']
     try:
-        with gzip.open(path, "wb") as out:
-            p = subprocess.Popen(cmd, cwd=PROJECT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            shutil.copyfileobj(p.stdout, out)
-            err = p.stderr.read().decode(errors="replace")
-            if p.wait() != 0:
+        with open(path, "wb") as target:
+            dump = subprocess.Popen(cmd, cwd=PROJECT, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if AGE_RECIPIENT:
+                enc = subprocess.Popen(["age", "-r", AGE_RECIPIENT], stdin=subprocess.PIPE, stdout=target, stderr=subprocess.PIPE)
+                with gzip.GzipFile(fileobj=enc.stdin, mode="wb") as gz:
+                    shutil.copyfileobj(dump.stdout, gz)
+                enc.stdin.close()
+                enc_err = enc.stderr.read().decode(errors="replace")
+                if enc.wait() != 0:
+                    dump.kill()
+                    raise RuntimeError("Die Verschlüsselung ist fehlgeschlagen: " + enc_err[-300:])
+            else:
+                with gzip.GzipFile(fileobj=target, mode="wb") as gz:
+                    shutil.copyfileobj(dump.stdout, gz)
+            err = dump.stderr.read().decode(errors="replace")
+            if dump.wait() != 0:
                 raise RuntimeError("Die Datenbank konnte nicht gesichert werden: " + err[-300:])
-        if os.path.getsize(path) < 200:
+        if os.path.getsize(path) < 100:
             raise RuntimeError("Die Sicherung ist leer.")
-        os.chmod(path, 0o600)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass  # manche NFS-Freigaben erlauben kein chmod
     except Exception:
         if os.path.exists(path):
             os.remove(path)
         raise
-    for old in sorted(f for f in os.listdir(BACKUPS) if f.startswith("bikehelper-"))[:-KEEP_BACKUPS]:
+    for old in sorted(f for f in os.listdir(BACKUPS) if re.fullmatch(BACKUP_RE, f))[:-KEEP_BACKUPS]:
         os.remove(os.path.join(BACKUPS, old))
     return name
 
@@ -78,7 +95,7 @@ def list_backups():
     if not os.path.isdir(BACKUPS):
         return []
     out = []
-    for f in sorted((f for f in os.listdir(BACKUPS) if re.fullmatch(r"bikehelper-\d{8}-\d{6}\.sql\.gz", f)), reverse=True):
+    for f in sorted((f for f in os.listdir(BACKUPS) if re.fullmatch(BACKUP_RE, f)), reverse=True):
         st = os.stat(os.path.join(BACKUPS, f))
         out.append({"name": f, "bytes": st.st_size, "at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})
     return out
