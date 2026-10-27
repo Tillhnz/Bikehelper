@@ -111,7 +111,7 @@ def import_status(job_id: str, user: User = Depends(current_user)):
 # ---------- Fahrten ansehen und zuordnen ----------
 
 def _conditions(user: User, unassigned: bool = False, bike_id: int | None = None, q: str | None = None,
-                day: date | None = None) -> list:
+                day: date | None = None, source: str | None = None) -> list:
     """Filter der Fahrtenliste; immer nur die eigenen Fahrten."""
     cond = [Activity.user_id == user.id]
     if unassigned:
@@ -124,6 +124,8 @@ def _conditions(user: User, unassigned: bool = False, bike_id: int | None = None
         cond += [Activity.start_date >= start, Activity.start_date < start + timedelta(days=1)]
     if q and q.strip():
         cond.append(Activity.name.ilike(f"%{q.strip()}%"))
+    if source:  # "unknown" = ältere Fahrten ohne gespeicherte Herkunft
+        cond.append(Activity.source.is_(None) if source == "unknown" else Activity.source == source)
     return cond
 
 
@@ -135,10 +137,11 @@ def list_activities(
     bike_id: int | None = None,
     q: str | None = None,
     day: date | None = None,
+    source: str | None = Query(None, max_length=20),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    cond = _conditions(user, unassigned, bike_id, q, day)
+    cond = _conditions(user, unassigned, bike_id, q, day, source)
     total = db.scalar(select(func.count()).select_from(Activity).where(*cond)) or 0
     rows = db.execute(
         select(Activity, Activity.polyline.is_not(None).label("has_track"))
@@ -149,6 +152,15 @@ def list_activities(
         .offset(offset)
     ).all()
     return ActivityPage(total=total, items=[_out(a, bool(t)) for a, t in rows])
+
+
+@router.get("/activities/sources")
+def list_sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Herkünfte, aus denen der Nutzer Fahrten hat (mit Anzahl), für den Filter der Fahrtenliste."""
+    rows = db.execute(
+        select(Activity.source, func.count()).where(Activity.user_id == user.id).group_by(Activity.source)
+    ).all()
+    return [{"source": s or "unknown", "count": n} for s, n in sorted(rows, key=lambda r: -r[1])]
 
 
 @router.get("/activities/gear", response_model=list[GearOut])
@@ -177,7 +189,7 @@ def assign_activities(data: AssignIn, user: User = Depends(current_user), db: Se
         stmt = stmt.where(Activity.id.in_(data.activity_ids))
     elif data.match is not None:  # alle Fahrten, die zu Suche und Filter der Liste passen
         m = data.match
-        stmt = stmt.where(*_conditions(user, m.unassigned, None, m.q, m.day))
+        stmt = stmt.where(*_conditions(user, m.unassigned, None, m.q, m.day, m.source))
     elif data.gear_name is not None:
         stmt = stmt.where(Activity.gear_name == data.gear_name)
     else:

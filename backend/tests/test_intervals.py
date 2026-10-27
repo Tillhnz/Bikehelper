@@ -129,3 +129,16 @@ def test_full_resync_restores_a_ride_deleted_in_bikehelper(monkeypatch):
         assert c.post("/api/intervals/sync", headers=h, json={"full": True}).status_code == 202
         with SessionLocal() as db:
             assert service.sync_user(db, db.get(User, uid), http=_fake([])).imported == 1
+
+
+def test_filter_activities_by_source():
+    with TestClient(app) as c:
+        h, uid = _user(c, "icu6@example.com")
+        with SessionLocal() as db:
+            from datetime import datetime
+            for i, src in enumerate(("wahoo", "wahoo", "intervals", None)):
+                db.add(Activity(user_id=uid, name=f"R{i}", start_date=datetime(2026, 1, 1 + i), distance_km=10, source=src))
+            db.commit()
+        assert c.get("/api/activities?source=wahoo", headers=h).json()["total"] == 2
+        assert c.get("/api/activities?source=unknown", headers=h).json()["total"] == 1
+        assert {s["source"]: s["count"] for s in c.get("/api/activities/sources", headers=h).json()} == {"wahoo": 2, "intervals": 1, "unknown": 1}

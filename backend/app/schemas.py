@@ -241,6 +241,7 @@ class AssignMatch(BaseModel):
     unassigned: bool = False
     q: str | None = Field(default=None, max_length=200)
     day: date | None = None
+    source: str | None = Field(default=None, max_length=20)
 
 
 class AssignIn(BaseModel):

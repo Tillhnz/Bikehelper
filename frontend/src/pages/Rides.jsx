@@ -328,6 +328,8 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [unassigned, setUnassigned] = useState(false);
+  const [source, setSource] = useState("");
+  const [sources, setSources] = useState([]);
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [error, setError] = useState("");
@@ -337,7 +339,9 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [assigning, setAssigning] = useState(false);
 
   // Bei neuem Filter oder neuer Suche beginnt die Auswahl von vorn
-  useEffect(() => { setPicked(new Set()); setAllMatching(false); }, [unassigned, debouncedQ, day]);
+  useEffect(() => { setPicked(new Set()); setAllMatching(false); }, [unassigned, debouncedQ, day, source]);
+
+  useEffect(() => { api.get("/activities/sources").then(setSources).catch(() => {}); }, [refreshKey]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
@@ -350,6 +354,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     try {
       const params = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
       if (unassigned) params.set("unassigned", "true");
+      if (source) params.set("source", source);
       if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
       if (day) params.set("day", day);
       const page = await api.get(`/activities?${params}`);
@@ -360,7 +365,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     } finally {
       setLoading(false);
     }
-  }, [unassigned, debouncedQ, day]);
+  }, [unassigned, debouncedQ, day, source]);
 
   useEffect(() => { load(0); }, [load, refreshKey]);
 
@@ -404,7 +409,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     setError("");
     try {
       const body = allMatching
-        ? { bike_id: bikeId, only_unassigned: false, match: { unassigned, q: debouncedQ.trim() || null, day: day || null } }
+        ? { bike_id: bikeId, only_unassigned: false, match: { unassigned, q: debouncedQ.trim() || null, day: day || null, source: source || null } }
         : { bike_id: bikeId, only_unassigned: false, activity_ids: [...picked] };
       const res = await api.post("/activities/assign", body);
       toast(`${res.updated} ${res.updated === 1 ? "Fahrt" : "Fahrten"} zugeordnet.`);
@@ -435,6 +440,12 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
         <h2>Alle Fahrten <span className="muted small">{total}</span></h2>
         <div className="filters">
           <input type="search" placeholder="Fahrt suchen" aria-label="Fahrt suchen" value={q} onChange={(e) => setQ(e.target.value)} />
+          {sources.length > 1 && (
+            <select aria-label="Nach Herkunft filtern" value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="">Alle Quellen</option>
+              {sources.map((s) => <option key={s.source} value={s.source}>{s.source === "unknown" ? "Ohne Angabe" : sourceLabel(s.source)} ({s.count})</option>)}
+            </select>
+          )}
           <label className="check">
             <input type="checkbox" checked={unassigned} onChange={(e) => setUnassigned(e.target.checked)} />
             Nur ohne Rad
@@ -468,8 +479,8 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
 
       {!loading && items.length === 0 ? (
         <EmptyState
-          title={unassigned || debouncedQ || day ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
-          text={unassigned || debouncedQ || day ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
+          title={unassigned || debouncedQ || day || source ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
+          text={unassigned || debouncedQ || day || source ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
         />
       ) : (
         <>
