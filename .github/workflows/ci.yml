@@ -58,3 +58,4 @@ jobs:
         run: |
           bash -n install.sh
           POSTGRES_PASSWORD=x SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx PUBLIC_URL=http://localhost docker compose config -q
+          POSTGRES_PASSWORD=x SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx PUBLIC_URL=http://localhost docker compose -f docker-compose.ghcr.yml config -q

@@ -1,0 +1,54 @@
+# BikeHelper mit fertigen Docker-Images (ohne Bauen, ohne Git):
+#   curl -fsSLO https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/docker-compose.ghcr.yml
+#   curl -fsSL https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/.env.example -o .env   # danach .env anpassen
+#   docker compose -f docker-compose.ghcr.yml up -d
+# Aktualisieren: docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d
+# Der Update-Knopf im Admin-Bereich gehört zur Variante mit Git (install.sh) und fehlt hier.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bikehelper
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bikehelper
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bikehelper"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/tillhnz/bikehelper-backend:${BIKEHELPER_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://bikehelper:${POSTGRES_PASSWORD}@db:5432/bikehelper
+      SECRET_KEY: ${SECRET_KEY}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-1}
+      TOKEN_EXPIRE_DAYS: ${TOKEN_EXPIRE_DAYS:-7}
+      WEATHER_ENABLED: ${WEATHER_ENABLED:-true}
+      TIMEZONE: ${TIMEZONE:-Europe/Berlin}
+      CARTO_API_KEY: ${CARTO_API_KEY:-}
+      MAP_TILE_URL: ${MAP_TILE_URL:-}
+      MAP_TILE_DARK: ${MAP_TILE_DARK:-true}
+      REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      NTFY_SERVER: ${NTFY_SERVER:-https://ntfy.sh}
+      WAHOO_ENABLED: ${WAHOO_ENABLED:-true}
+      GEO_ENABLED: ${GEO_ENABLED:-true}
+      NOMINATIM_URL: ${NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+
+volumes:
+  db_data:

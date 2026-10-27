@@ -235,6 +235,26 @@ Weitere Befehle im Projektordner:
 | `./install.sh url https://bike.example.de` | Öffentliche Adresse ändern |
 | `./install.sh logs` | Protokolle anzeigen |
 
+## Mit fertigen Docker-Images (ohne Bauen)
+
+Für alle, die ohnehin mit Docker arbeiten: GitHub baut bei jeder Änderung Images für amd64 und arm64 und legt sie in der GitHub Container Registry ab (`ghcr.io/tillhnz/bikehelper-backend` und `…-frontend`). Du brauchst nur Docker mit Compose, kein Git und keinen Build:
+
+```bash
+mkdir bikehelper && cd bikehelper
+curl -fsSLO https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/docker-compose.ghcr.yml
+curl -fsSL https://raw.githubusercontent.com/Tillhnz/Bikehelper/main/.env.example -o .env
+# .env anpassen: POSTGRES_PASSWORD, SECRET_KEY (openssl rand -hex 32), PUBLIC_URL
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+Die Seite läuft danach auf `http://<server-ip>:8080` (`WEB_PORT`). Aktualisieren:
+
+```bash
+docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d
+```
+
+Mit `BIKEHELPER_TAG=<Version oder Commit>` in der `.env` bleibst du auf einem bestimmten Stand (Standard `latest`). Der Update-Knopf im Admin-Bereich gehört zur Variante mit `install.sh` und fehlt hier, weil der Update-Dienst Zugriff auf den Docker-Socket bräuchte. Die Daten liegen im Volume `db_data`; Sicherung wie unter „Backup“ beschrieben mit `pg_dump` im Container `db`.
+
 ## Manuell starten (Docker)
 
 Auf dem Server muss Docker mit Compose installiert sein.
