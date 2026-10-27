@@ -56,6 +56,7 @@ class UserOut(BaseModel):
     is_admin: bool = False
     role: str = "user"
     mechanic_enabled: bool = False
+    whatsnew: str | None = None  # Kennung eines noch nicht gezeigten Neuigkeiten-Hinweises
 
 
 class StravaSettingsIn(BaseModel):

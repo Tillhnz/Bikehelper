@@ -9,13 +9,17 @@ from ..config import settings
 from ..database import get_db
 from .. import ratelimit
 from ..models import (
-    MechanicGrant,
+    IntervalsSeen, MechanicGrant,
     Activity, Bike, Component, Goal, GeoState, InventoryItem, Invite, PasswordReset, PlaceVisit, RuleNotice, TireSet, User, UserTire, WahooSeen,
 )
 from ..schemas import LoginIn, PasswordChangeIn, PasswordConfirmIn, RegisterIn, StravaSettingsIn, TokenOut, UserOut
 from ..security import create_token, current_user, hash_password, is_admin, verify_password
 
 router = APIRouter(prefix="/api", tags=["auth"])
+
+
+# Hinweis „Neu“, der einmal pro Konto nach der Anmeldung erscheint. Zum nächsten Hinweis die Kennung ändern.
+CURRENT_WHATSNEW = "intervals-2026-10"
 
 
 def _user_out(u: User, admin: bool = False) -> UserOut:
@@ -28,6 +32,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         is_admin=admin,
         role="admin" if admin else "user",
         mechanic_enabled=bool(u.mechanic_enabled),
+        whatsnew=CURRENT_WHATSNEW if u.whatsnew_seen != CURRENT_WHATSNEW else None,
     )
 
 
@@ -61,7 +66,8 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "E-Mail bereits vergeben")
     user = User(email=email, password_hash=hash_password(data.password), token_version=0,
-                role="admin" if first_user else "user", active=True)
+                role="admin" if first_user else "user", active=True,
+                whatsnew_seen=CURRENT_WHATSNEW)  # neue Konten brauchen den Hinweis nicht
     db.add(user)
     if invite is not None:
         invite.used_by_email, invite.used_at = email, datetime.utcnow()
@@ -132,7 +138,7 @@ def delete_user_data(db: Session, user: User) -> None:
     db.flush()
     db.execute(delete(PasswordReset).where(PasswordReset.user_id == uid))
     db.execute(delete(MechanicGrant).where((MechanicGrant.owner_id == uid) | (MechanicGrant.mechanic_id == uid)))
-    for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, UserTire, Bike):
+    for model in (Activity, Goal, InventoryItem, PlaceVisit, GeoState, WahooSeen, IntervalsSeen, UserTire, Bike):
         db.execute(delete(model).where(model.user_id == uid))
     db.delete(user)
     db.commit()
@@ -145,6 +151,12 @@ def delete_account(data: PasswordConfirmIn, request: Request, user: User = Depen
     if is_admin(db, user) and _admin_count(db) <= 1 and db.scalar(select(func.count()).select_from(User)) > 1:
         raise HTTPException(status.HTTP_409_CONFLICT, "Du bist der letzte Administrator. Ernenne zuerst jemand anderen zum Administrator.")
     delete_user_data(db, user)
+
+
+@router.post("/me/whatsnew/seen", status_code=204)
+def whatsnew_seen(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.whatsnew_seen = CURRENT_WHATSNEW
+    db.commit()
 
 
 @router.get("/me", response_model=UserOut)

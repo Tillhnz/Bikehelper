@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, clearToken, getToken, setUnauthorizedHandler } from "./api.js";
 import { resetMapConfig } from "./geo.js";
+import WhatsNew from "./components/WhatsNew.jsx";
 import Shell from "./components/Shell.jsx";
 import { ErrorBoundary, FeedbackHost } from "./components/feedback.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
@@ -68,6 +69,7 @@ export default function App() {
   return (
     <Shell user={user} onLogout={logout}>
       <FeedbackHost />
+      <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
       <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Home />} />

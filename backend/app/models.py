@@ -41,6 +41,13 @@ class User(Base):
     wahoo_bike_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Standardrad für importierte Fahrten
     wahoo_last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     mechanic_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # Mechanics-Modus aktiviert (eigener Tab)
+    # intervals.icu: persönlicher API-Schlüssel des Nutzers
+    icu_api_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    icu_bike_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    icu_last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    icu_synced_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    icu_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    whatsnew_seen: Mapped[str | None] = mapped_column(String(32), nullable=True)  # zuletzt gezeigter Neuigkeiten-Hinweis
     wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
 
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
@@ -322,6 +329,15 @@ class WahooSeen(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     workout_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    status: Mapped[str] = mapped_column(String(12))  # imported | duplicate | skipped
+
+
+class IntervalsSeen(Base):
+    """intervals.icu-Aktivitäten, die schon verarbeitet wurden (importiert, Duplikat oder übersprungen)."""
+    __tablename__ = "intervals_seen"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    activity_id: Mapped[str] = mapped_column(String(40), primary_key=True)
     status: Mapped[str] = mapped_column(String(12))  # imported | duplicate | skipped
 
 

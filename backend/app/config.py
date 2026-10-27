@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     # Wahoo Cloud: Fahrten regelmäßig automatisch abholen (Nutzer verbinden ihr Konto in den Einstellungen)
     wahoo_enabled: bool = True
+    # intervals.icu: Fahrten (auch von Garmin, Zwift, Polar …) mit dem persönlichen API-Schlüssel abholen
+    intervals_enabled: bool = True
+    intervals_api_url: str = "https://intervals.icu"
     wahoo_api_url: str = "https://api.wahooligan.com"
 
     class Config:

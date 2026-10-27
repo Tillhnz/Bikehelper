@@ -376,6 +376,96 @@ function WahooSettings() {
   );
 }
 
+function IntervalsSettings() {
+  const [st, setSt] = useState(null);
+  const [bikes, setBikes] = useState([]);
+  const [key, setKey] = useState("");
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => api.get("/settings/intervals").then(setSt).catch((e) => setError(e.message)), []);
+  useEffect(() => {
+    load();
+    api.get("/bikes").then(setBikes).catch(() => {});
+  }, [load]);
+  useEffect(() => {  // Link aus dem Neuigkeiten-Hinweis: hierher scrollen
+    if (st && window.location.hash === "#intervals") document.getElementById("intervals")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [st]);
+  useEffect(() => {
+    if (!st?.running) return undefined;
+    const t = setInterval(load, 4000);
+    return () => clearInterval(t);
+  }, [st?.running, load]);
+
+  async function run(fn, done) {
+    setMsg("");
+    setError("");
+    setBusy(true);
+    try {
+      await fn();
+      if (done) setMsg(done);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!st) return <section className="panel" id="intervals"><h2>intervals.icu</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
+  if (!st.enabled) return null;
+
+  return (
+    <section className="panel" id="intervals">
+      <h2>intervals.icu</h2>
+      <p className="muted">
+        Neue Fahrten werden alle 30 Minuten automatisch aus <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer">intervals.icu</a> abgeholt.
+        Dorthin synchronisieren Garmin Connect, Wahoo, Zwift, Polar, Suunto und weitere, so ist es auch der Weg für Garmin ohne Strava.
+      </p>
+      <details className="howto">
+        <summary>So richtest du es ein</summary>
+        <ol>
+          <li>Bei intervals.icu anmelden und dort dein Garmin-, Wahoo- oder anderes Konto verbinden (Einstellungen → Verbindungen).</li>
+          <li>Unter Einstellungen → Entwicklereinstellungen den persönlichen API-Schlüssel anzeigen oder erzeugen und kopieren.</li>
+          <li>Hier einfügen und speichern. BikeHelper prüft den Schlüssel und startet den ersten Import.</li>
+        </ol>
+        <p className="muted small">
+          Fahrten, die bei intervals.icu von Strava kommen, gibt intervals.icu nicht an andere Programme weiter; sie werden übersprungen. Dafür gibt es den Strava-Export.
+          Der Schlüssel liegt wie die anderen Einstellungen in der Datenbank deines Servers und wird hier nie wieder angezeigt.
+        </p>
+      </details>
+      <form className="inline-form" onSubmit={(e) => { e.preventDefault(); run(async () => { await api.put("/settings/intervals", { api_key: key.trim(), bike_id: st.bike_id }); setKey(""); }, "Verbunden. Der erste Import läuft."); }}>
+        <label className="grow">API-Schlüssel
+          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false}
+            placeholder={st.connected ? `gespeichert (${st.key_hint}), zum Ersetzen neuen einfügen` : "Schlüssel von intervals.icu einfügen"} />
+        </label>
+        <button className="btn primary" disabled={!key.trim() || busy}>{st.connected ? "Ersetzen" : "Verbinden"}</button>
+      </form>
+      {st.connected && (
+        <>
+          <label className="block">
+            Importierte Fahrten diesem Rad zuordnen
+            <select value={st.bike_id ?? ""} onChange={(e) => run(() => api.put("/settings/intervals", { api_key: null, bike_id: e.target.value ? Number(e.target.value) : null }))}>
+              <option value="">Nach dem Radnamen in intervals.icu, sonst später zuordnen</option>
+              {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+          <div className="actions">
+            <button className="btn primary" disabled={st.running} onClick={() => run(() => api.post("/intervals/sync", {}), "Import gestartet.")}>{st.running ? "Läuft …" : "Jetzt abholen"}</button>
+            <button className="btn" onClick={() => run(() => api.del("/intervals/connection"), "Verbindung getrennt.")}>Trennen</button>
+          </div>
+          <p className="muted small">
+            {st.imported} Fahrten importiert{st.last_sync ? `, letzter Lauf ${fmtDateTime(st.last_sync)}` : ""}.{st.status ? ` ${st.status}.` : ""}
+          </p>
+        </>
+      )}
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function SecuritySettings({ user }) {
   const [pw, setPw] = useState({ current: "", next: "" });
   const [del, setDel] = useState({ open: false, password: "" });
@@ -561,6 +651,8 @@ export default function Settings({ user, onChange }) {
       <InstallSettings />
 
       <WahooSettings />
+
+      <IntervalsSettings />
 
       <MapSettings />
 

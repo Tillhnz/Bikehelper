@@ -138,6 +138,16 @@ Fahrten deines Wahoo-ELEMNT werden über die Wahoo Cloud API abgeholt, ohne Stra
 
 Danach holt die App alle 30 Minuten neue Fahrten ab (oder sofort über „Jetzt abholen“) und ordnet sie dem gewählten Rad zu. Doppelte Fahrten, etwa aus einem früheren Strava-Export, werden erkannt. Neue Wahoo-Apps laufen im Testmodus mit höchstens 100 Abrufen pro Stunde und 250 pro Tag, und jede neue Fahrt braucht einen Abruf. Ein großer Altbestand verteilt sich deshalb über mehrere Läufe, die App macht automatisch weiter. Die Zugangsdaten liegen wie die anderen Einstellungen in der Datenbank. Mit `WAHOO_ENABLED=false` schaltest du die Funktion ab.
 
+### intervals.icu-Import (automatisch)
+
+[intervals.icu](https://intervals.icu) sammelt Fahrten aus Garmin Connect, Wahoo, Zwift, Polar, Suunto und weiteren Diensten. BikeHelper holt sie von dort ab, das ist auch der Weg für Garmin ohne Strava (Garmin vergibt seine eigene API nur an Geschäftskunden):
+
+1. Bei intervals.icu das Garmin- oder andere Konto verbinden.
+2. Dort unter Einstellungen → Entwicklereinstellungen den persönlichen API-Schlüssel kopieren.
+3. In BikeHelper unter Einstellungen → intervals.icu einfügen und „Verbinden“ klicken.
+
+Danach werden alle 30 Minuten neue Fahrten als Originaldatei (FIT, GPX, TCX) geholt und dem gewählten Rad zugeordnet, sonst nach dem Radnamen in intervals.icu (Übereinstimmung mit dem Namen deines Rades). Doppelte Fahrten, etwa aus Wahoo, Strava-Export oder Upload, werden erkannt. Fahrten, die bei intervals.icu von Strava stammen, gibt intervals.icu nicht heraus und werden übersprungen. Der Schlüssel liegt in der Datenbank und wird nie wieder angezeigt. Unter Administration → Funktionen lässt sich der Import abschalten (oder mit `INTERVALS_ENABLED=false`). Nach dem Update erscheint einmal pro Konto ein kurzer Hinweis auf die neue Funktion.
+
 ### Reifenkatalog
 
 Beim Anlegen eines Reifensatzes suchst du den Reifen im Katalog (Marke, Modell, Breite) und die Felder werden gefüllt. Alles bleibt änderbar, und ein Reifen, der nicht im Katalog steht, lässt sich wie bisher von Hand eintragen. Zu jedem Satz kannst du die Karkasse (dünn, normal, Pannenschutz; der Ratgeber übernimmt sie für den Reifendruck), Gewicht, Rollwiderstand (Watt je Reifen) und einen Quell-Link speichern. Hast du mehrere Sätze mit Watt-Werten, zeigt jede Karte den Abstand zum besten Satz.

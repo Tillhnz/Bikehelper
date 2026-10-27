@@ -291,6 +291,7 @@ const FEATURES = [
   { key: "weather_enabled", type: "bool", label: "Wetter pro Fahrt holen", hint: "Sendet gerundete Startkoordinaten an Open-Meteo." },
   { key: "geo_enabled", type: "bool", label: "Orte und Länder zuordnen", hint: "Sendet Kachelmittelpunkte an OpenStreetMap (Nominatim)." },
   { key: "wahoo_enabled", type: "bool", label: "Wahoo-Import anbieten" },
+  { key: "intervals_enabled", type: "bool", label: "intervals.icu-Import anbieten" },
 ];
 const MAPS = [
   { key: "carto_api_key", type: "text", secret: true, label: "CARTO-Schlüssel (dunkle Karte)", hint: "Kostenlos bei carto.com/basemaps/apikey. Leer: helle OpenStreetMap-Karte." },
