@@ -101,7 +101,8 @@ def _wet_notices(db: Session, user: User, acts, bikes: dict, tz) -> list[dict]:
         select(Component.bike_id, MaintenanceLog.performed_at, MaintenanceLog.performed_time)
         .join(MaintenanceLog, MaintenanceLog.component_id == Component.id)
         .where(Component.user_id == user.id, Component.category == "chain", Component.bike_id.in_({a.bike_id for a in recent}),
-               MaintenanceLog.performed_at >= (horizon - timedelta(days=1)).date())
+               MaintenanceLog.performed_at >= (horizon - timedelta(days=1)).date(),
+               MaintenanceLog.result.is_(None) | MaintenanceLog.rule_id.is_not(None))  # eine Sichtprüfung ist keine Kettenpflege
     ).all()
     for bike_id, day, at in rows:  # eingetragene Zeiten sind Ortszeit; ohne Uhrzeit zählt das Tagesende
         local_dt = datetime.combine(day, at or time(23, 59))

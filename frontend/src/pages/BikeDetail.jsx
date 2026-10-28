@@ -6,7 +6,7 @@ import ChainMeasure from "../components/ChainMeasure.jsx";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
-import { confirmDialog, Loading } from "../components/feedback.jsx";
+import { confirmDialog, Loading, toast } from "../components/feedback.jsx";
 import CheckGuide from "../components/CheckGuide.jsx";
 
 function ruleIntervalText(r) {
@@ -94,6 +94,71 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
   );
 }
 
+const CHECK_RESULT = { good: "okay", watch: "im Auge behalten", replace: "austauschen" };
+const CHECK_OPTIONS = [
+  ["good", "Völlig okay", "Keine Auffälligkeiten. Es ändert sich nichts, die Prüfung wird nur vermerkt."],
+  ["watch", "Im Auge behalten", "Noch fahrbar, aber mittelfristig beobachten. Die Restlaufzeit wird halbiert, das Teil wird früher fällig."],
+  ["replace", "Schlecht, austauschen", "Das Teil muss ersetzt werden. Es wird sofort als fällig markiert."],
+];
+
+/** Sichtprüfung einer Komponente mit drei Ergebnissen. Wirkt auf die Wechselregeln, setzt aber keine Wartung zurück. */
+function VisualCheck({ comp, logs, disabled, onSaved }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ result: "good", performed_at: today(), note: "" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const last = logs.find((l) => l.rule_id == null && l.result);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/components/${comp.id}/inspections`, { performed_at: form.performed_at, result: form.result, note: form.note || null });
+      setOpen(false);
+      setForm({ result: "good", performed_at: today(), note: "" });
+      toast("Sichtprüfung eingetragen.");
+      await onSaved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="visual-check">
+      <div className="visual-check-head">
+        <span className="muted small">
+          {last ? `Letzte Sichtprüfung am ${fmtDate(last.performed_at)}: ${CHECK_RESULT[last.result]}` : "Noch keine Sichtprüfung eingetragen."}
+        </span>
+        {!disabled && !open && <button className="link small" onClick={() => setOpen(true)}>Sichtprüfung eintragen</button>}
+      </div>
+      {open && (
+        <form className="visual-check-form" onSubmit={save}>
+          <fieldset>
+            <legend>Wie sieht das Teil aus?</legend>
+            {CHECK_OPTIONS.map(([key, title, text]) => (
+              <label key={key} className={`check-option check-${key} ${form.result === key ? "on" : ""}`}>
+                <input type="radio" name={`vc-${comp.id}`} value={key} checked={form.result === key} onChange={() => setForm({ ...form, result: key })} />
+                <span><strong>{title}</strong><br /><span className="muted small">{text}</span></span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="inline-form" style={{ marginTop: ".6rem" }}>
+            <label>Datum<input type="date" value={form.performed_at} onChange={(e) => setForm({ ...form, performed_at: e.target.value })} required /></label>
+            <label className="grow">Notiz<input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="optional" /></label>
+            <button className="btn primary" disabled={busy}>Eintragen</button>
+            <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
+          </div>
+          <p className="muted small">Die Wirkung gilt für die Wechselregeln dieser Komponente und endet mit der nächsten Wartung oder dem Wechsel. Zähler werden nicht zurückgesetzt.</p>
+        </form>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
 function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax", result: "good" });
@@ -110,8 +175,13 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   ].filter(Boolean).join(" · ");
 
   const a = rule.assessment;
-  const RESULTS = { good: "gut", watch: "Beobachtung", replace: "wechseln" };
-  const assessLine = a && (rule.is_inspection
+  const RESULTS = CHECK_RESULT;
+  const visualLine = a?.visual && (a.result === "replace"
+    ? `Sichtprüfung am ${fmtDate(a.date)}: austauschen, jetzt fällig.`
+    : a.result === "watch"
+      ? `Sichtprüfung am ${fmtDate(a.date)}: im Auge behalten, Restlaufzeit halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
+      : `Sichtprüfung am ${fmtDate(a.date)}: okay.`);
+  const assessLine = visualLine || a && (rule.is_inspection
     ? `Letzte Prüfung am ${fmtDate(a.date)}: ${RESULTS[a.result]}${a.result === "watch" ? ", früher erneut prüfen" : ""}.`
     : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}, angepasstes Intervall ${fmtKm(a.interval_km)} km.`);
 
@@ -388,6 +458,7 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
       )}
 
       <CheckGuide category={comp.category} />
+      <VisualCheck comp={comp} logs={logs} disabled={retired} onSaved={refresh} />
 
       {comp.category === "chain" && (
         <ChainMeasure comp={comp} rule={rules.find((r) => r.measure !== undefined && r.measure !== null) ?? rules.find((r) => r.label === "Kette wechseln")} disabled={retired} onChanged={refresh} />
@@ -406,8 +477,8 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
                 <li key={l.id}>
                   <span>
                     <strong>{fmtDate(l.performed_at)}{l.performed_time ? `, ${l.performed_time.slice(0, 5)} Uhr` : ""}</strong>{" "}
-                    <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : "ganze Komponente"}</span>
-                    {variant ? `, ${variant}` : ""}{l.result ? `, Ergebnis: ${{ good: "gut", watch: "Beobachtung", replace: "wechseln" }[l.result]}` : ""}{l.note ? ` – ${l.note}` : ""}
+                    <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : l.result ? "Sichtprüfung" : "ganze Komponente"}</span>
+                    {variant ? `, ${variant}` : ""}{l.result ? `, Ergebnis: ${CHECK_RESULT[l.result]}` : ""}{l.note ? ` – ${l.note}` : ""}
                     {l.performed_by && <span className="muted small"> (durch {l.performed_by})</span>}
                   </span>
                   <button className="link small danger" onClick={() => removeLog(l)}>Löschen</button>

@@ -193,6 +193,10 @@ class LogIn(BaseModel):
     note: str | None = None
 
 
+class InspectionIn(LogIn):
+    result: Literal["good", "watch", "replace"]  # gut | im Auge behalten | wechseln
+
+
 class LogOut(LogIn):
     id: int
     rule_id: int | None = None

@@ -1219,3 +1219,15 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .impact-good{color:var(--celeste)}.impact-neutral{color:var(--amber)}
 .zone-bars li{align-items:center}
 .zone-bars .hbar-label{line-height:1.25}.zone-bars .hbar-val{text-align:right;line-height:1.25;min-width:5.5rem}
+
+/* Sichtprüfung */
+.visual-check{margin:.8rem 0;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px}
+.visual-check-head{display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap}
+.visual-check-form fieldset{border:0;padding:0;margin:.6rem 0 0;display:grid;gap:.5rem}
+.visual-check-form legend{font-weight:600;margin-bottom:.4rem;padding:0}
+.check-option{display:flex;gap:.7rem;align-items:flex-start;padding:.6rem .8rem;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.check-option input{margin-top:.25rem}
+.check-option.on{border-width:2px;padding:calc(.6rem - 1px) calc(.8rem - 1px)}
+.check-option.on.check-good{border-color:var(--celeste)}
+.check-option.on.check-watch{border-color:var(--amber)}
+.check-option.on.check-replace{border-color:var(--signal)}

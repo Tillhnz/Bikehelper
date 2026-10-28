@@ -116,6 +116,16 @@ Beim Eintragen von „Belagstärke prüfen“ wählst du das Ergebnis und die Ap
 
 Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RATIO`, `WATCH_RECHECK_FACTOR` in `services.py`). Nach dem Eintrag „Bremsbeläge wechseln“ zählt das alte Ergebnis nicht mehr.
 
+### Sichtprüfung jeder Komponente
+
+In jeder Komponente (Garage, Rad öffnen) gibt es unter der Anleitung „Sichtprüfung eintragen“ mit drei Ergebnissen:
+
+- **Völlig okay:** Es ändert sich nichts, die Prüfung wird nur vermerkt.
+- **Im Auge behalten:** Die Restlaufzeit ab dem Prüftag wird halbiert (Kilometer und Monate). Bei 1200 von 5000 km Kettenlebensdauer bleiben dann 1900 statt 3800 km, die Kette wird früher fällig.
+- **Schlecht, austauschen:** Die Wechselregel („… wechseln“, „… erneuern“) ist sofort fällig.
+
+Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch, und sie ist keine Wartung: Zähler werden nicht zurückgesetzt. Sie gilt bis zur nächsten Wartung oder zum Wechsel dieser Regel. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
+
 ## Startseite, Inventar, Anleitungen und Orte
 
 - **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche (mit „‹ Zurück“ blätterst du durch frühere Wochen, ein Tipp auf einen Tag öffnet dessen Fahrten), die wichtigsten Wartungen mit Knopf „Erledigt“, deine Räder, deine Jahresziele mit nötigem Pensum pro Woche und die letzten Fahrten. Auf der Seite einer Fahrt steht, was am Rad zu tun ist, und lässt sich direkt abhaken.

@@ -368,6 +368,53 @@ def test_brake_pad_inspection_result_adjusts_intervals():
         assert wear["assessment"] is None and check["assessment"] is None
 
 
+def test_visual_check_of_a_component_has_three_results():
+    with TestClient(app) as c:
+        h = _user(c, "visual@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        uid = c.get("/api/me", headers=h).json()["id"]
+        start = date.today() - timedelta(days=60)
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "chain", "name": "Kette", "installed_at": start.isoformat(),
+        }).json()
+        with SessionLocal() as db:
+            for i in range(3):
+                db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=400.0,
+                                start_date=datetime.combine(start + timedelta(days=i + 1), datetime.min.time())))
+            db.commit()
+
+        def wear():
+            rs = c.get(f"/api/components/{comp['id']}/rules", headers=h).json()
+            return next(r for r in rs if r["label"] == "Kette wechseln"), [r for r in rs if r["label"] != "Kette wechseln"]
+
+        w0, others = wear()
+        interval = w0["interval_km"]
+        assert w0["assessment"] is None and round(w0["km_since"]) == 1200
+        today = date.today().isoformat()
+
+        assert c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today}).status_code == 422  # ohne Ergebnis
+        good = c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "good"}).json()
+        w, _ = wear()
+        assert good["result"] == "good" and good["rule_id"] is None
+        assert w["assessment"]["result"] == "good" and w["progress"] == w0["progress"] and round(w["km_since"]) == 1200  # setzt nichts zurück
+
+        c.delete(f"/api/logs/{good['id']}", headers=h)
+        c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "watch"})
+        w, _ = wear()
+        assert w["assessment"]["result"] == "watch" and round(w["interval_km"]) == round(1200 + (interval - 1200) * 0.5)  # Restlaufzeit halbiert
+        assert w["progress"] > w0["progress"] and round(w["km_since"]) == 1200
+        assert w["assessment"]["km_left"] == round(w["interval_km"] - 1200)
+
+        c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "replace"})
+        w, others_after = wear()
+        assert w["status"] == "due" and w["assessment"]["result"] == "replace"
+        assert all(r["assessment"] is None for r in others_after)  # Schmierregel bleibt unberührt
+
+        # Nach dem Wechsel zählt die alte Sichtprüfung nicht mehr
+        c.post(f"/api/rules/{w['id']}/done", headers=h, json={"performed_at": (date.today() + timedelta(days=1)).isoformat()})
+        assert wear()[0]["assessment"] is None
+
+
 def test_notification_settings_roundtrip():
     with TestClient(app) as c:
         h = _user(c, "notify@example.com")

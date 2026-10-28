@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-28.3",
+    "date": "2026-10-28",
+    "title": "Sichtprüfung mit drei Ergebnissen",
+    "changes": [
+      "Bei jeder Komponente kannst du eine Sichtprüfung eintragen: völlig okay, im Auge behalten oder schlecht und austauschen.",
+      "„Im Auge behalten“ halbiert die Restlaufzeit des Teils, „austauschen“ macht den Wechsel sofort fällig. Die Prüfung setzt keine Wartung zurück und steht im Wartungsverlauf."
+    ]
+  },
+  {
     "id": "2026-10-28.2",
     "date": "2026-10-28",
     "title": "Leistungsanalyse pro Fahrt",

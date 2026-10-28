@@ -7,7 +7,7 @@ from ..database import get_db
 from ..access import can_use
 from ..models import Bike, ChainMeasurement, Component, MaintenanceLog, MaintenanceRule, TireSet, User
 from ..schemas import (
-    BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
+    BikeCreate, BikeIn, BikeOut, ComponentIn, ComponentOut, InspectionIn, LogIn, LogOut, ReplaceIn, RuleDoneIn, RuleIn,
     MeasurementIn, MeasurementOut, MountedTireSet, RuleOut, StandardComponentsIn, WaxVariantOut,
 )
 from ..security import current_user
@@ -292,6 +292,17 @@ def create_log(comp_id: int, data: LogIn, user: User = Depends(current_user), db
     """Wartung für die ganze Komponente (setzt alle ihre Regeln zurück)."""
     comp = _own_component(db, user, comp_id)
     log = MaintenanceLog(component_id=comp.id, performed_by=_by(user, comp.user_id), **data.model_dump())
+    db.add(log)
+    db.commit()
+    return log
+
+
+@router.post("/components/{comp_id}/inspections", response_model=LogOut, status_code=201)
+def create_inspection(comp_id: int, data: InspectionIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Sichtprüfung der Komponente: gut, im Auge behalten (Restlaufzeit halbiert) oder wechseln (sofort fällig).
+    Zählt nicht als Wartung, die Zähler der Regeln bleiben unberührt."""
+    comp = _own_component(db, user, comp_id)
+    log = MaintenanceLog(component_id=comp.id, rule_id=None, performed_by=_by(user, comp.user_id), **data.model_dump())
     db.add(log)
     db.commit()
     return log
