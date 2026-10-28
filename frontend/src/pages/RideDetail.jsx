@@ -6,6 +6,7 @@ import { WEATHER_TEXT, api, sourceLabel, fmtDateTime, fmtDuration, fmtKm, fmtKm1
 import { ProfileChart } from "../components/charts.jsx";
 import { decodePolyline, loadMapConfig, tileOptions } from "../geo.js";
 import AfterRide from "../components/AfterRide.jsx";
+import { RideImpact } from "../components/StatsDeep.jsx";
 import { confirmDialog, Loading, toast } from "../components/feedback.jsx";
 
 function RouteMap({ polyline, hoverPoint, cfg }) {
@@ -181,6 +182,8 @@ export default function RideDetail() {
       ) : (
         <p className="muted">Zu dieser Fahrt gibt es keine GPS-Strecke.</p>
       )}
+
+      <RideImpact id={id} />
 
       {profile ? (
         <section className="panel" style={{ marginTop: "1.25rem" }}>

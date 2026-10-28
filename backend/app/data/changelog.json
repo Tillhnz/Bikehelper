@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-10-28.1",
+    "date": "2026-10-28",
+    "title": "Einfluss jeder Fahrt auf Fitness und FTP",
+    "changes": [
+      "Auf der Seite jeder Fahrt steht jetzt, wie sie deine Fitness, Ermüdung und Form verändert hat und wie hart sie für dich war.",
+      "Mit Leistungsdaten zeigt BikeHelper außerdem, ob sich deine FTP-Schätzung geändert hat und ob du neue Bestleistungen gefahren bist.",
+      "Der Rundgang für neue Konten springt nicht mehr zu Schritt 1 zurück und enthält jetzt die Anleitung für den Strava-Export."
+    ]
+  },
+  {
     "id": "2026-10-27.11",
     "date": "2026-10-27",
     "title": "Gruppen: Ziel, Duell, Serien und fairere Wertung",

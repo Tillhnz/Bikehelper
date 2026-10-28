@@ -271,3 +271,13 @@ def stats_forecast(user: User = Depends(current_user), db: Session = Depends(get
                     items.append(it)
     items.sort(key=lambda x: x["days"])
     return {"items": items[:30], "today": today.isoformat()}
+
+
+@router.get("/stats/ride-impact/{activity_id}")
+def stats_ride_impact(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Einfluss einer Fahrt auf Fitness, Ermüdung, Form und FTP (Stand nach dieser Fahrt)."""
+    tz, rows = _load(db, user, None, None, with_tiles=False, with_power=True)
+    out = D.ride_impact([r for _, r in rows], activity_id, tz)
+    if out is None:
+        raise HTTPException(404, "Fahrt nicht gefunden")
+    return out

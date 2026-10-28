@@ -477,3 +477,94 @@ def forecast_item(label: str, comp: str, bike: str, state: dict, pace_km_week: f
         "basis": basis, "km_left": km_left, "progress": _r(progress * 100, 0), "status": state.get("status"),
         "pace": _r(pace_km_week, 0),
     }
+
+
+# ---------- Einfluss einer einzelnen Fahrt ----------
+
+def _ftp_at(items: list[tuple[date, dict, bool]], end: date) -> float | None:
+    """FTP-Schätzung am Tag `end` aus den Fahrten der 90 Tage davor."""
+    win = [x for x in items if end - timedelta(days=FTP_WINDOW_DAYS) < x[0] <= end]
+    if not win:
+        return None
+    return estimate_ftp({k: v["watts"] for k, v in _best_curve(win).items()})[0]
+
+
+def _zone_of(ratio: float) -> str | None:
+    for lo, hi, name in ZONES:
+        if lo <= ratio < hi:
+            return name
+    return None
+
+
+def ride_impact(rows: list[Row], ride_id: int, tz) -> dict | None:
+    """Was eine Fahrt für Fitness, Ermüdung, Form und FTP bedeutet hat, jeweils im Stand nach dieser Fahrt.
+
+    Vergleich wird mit und ohne die Fahrt gerechnet; spätere Fahrten bleiben außen vor.
+    """
+    from .extra import load_series, ride_load
+
+    ride = next((r for r in rows if r.id == ride_id), None)
+    if ride is None:
+        return None
+    day = local(ride.start, tz).date()
+    upto = [r for r in rows if local(r.start, tz).date() <= day]
+    others = [r for r in upto if r.id != ride_id]
+
+    def state(rs):
+        series = load_series(sorted(((local(r.start, tz), r) for r in rs), key=lambda x: x[0]), day, days=1)
+        last = series[-1] if series and series[-1]["date"] == day.isoformat() else None
+        return last or {"fitness": 0.0, "fatigue": 0.0, "form": 0.0}
+
+    before, after = state(others), state(upto)
+    delta = lambda k: _r(after[k] - before[k], 1)  # noqa: E731
+    points = ride_load(ride)
+    recent = sorted(ride_load(r) for r in others[-40:] if r.start < ride.start)
+    typical = median(recent) if len(recent) >= 5 else None
+    rel = points / typical if typical else None
+    if rel is None:
+        level = None
+    elif rel < 0.6:
+        level = "sehr locker"
+    elif rel < 0.9:
+        level = "locker"
+    elif rel < 1.2:
+        level = "normal"
+    elif rel < 1.6:
+        level = "fordernd"
+    else:
+        level = "sehr hart"
+    out: dict = {
+        "date": day.isoformat(),
+        "load": {
+            "points": _r(points), "typical": _r(typical) if typical else None, "level": level,
+            "fitness": {"before": _r(before["fitness"]), "after": _r(after["fitness"]), "delta": delta("fitness")},
+            "fatigue": {"before": _r(before["fatigue"]), "after": _r(after["fatigue"]), "delta": delta("fatigue")},
+            "form": {"before": _r(before["form"]), "after": _r(after["form"]), "delta": delta("form")},
+        },
+    }
+
+    # FTP und Bestwerte: nur mit Leistungskurve
+    def items(rs):
+        return [(local(r.start, tz).date(), {int(k): v for k, v in r.curve.items()}, r.curve_approx) for r in rs if r.curve]
+
+    ftp: dict = {"available": bool(ride.curve)}
+    if ride.curve:
+        prior = items(others)
+        ftp_before, ftp_after = _ftp_at(prior, day), _ftp_at(items(upto), day)
+        records = []
+        prior_best = _best_curve(prior)
+        for k, w in sorted((int(k), v) for k, v in ride.curve.items()):
+            if k in CURVE_LABELS and (k not in prior_best or w > prior_best[k]["watts"]):
+                records.append({"seconds": k, "label": CURVE_LABELS[k], "watts": w,
+                                "before": prior_best[k]["watts"] if k in prior_best else None, "approx": ride.curve_approx})
+        ftp.update({
+            "before": round(ftp_before) if ftp_before else None, "after": round(ftp_after) if ftp_after else None,
+            "delta": round(ftp_after) - round(ftp_before) if ftp_before and ftp_after else None,
+            "records": records, "approx": ride.curve_approx,
+        })
+        if ftp_after and ride.avg_power:
+            ratio = ride.avg_power * 1.06 / ftp_after
+            ftp.update({"intensity_pct": round(ratio * 100), "zone": _zone_of(ratio),
+                        "tss": _r(ride_tss(ride, ftp_after), 0)})
+    out["ftp"] = ftp
+    return out

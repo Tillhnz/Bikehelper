@@ -296,3 +296,74 @@ export function RoutesView() {
     </>
   );
 }
+
+// ---------- Einfluss einer Fahrt (Fahrtseite) ----------
+
+function Change({ label, v, goodWhenUp = true }) {
+  const up = v.delta > 0, flat = v.delta === 0;
+  const good = flat ? null : up === goodWhenUp;
+  return (
+    <div className="kpi impact-kpi">
+      <div className="kpi-value">{fmtNum(v.after, 1)}<small className={flat ? "" : good ? "impact-good" : "impact-neutral"}>{flat ? "±0" : sign(v.delta, 1)}</small></div>
+      <div className="kpi-label">{label}</div>
+      <div className="muted small">vorher {fmtNum(v.before, 1)}</div>
+    </div>
+  );
+}
+
+export function RideImpact({ id }) {
+  const [d, setD] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setD(null);
+    setFailed(false);
+    api.get(`/stats/ride-impact/${id}`).then(setD).catch(() => setFailed(true));
+  }, [id]);
+  if (failed) return null;
+  if (!d) return <section className="panel" style={{ marginTop: "1.25rem" }}><h2>Einfluss auf Fitness und FTP</h2><Loading rows={2} /></section>;
+  const { load, ftp } = d;
+  const formWord = load.form.after > 10 ? "sehr frisch" : load.form.after > 0 ? "frisch" : load.form.after > -10 ? "leicht ermüdet" : load.form.after > -25 ? "ermüdet" : "stark ermüdet";
+  return (
+    <section className="panel" style={{ marginTop: "1.25rem" }}>
+      <h2>Einfluss auf Fitness und FTP</h2>
+      <p>
+        {load.level ? <>Für dich eine <strong>{load.level}e</strong> Fahrt: </> : null}
+        {fmtNum(load.points, 0)} Belastungspunkte{load.typical ? <> (deine typische Fahrt: {fmtNum(load.typical, 0)})</> : null}.
+        Danach giltst du als <strong>{formWord}</strong> (Form {load.form.after > 0 ? "+" : ""}{fmtNum(load.form.after, 0)}).
+      </p>
+      <div className="kpis">
+        <Change label="Fitness (42 Tage)" v={load.fitness} />
+        <Change label="Ermüdung (7 Tage)" v={load.fatigue} goodWhenUp={false} />
+        <Change label="Form" v={load.form} />
+      </div>
+      {ftp.available ? (
+        <>
+          <h3 className="chart-title">FTP</h3>
+          <p>
+            {ftp.after == null ? "Noch keine FTP-Schätzung möglich." : ftp.delta == null
+              ? <>Erste FTP-Schätzung: <strong>{ftp.after} W</strong>.</>
+              : ftp.delta === 0 ? <>Die FTP-Schätzung bleibt bei <strong>{ftp.after} W</strong>.</>
+                : <>Die FTP-Schätzung {ftp.delta > 0 ? "steigt" : "sinkt"} von {ftp.before} auf <strong>{ftp.after} W</strong> ({sign(ftp.delta, 0)} W).</>}
+            {ftp.delta < 0 && " Das heißt nur, dass ältere Bestwerte aus dem 90-Tage-Fenster fallen."}
+          </p>
+          {ftp.records.length > 0 && (
+            <ul className="insights">
+              {ftp.records.map((r) => (
+                <li key={r.seconds}>🏅 Neue Bestleistung über {r.label}: <strong>{fmtNum(r.watts, 0)} W</strong>{r.before ? ` (vorher ${fmtNum(r.before, 0)} W)` : " (erste Fahrt mit diesem Wert)"}{r.approx ? ", aus dem Profil genähert" : ""}</li>
+              ))}
+            </ul>
+          )}
+          {ftp.intensity_pct != null && (
+            <p className="muted small">Die Durchschnittsleistung entsprach etwa {ftp.intensity_pct} % deiner FTP ({ftp.zone}), das sind rund {fmtNum(ftp.tss, 0)} Trainingspunkte nach FTP.</p>
+          )}
+        </>
+      ) : (
+        <p className="muted small">Ohne Leistungsdaten lässt sich der Einfluss auf die FTP nicht berechnen.</p>
+      )}
+      <p className="muted small">
+        Stand direkt nach dieser Fahrt, spätere Fahrten sind nicht eingerechnet. Die Belastung ist aus Fahrzeit, Höhenmetern und Tempo geschätzt, kein Messwert.
+        Mehr dazu in der <Link className="link" to="/stats?tab=power">Statistik unter „Leistung“</Link>.
+      </p>
+    </section>
+  );
+}

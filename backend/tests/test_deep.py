@@ -96,6 +96,21 @@ def test_forecast_uses_pace():
     assert D.forecast_item("x", "K", "Rad", {"status": "unknown", "progress": 0}, 100, date(2026, 7, 1)) is None
 
 
+def test_ride_impact_fitness_and_ftp():
+    rows = _rows(20)
+    last = rows[-1]
+    last.curve = {"300": 400, "1200": 300, "3600": 250}  # klar besser als alle davor
+    out = D.ride_impact(rows, last.id, TZ)
+    assert out["load"]["fitness"]["delta"] > 0 and out["load"]["fatigue"]["delta"] > out["load"]["fitness"]["delta"]
+    assert out["load"]["form"]["delta"] < 0 and out["load"]["level"] in ("locker", "normal", "fordernd", "sehr hart", "sehr locker")
+    assert out["ftp"]["available"] and out["ftp"]["delta"] > 0 and {r["label"] for r in out["ftp"]["records"]} == {"5 min", "20 min", "60 min"}
+    first = D.ride_impact(rows, rows[0].id, TZ)  # erste Fahrt: nichts davor
+    assert first["load"]["fitness"]["before"] == 0 and first["ftp"]["records"]
+    rows[3].curve = None
+    assert D.ride_impact(rows, rows[3].id, TZ)["ftp"] == {"available": False}
+    assert D.ride_impact(rows, 9999, TZ) is None
+
+
 def test_endpoints_answer_for_new_account():
     with TestClient(app) as c:
         c.post("/api/auth/register", json={"email": "deep@example.com", "password": "geheim1234"})
@@ -105,3 +120,4 @@ def test_endpoints_answer_for_new_account():
             r = c.get(f"/api/stats/{path}", headers=h)
             assert r.status_code == 200, (path, r.text)
         assert c.get("/api/stats/power", headers=h).json()["has_curve"] is False
+        assert c.get("/api/stats/ride-impact/12345", headers=h).status_code == 404
