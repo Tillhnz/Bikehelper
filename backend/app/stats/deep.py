@@ -18,6 +18,7 @@ FTP_WINDOW_DAYS = 90
 # Leistungsbereiche nach Coggan, Anteile der FTP
 ZONES = [(0, 0.55, "Z1 Erholung"), (0.55, 0.75, "Z2 Grundlage"), (0.75, 0.90, "Z3 Tempo"), (0.90, 1.05, "Z4 Schwelle"),
          (1.05, 1.20, "Z5 VO2max"), (1.20, 1.50, "Z6 Anaerob"), (1.50, 9.99, "Z7 Sprint")]
+HEADWIND_BUCKETS = [(-200, -8, "Rückenwind > 8"), (-8, -3, "Rückenwind 3–8"), (-3, 3, "kaum Wind in Fahrtrichtung"), (3, 8, "Gegenwind 3–8"), (8, 200, "Gegenwind > 8")]
 WIND_BUCKETS = [(0, 10, "< 10 km/h"), (10, 20, "10–20"), (20, 30, "20–30"), (30, 200, "> 30 km/h")]
 TEMP_BUCKETS = [(-100, 5, "< 5 °C"), (5, 10, "5–10"), (10, 15, "10–15"), (15, 20, "15–20"), (20, 25, "20–25"), (25, 100, "> 25 °C")]
 MIN_BUCKET_RIDES = 3  # darunter ist ein Durchschnitt zu zufällig
@@ -234,9 +235,10 @@ def build_conditions(rows: list[Row]) -> dict:
     wx = [r for r in ok if r.temp_c is not None]
     temp = _avg_by(wx, lambda r: r.temp_c, TEMP_BUCKETS, _speed)
     wind = _avg_by([r for r in ok if r.wind_kmh is not None], lambda r: r.wind_kmh, WIND_BUCKETS, _speed)
+    headwind = _avg_by([r for r in ok if r.headwind_kmh is not None], lambda r: r.headwind_kmh, HEADWIND_BUCKETS, _speed)
     pw_rows = [r for r in wx if r.avg_power and r.avg_power > 0]
     power = _avg_by(pw_rows, lambda r: r.temp_c, TEMP_BUCKETS, lambda r: r.avg_power)
-    for rowset in (temp, wind):
+    for rowset in (temp, wind, headwind):
         for b in rowset:
             b["delta_pct"] = _r((b["value"] / base - 1) * 100) if b["value"] else None
     wet = [r for r in ok if r.wet_minutes is not None and r.time_s > 0 and r.wet_minutes / (r.time_s / 60) >= 0.3]
@@ -251,7 +253,7 @@ def build_conditions(rows: list[Row]) -> dict:
     strong = [b for b in wind if b["value"]]
     return {
         "rides": len(ok), "weather_rides": len(wx), "base_speed": _r(base),
-        "temp": temp, "wind": wind, "power_by_temp": power, "wet_dry": wet_dry,
+        "temp": temp, "wind": wind, "headwind": headwind, "power_by_temp": power, "wet_dry": wet_dry,
         "fastest_temp": best_t["label"] if best_t else None,
         "most_rides_temp": most_t["label"] if most_t and most_t["rides"] else None,
         "wind_cost_pct": _r((strong[-1]["value"] / strong[0]["value"] - 1) * 100) if len(strong) >= 2 else None,

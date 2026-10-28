@@ -30,6 +30,7 @@ class Row:
     weather_status: str | None = None
     tiles: set | None = None
     wind_kmh: float | None = None
+    headwind_kmh: float | None = None  # mittlerer Gegenwind entlang der Strecke (negativ = Rückenwind)
     avg_power: float | None = None
     terrain: str | None = None
     curve: dict | None = None  # beste Leistung je Dauer (Sekunden -> Watt), siehe stats/deep.py

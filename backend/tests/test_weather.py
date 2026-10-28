@@ -98,3 +98,49 @@ def test_describe_code():
     assert describe_code(63) == "Regen"
     assert describe_code(95) == "Gewitter"
     assert describe_code(None) is None
+
+
+# ---------- Wetter entlang der Strecke und Windrichtung ----------
+
+def wind_series(wind, wdir):
+    return {DAY.replace(hour=h): Hour(temp=10.0, precip=0.0, wind=wind, wdir=wdir, code=3) for h in range(24)}
+
+
+def test_parse_hourly_reads_wind_direction():
+    s = parse_hourly({"hourly": {"time": ["2026-10-23T08:00"], "wind_speed_10m": [12.0], "wind_direction_10m": [270]}})
+    assert s[datetime(2026, 10, 23, 8)].wdir == 270
+
+
+def test_headwind_and_tailwind():
+    from app.weather.core import summarize as sm
+    start = DAY.replace(hour=8)
+    west = wind_series(20.0, 270)  # Wind kommt aus Westen
+    r = sm(west, start, 3600, direction=(-1.0, 0.0))  # Fahrt nach Westen: Gegenwind
+    assert r.wind_dir == 270 and r.headwind_kmh == 20.0
+    assert sm(west, start, 3600, direction=(1.0, 0.0)).headwind_kmh == -20.0  # nach Osten: Rückenwind
+    assert abs(sm(west, start, 3600, direction=(0.0, 1.0)).headwind_kmh) < 0.05  # nach Norden: Seitenwind
+    assert sm(west, start, 3600).headwind_kmh is None
+
+
+def test_route_is_split_and_direction_follows_the_route():
+    from app.weather.core import route_items
+    # 30 km nach Norden, dann 30 km nach Osten (grob): zwei Hälften mit verschiedener Richtung
+    north = [(53.0 + i * 0.027, 10.0) for i in range(11)]
+    east = [(north[-1][0], 10.0 + i * 0.045) for i in range(1, 11)]
+    items = route_items(7, north + east, DAY.replace(hour=8), 7200)
+    assert items and len(items) == 5 and items[0].parts == 5
+    assert items[0].dir_y > 0.99 and abs(items[0].dir_x) < 0.05      # Norden
+    assert items[-1].dir_x > 0.99 and abs(items[-1].dir_y) < 0.05    # Osten
+    assert items[0].start == DAY.replace(hour=8) and items[1].start > items[0].start
+    assert items[0].lat < items[2].lat  # Positionen wandern mit
+    assert route_items(1, [(53.0, 10.0), (53.001, 10.0)], DAY, 600) is None  # zu kurz
+
+
+def test_combine_adds_rain_and_averages_wind():
+    from app.weather.core import WeatherSummary, combine
+    a = WeatherSummary(10.0, 1.0, 20.0, 10.0, 61, 270.0, 20.0)
+    b = WeatherSummary(14.0, 0.0, 20.0, 0.0, 3, 270.0, -20.0)
+    c = combine([(a, 1800), (b, 1800), (None, 600)])
+    assert c.precip_mm == 1.0 and c.wet_minutes == 10.0 and c.weather_code == 61
+    assert c.temp_c == 12.0 and c.headwind_kmh == 0.0 and c.wind_dir == 270
+    assert combine([(None, 60)]) is None

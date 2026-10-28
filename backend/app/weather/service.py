@@ -1,8 +1,8 @@
 """Wetter für importierte Fahrten von Open-Meteo holen (kostenlos, ohne Schlüssel, für private Nutzung).
 
 Die Abfragen werden gebündelt (eine je Gitterzelle und Zeitraum von bis zu 90 Tagen) und gedrosselt, damit das
-kostenlose Limit (600 pro Minute, 10.000 pro Tag) weit unterschritten bleibt. Es werden nur die gerundeten
-Startkoordinaten der Fahrten und Zeiträume an Open-Meteo gesendet, keine Konto- oder Fahrtnamen.
+kostenlose Limit (600 pro Minute, 10.000 pro Tag) weit unterschritten bleibt. Es werden nur auf 0,1 Grad (etwa 11 km) gerundete
+Koordinaten von Punkten entlang der Fahrten und Zeiträume an Open-Meteo gesendet, keine Konto- oder Fahrtnamen.
 Daten: Open-Meteo.com, Lizenz CC BY 4.0.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import Counter
 from datetime import datetime, timezone
 
 import httpx
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import SessionLocal
+from ..importers import polyline as polyline_codec
 from ..models import Activity
 from . import core
 
@@ -25,7 +27,7 @@ log = logging.getLogger("bikehelper.weather")
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-HOURLY = "temperature_2m,precipitation,wind_speed_10m,weather_code"
+HOURLY = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code"
 PAUSE_BETWEEN_REQUESTS_S = 0.6
 SCHEDULE_INTERVAL_S = 6 * 3600
 
@@ -63,20 +65,33 @@ def _today():
     return datetime.now(timezone.utc).date()
 
 
+def _items_for(aid: int, lat: float, lng: float, start: datetime, dur: int, encoded: str | None) -> list[core.Item]:
+    """Abschnitte entlang der Strecke; ohne brauchbare Strecke ein einzelner Punkt am Start."""
+    if encoded:
+        try:
+            items = core.route_items(aid, polyline_codec.decode(encoded), start, dur)
+        except (IndexError, ValueError):
+            items = None
+        if items:
+            return items
+    return [core.Item(aid, lat, lng, start, dur)]
+
+
 def _candidates(db: Session, user_id: int | None) -> list[core.Item]:
     q = select(
         Activity.id, Activity.start_lat, Activity.start_lng, Activity.start_date,
-        Activity.moving_time_s, Activity.weather_status,
+        Activity.moving_time_s, Activity.weather_status, Activity.weather_pts, Activity.polyline,
     ).where(Activity.start_lat.is_not(None), Activity.start_lng.is_not(None))
     if user_id is not None:
         q = q.where(Activity.user_id == user_id)
     today = _today()
-    items = []
-    for aid, lat, lng, start, dur, status in db.execute(q):
+    items: list[core.Item] = []
+    for aid, lat, lng, start, dur, status, pts, encoded in db.execute(q):
         age_days = (today - start.date()).days
-        # offen, oder vorläufig und inzwischen im Archiv verfügbar
-        if status is None or (status == "prelim" and age_days >= core.ARCHIVE_DELAY_DAYS):
-            items.append(core.Item(aid, lat, lng, start, dur or 0))
+        # offen, vorläufig und inzwischen im Archiv verfügbar, oder bisher nur mit dem Wetter am Startpunkt
+        upgrade = status in ("ok", "prelim") and pts is None and bool(encoded)
+        if status is None or (status == "prelim" and age_days >= core.ARCHIVE_DELAY_DAYS) or upgrade:
+            items.extend(_items_for(aid, lat, lng, start, dur or 0, encoded))
     return items
 
 
@@ -90,8 +105,32 @@ def enrich(user_id: int | None = None, fetch=fetch_window, pause: float = PAUSE_
         _progress.update(running=True, total=0, done=0, error=None)
         with SessionLocal() as db:
             items = _candidates(db, user_id)
-            _progress["total"] = len(items)
+            remaining = Counter(it.activity_id for it in items)  # offene Abschnitte je Fahrt
+            _progress["total"] = len(remaining)
+            failed: set[int] = set()
+            parts: dict[int, list[tuple[core.WeatherSummary | None, float]]] = {}
+            prelim: set[int] = set()
+            n_parts = {it.activity_id: it.parts for it in items}
             windows = core.plan_windows(items, _today())
+
+            def finish(aid: int) -> None:
+                """Alle Abschnitte einer Fahrt sind bearbeitet: zusammenfassen und speichern."""
+                _progress["done"] += 1
+                got = parts.pop(aid, [])
+                if aid in failed:
+                    return  # später erneut versuchen
+                s = core.combine(got)
+                values: dict = {
+                    "weather_status": "none" if s is None else ("prelim" if aid in prelim else "ok"),
+                    "weather_pts": n_parts[aid],
+                }
+                if s is not None:
+                    values.update(
+                        temp_c=s.temp_c, precip_mm=s.precip_mm, wind_kmh=s.wind_kmh, wet_minutes=s.wet_minutes,
+                        weather_code=s.weather_code, wind_dir=s.wind_dir, headwind_kmh=s.headwind_kmh,
+                    )
+                db.execute(update(Activity).where(Activity.id == aid).values(**values))
+
             with httpx.Client(headers={"User-Agent": "BikeHelper (self-hosted)"}, timeout=30) as client:
                 for w in windows:
                     try:
@@ -103,23 +142,20 @@ def enrich(user_id: int | None = None, fetch=fetch_window, pause: float = PAUSE_
                         break
                     except Exception as e:  # Netzwerkfehler o. Ä.: überspringen, später erneut versuchen
                         log.warning("Wetterabruf fehlgeschlagen (%s, %s): %s", w.lat, w.lng, e)
-                        _progress["done"] += len(w.items)
-                        continue
-                    if not series:
-                        _progress["done"] += len(w.items)
-                        continue
+                        series = None
                     for it in w.items:
-                        s = core.summarize(series, it.start, it.duration_s)
-                        values: dict = {"weather_status": "none" if s is None else ("prelim" if w.recent else "ok")}
-                        if s is not None:
-                            values.update(
-                                temp_c=s.temp_c, precip_mm=s.precip_mm, wind_kmh=s.wind_kmh,
-                                wet_minutes=s.wet_minutes, weather_code=s.weather_code,
-                            )
-                        db.execute(update(Activity).where(Activity.id == it.activity_id).values(**values))
+                        aid = it.activity_id
+                        if not series:
+                            failed.add(aid)
+                        else:
+                            parts.setdefault(aid, []).append((core.summarize(series, it.start, it.duration_s, it.direction), it.duration_s))
+                            if w.recent:
+                                prelim.add(aid)
+                        remaining[aid] -= 1
+                        if remaining[aid] == 0:
+                            finish(aid)
                     db.commit()
-                    _progress["done"] += len(w.items)
-                    if pause:
+                    if series and pause:
                         time.sleep(pause)
     except Exception as e:
         log.exception("Wetter-Anreicherung fehlgeschlagen")

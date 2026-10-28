@@ -41,6 +41,9 @@ function RouteMap({ polyline, hoverPoint, cfg }) {
   return <div className="detail-map" ref={boxRef} />;
 }
 
+const COMPASS = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+
 function Stat({ value, unit, label }) {
   if (value == null || value === "–") return null;
   return (
@@ -241,13 +244,17 @@ export default function RideDetail() {
             <div className="kpis" style={{ marginBottom: 0 }}>
               <Stat value={fmtNum(a.temp_c)} unit="°C" label={WEATHER_TEXT(a.weather_code) ?? "Temperatur"} />
               <Stat value={fmtNum(a.precip_mm)} unit="mm" label="Regen" />
-              <Stat value={fmtNum(a.wind_kmh, 0)} unit="km/h" label="Wind" />
+              <Stat value={fmtNum(a.wind_kmh, 0)} unit="km/h" label={a.wind_dir != null ? `Wind aus ${compass(a.wind_dir)}` : "Wind"} />
+              {a.headwind_kmh != null && (
+                <Stat value={fmtNum(Math.abs(a.headwind_kmh), 0)} unit="km/h" label={Math.abs(a.headwind_kmh) < 1 ? "Wind in Fahrtrichtung" : a.headwind_kmh > 0 ? "Gegenwind im Mittel" : "Rückenwind im Mittel"} />
+              )}
               <Stat value={a.wet_minutes != null ? fmtNum(a.wet_minutes, 0) : null} unit="min" label="auf nasser Straße" />
             </div>
             <p className="muted small" style={{ marginTop: "0.75rem" }}>
               {wetText
                 ? "Die Nässe wurde bei den Wartungsintervallen deines Rades mit dem jeweiligen Nässefaktor gezählt."
                 : "Trockene Fahrt: Es wird ganz normal gezählt."}
+              {a.weather_pts > 1 ? ` Das Wetter wurde an ${a.weather_pts} Stellen entlang der Strecke abgefragt (Zeit gleichmäßig über die Strecke verteilt).` : ""}
               {a.weather_status === "prelim" ? " Die Werte sind vorläufig und werden in einigen Tagen aus dem Archiv aktualisiert." : ""}
             </p>
           </>

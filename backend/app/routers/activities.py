@@ -27,7 +27,7 @@ def _out(a: Activity, has_track: bool) -> ActivityOut:
         id=a.id, name=a.name, sport_type=a.sport_type, start_date=a.start_date,
         distance_km=a.distance_km, moving_time_s=a.moving_time_s, elevation_m=a.elevation_m,
         bike_id=a.bike_id, gear_name=a.gear_name, source=a.source, has_track=has_track,
-        temp_c=a.temp_c, precip_mm=a.precip_mm, wind_kmh=a.wind_kmh, wet_minutes=a.wet_minutes,
+        temp_c=a.temp_c, precip_mm=a.precip_mm, wind_kmh=a.wind_kmh, wind_dir=a.wind_dir, headwind_kmh=a.headwind_kmh, weather_pts=a.weather_pts, wet_minutes=a.wet_minutes,
         weather_code=a.weather_code, weather_status=a.weather_status,
     )
 

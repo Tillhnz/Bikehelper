@@ -50,7 +50,7 @@ def _load(db: Session, user: User, bike_id: int | None, year: int | None, with_t
             time_s=a.moving_time_s, elev_m=a.elevation_m, temp_c=a.temp_c, precip_mm=a.precip_mm,
             wet_minutes=a.wet_minutes, weather_status=a.weather_status,
             tiles=T.decode(a.tiles) if with_tiles else None,
-            wind_kmh=a.wind_kmh, avg_power=a.avg_power, terrain=a.terrain,
+            wind_kmh=a.wind_kmh, headwind_kmh=a.headwind_kmh, avg_power=a.avg_power, terrain=a.terrain,
         )))
         if with_power and a.avg_power and a.avg_power > 0 and a.details:
             try:

@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-10-28.5",
+    "date": "2026-10-28",
+    "title": "Wetter und Wind entlang der Strecke",
+    "changes": [
+      "Das Wetter wird nicht mehr nur am Start, sondern an mehreren Stellen entlang der Strecke abgefragt. Regen, Temperatur und Wind passen damit besser zur echten Fahrt.",
+      "Neu in der Fahrt: Windrichtung und mittlerer Gegen- oder Rückenwind. In der Statistik zeigt ein neues Diagramm dein Tempo nach Gegen- und Rückenwind.",
+      "Ältere Fahrten werden nach dem Update im Hintergrund einmal neu ausgewertet. Das kann bei vielen Fahrten eine Weile dauern."
+    ]
+  },
+  {
     "id": "2026-10-28.4",
     "date": "2026-10-28",
     "title": "Reifen in der Garage eingeklappt",

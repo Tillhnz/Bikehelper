@@ -220,6 +220,9 @@ class ActivityOut(BaseModel):
     temp_c: float | None = None
     precip_mm: float | None = None
     wind_kmh: float | None = None
+    wind_dir: float | None = None
+    headwind_kmh: float | None = None
+    weather_pts: int | None = None
     wet_minutes: float | None = None
     weather_code: int | None = None
     weather_status: str | None = None

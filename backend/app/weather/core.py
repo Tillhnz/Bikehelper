@@ -7,11 +7,17 @@ Annahmen des Modells (bewusst einfach gehalten):
 - Eine Stunde gilt als nass, wenn mindestens WET_HOUR_MM Niederschlag fiel oder in den DAMP_LOOKBACK_H Stunden
   davor zusammen mindestens DAMP_MM (die Straße ist dann noch feucht).
 - Die Fahrzeit wird als zusammenhängend ab dem Start angenommen (Start + Bewegungszeit).
+- Entlang der Strecke wird die Fahrt in Abschnitte von etwa 12 km geteilt. Jeder Abschnitt bekommt das Wetter an seiner
+  Position und zu seiner Zeit; die Zeit wird dabei gleichmäßig über die Strecke verteilt (konstantes Tempo angenommen).
+- Wind: Open-Meteo liefert die Richtung, aus der der Wind kommt (0° = Nord). Der Gegenwind ist der Anteil des Windes
+  in Fahrtrichtung, gemittelt über die Wegstücke des Abschnitts (positiv = Gegenwind, negativ = Rückenwind).
 """
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+import math
+from bisect import bisect_left
 from datetime import date, datetime, timedelta
 
 WET_HOUR_MM = 0.1
@@ -28,6 +34,7 @@ class Hour:
     temp: float | None = None
     precip: float | None = None
     wind: float | None = None
+    wdir: float | None = None
     code: int | None = None
 
 
@@ -41,6 +48,8 @@ class WeatherSummary:
     wind_kmh: float | None
     wet_minutes: float | None
     weather_code: int | None
+    wind_dir: float | None = None      # Grad, aus der der Wind kommt
+    headwind_kmh: float | None = None  # positiv = Gegenwind, negativ = Rückenwind
 
 
 # ---------- Antwort der API einlesen ----------
@@ -65,6 +74,7 @@ def parse_hourly(payload: dict) -> Series:
             temp=_at(h.get("temperature_2m"), i),
             precip=_at(h.get("precipitation"), i),
             wind=_at(h.get("wind_speed_10m"), i),
+            wdir=_at(h.get("wind_direction_10m"), i),
             code=int(code) if code is not None else None,
         )
     return series
@@ -95,6 +105,28 @@ def _interp(series: Series, when: datetime, attr: str) -> float | None:
     return float(a) + (float(b) - float(a)) * w
 
 
+def _wind_vec(series: Series, when: datetime) -> tuple[float, float] | None:
+    """Wind als (Ost, Nord)-Anteil des Windes „von dort“ in km/h; None, wenn Richtung oder Tempo fehlen."""
+    lo = floor_hour(when)
+    w = (when - lo) / HOUR
+    vecs = []
+    for t in (lo, lo + HOUR):
+        h = series.get(t)
+        if h is None or h.wind is None or h.wdir is None:
+            vecs.append(None)
+            continue
+        r = math.radians(h.wdir)
+        vecs.append((h.wind * math.sin(r), h.wind * math.cos(r)))
+    a, b = vecs
+    if a is None and b is None:
+        return None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return (a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w)
+
+
 def _is_wet(series: Series, t: datetime) -> bool:
     here = series[t].precip or 0.0
     if here >= WET_HOUR_MM:
@@ -107,8 +139,10 @@ def _is_wet(series: Series, t: datetime) -> bool:
     return before >= DAMP_MM
 
 
-def summarize(series: Series, start: datetime, duration_s: int | None) -> WeatherSummary | None:
-    """Wetter während der Fahrt. Gibt None zurück, wenn für den Zeitraum keine Daten vorliegen."""
+def summarize(series: Series, start: datetime, duration_s: int | None, direction: tuple[float, float] | None = None) -> WeatherSummary | None:
+    """Wetter während der Fahrt (oder eines Abschnitts). Gibt None zurück, wenn für den Zeitraum keine Daten vorliegen.
+
+    direction: mittlere Fahrtrichtung als (Ost, Nord)-Anteil (Länge 0 bis 1); damit wird der Gegenwind berechnet."""
     end = start + timedelta(seconds=max(int(duration_s or 0), 60))
 
     precip = wet_min = 0.0
@@ -138,6 +172,16 @@ def summarize(series: Series, start: datetime, duration_s: int | None) -> Weathe
             codes.append(h.code)
         t += HOUR
 
+    vecs = [v for v in (_wind_vec(series, s) for s in samples) if v is not None]
+    wind_dir = head = None
+    if vecs:
+        fx = sum(v[0] for v in vecs) / len(vecs)
+        fy = sum(v[1] for v in vecs) / len(vecs)
+        if math.hypot(fx, fy) >= 0.5:
+            wind_dir = round(math.degrees(math.atan2(fx, fy)) % 360, 0)
+        if direction is not None:
+            head = round(fx * direction[0] + fy * direction[1], 1)
+
     if not (temps or winds or codes or have_precip):
         return None
     return WeatherSummary(
@@ -146,6 +190,44 @@ def summarize(series: Series, start: datetime, duration_s: int | None) -> Weathe
         wind_kmh=round(sum(winds) / len(winds), 1) if winds else None,
         wet_minutes=round(wet_min, 1) if have_precip else None,
         weather_code=max(codes) if codes else None,
+        wind_dir=wind_dir,
+        headwind_kmh=head,
+    )
+
+
+def combine(parts: list[tuple[WeatherSummary | None, float]]) -> WeatherSummary | None:
+    """Fasst die Abschnitte einer Fahrt zusammen. parts: (Wetter, Dauer in Sekunden). Regen und Nässezeit addieren sich,
+    Temperatur, Wind und Gegenwind werden nach Dauer gewichtet gemittelt, die Windrichtung als Vektor."""
+    have = [(w, max(sec, 1.0)) for w, sec in parts if w is not None]
+    if not have:
+        return None
+
+    def wavg(attr: str) -> float | None:
+        vals = [(getattr(w, attr), sec) for w, sec in have if getattr(w, attr) is not None]
+        total = sum(sec for _, sec in vals)
+        return round(sum(v * sec for v, sec in vals) / total, 1) if total else None
+
+    def wsum(attr: str) -> float | None:
+        vals = [getattr(w, attr) for w, _ in have if getattr(w, attr) is not None]
+        return round(sum(vals), 2) if vals else None
+
+    fx = fy = 0.0
+    for w, sec in have:
+        if w.wind_dir is not None and w.wind_kmh is not None:
+            r = math.radians(w.wind_dir)
+            fx += w.wind_kmh * math.sin(r) * sec
+            fy += w.wind_kmh * math.cos(r) * sec
+    total = sum(sec for _, sec in have)
+    wind_dir = round(math.degrees(math.atan2(fx, fy)) % 360, 0) if math.hypot(fx, fy) / total >= 0.5 else None
+    codes = [w.weather_code for w, _ in have if w.weather_code is not None]
+    return WeatherSummary(
+        temp_c=wavg("temp_c"),
+        precip_mm=wsum("precip_mm"),
+        wind_kmh=wavg("wind_kmh"),
+        wet_minutes=wsum("wet_minutes"),
+        weather_code=max(codes) if codes else None,
+        wind_dir=wind_dir,
+        headwind_kmh=wavg("headwind_kmh"),
     )
 
 
@@ -153,11 +235,20 @@ def summarize(series: Series, start: datetime, duration_s: int | None) -> Weathe
 
 @dataclass
 class Item:
+    """Eine Fahrt oder ein Abschnitt einer Fahrt, für den das Wetter an Position lat/lng zur Zeit start gebraucht wird."""
     activity_id: int
     lat: float
     lng: float
     start: datetime
     duration_s: int
+    dir_x: float | None = None  # mittlere Fahrtrichtung im Abschnitt (Ost-Anteil, 0 bis 1)
+    dir_y: float | None = None  # Nord-Anteil
+    part: int = 0
+    parts: int = 1
+
+    @property
+    def direction(self) -> tuple[float, float] | None:
+        return None if self.dir_x is None or self.dir_y is None else (self.dir_x, self.dir_y)
 
 
 @dataclass
@@ -225,3 +316,55 @@ def describe_code(code: int | None) -> str | None:
     if code >= 95:
         return "Gewitter"
     return None
+
+
+# ---------- Strecke in Abschnitte teilen ----------
+
+SEGMENT_KM = 12.0
+MAX_SEGMENTS = 12
+MIN_ROUTE_M = 1500.0
+
+
+def route_items(activity_id: int, points: list[tuple[float, float]], start: datetime, duration_s: int) -> list[Item] | None:
+    """Teilt eine Strecke in Abschnitte von etwa SEGMENT_KM. None, wenn die Strecke zu kurz oder unbrauchbar ist
+    (dann bleibt es beim Wetter am Startpunkt)."""
+    if len(points) < 2:
+        return None
+    steps = []  # (Ost m, Nord m, Länge m)
+    cum = [0.0]
+    for (la1, ln1), (la2, ln2) in zip(points, points[1:]):
+        north = (la2 - la1) * 111_320
+        east = (ln2 - ln1) * 111_320 * math.cos(math.radians((la1 + la2) / 2))
+        steps.append((east, north, math.hypot(east, north)))
+        cum.append(cum[-1] + steps[-1][2])
+    total = cum[-1]
+    if total < MIN_ROUTE_M:
+        return None
+    n = max(1, min(MAX_SEGMENTS, round(total / 1000 / SEGMENT_KM)))
+    sums = [[0.0, 0.0, 0.0] for _ in range(n)]
+    for j, (east, north, length) in enumerate(steps):
+        if length <= 0:
+            continue
+        i = min(n - 1, int((cum[j] + length / 2) / total * n))
+        sums[i][0] += east
+        sums[i][1] += north
+        sums[i][2] += length
+
+    def point_at(dist: float) -> tuple[float, float]:
+        k = min(max(bisect_left(cum, dist), 1), len(cum) - 1)
+        seg = cum[k] - cum[k - 1]
+        f = (dist - cum[k - 1]) / seg if seg > 0 else 0.0
+        (la1, ln1), (la2, ln2) = points[k - 1], points[k]
+        return la1 + (la2 - la1) * f, ln1 + (ln2 - ln1) * f
+
+    duration = max(int(duration_s or 0), 60)
+    out = []
+    for i in range(n):
+        lat, lng = point_at(total * (i + 0.5) / n)
+        east, north, length = sums[i]
+        out.append(Item(
+            activity_id, lat, lng, start + timedelta(seconds=duration * i / n), max(int(duration / n), 60),
+            dir_x=east / length if length > 0 else None, dir_y=north / length if length > 0 else None,
+            part=i, parts=n,
+        ))
+    return out

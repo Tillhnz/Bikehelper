@@ -167,7 +167,7 @@ export function PatternsView({ bikeId }) {
       </div>
       <Insights items={[
         c.wet_dry && `Bei Regen fährst du ${fmtNum(Math.abs(c.wet_dry.delta_pct), 1)} % ${c.wet_dry.delta_pct < 0 ? "langsamer" : "schneller"} als bei trockenen Fahrten (${fmtNum(c.wet_dry.wet, 1)} gegen ${fmtNum(c.wet_dry.dry, 1)} km/h).`,
-        c.wind_cost_pct != null && `Bei starkem Wind liegt dein Tempo ${fmtNum(Math.abs(c.wind_cost_pct), 1)} % ${c.wind_cost_pct < 0 ? "unter" : "über"} dem bei Windstille. Die Windrichtung ist nicht gespeichert, es ist also ein Mittel aus Gegen- und Rückenwind.`,
+        c.wind_cost_pct != null && `Bei starkem Wind liegt dein Tempo ${fmtNum(Math.abs(c.wind_cost_pct), 1)} % ${c.wind_cost_pct < 0 ? "unter" : "über"} dem bei Windstille. Bei Fahrten, die schon mit Windrichtung ausgewertet sind, siehst du unten zusätzlich das Tempo nach Gegen- und Rückenwind.`,
         c.most_rides_temp && `Die meisten Fahrten machst du bei ${c.most_rides_temp}.`,
         p.fastest_daypart && `Zu welcher Tageszeit du am schnellsten bist: ${p.fastest_daypart}.`,
         p.median_pause_days != null && `Typische Pause zwischen zwei Fahrtagen: ${p.median_pause_days} Tag${p.median_pause_days === 1 ? "" : "e"}, die längste war ${p.longest_pause_days} Tage.`,
@@ -179,6 +179,11 @@ export function PatternsView({ bikeId }) {
         <Panel title="Tempo nach Wind" sub="Mittlere Windgeschwindigkeit während der Fahrt.">
           <SpeedBars rows={w(c.wind).map((r, i) => ({ ...r, delta_pct: c.wind[i].delta_pct }))} color="var(--celeste)" />
         </Panel>
+        {c.headwind?.some((r) => r.value != null) && (
+          <Panel title="Tempo nach Gegen- und Rückenwind" sub="Wind in Fahrtrichtung, gemittelt über die Strecke. Bei Rundtouren heben sich Gegen- und Rückenwind teilweise auf.">
+            <SpeedBars rows={w(c.headwind).map((r, i) => ({ ...r, delta_pct: c.headwind[i].delta_pct }))} color="var(--celeste)" />
+          </Panel>
+        )}
         {c.power_by_temp.some((r) => r.value != null) && (
           <Panel title="Leistung nach Temperatur" sub="Durchschnittliche Wattzahl der Fahrten.">
             <Bars data={c.power_by_temp.map((r) => ({ label: r.label, value: r.value ?? 0, sub: `${r.rides} Fahrten` }))} unit="W" color="var(--signal)" />

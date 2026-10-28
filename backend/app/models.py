@@ -225,6 +225,9 @@ class Activity(Base):
     temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
     wind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
+    wind_dir: Mapped[float | None] = mapped_column(Float, nullable=True)  # Grad, aus der der Wind im Mittel kam (0 = Nord)
+    headwind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)  # mittlerer Gegenwind entlang der Strecke, negativ = Rückenwind
+    weather_pts: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Zahl der Streckenabschnitte mit eigenem Wetter; NULL = nur Startpunkt (alt)
     wet_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Regen oder nasser Straße
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # WMO-Wettercode (höchster während der Fahrt)
     weather_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | prelim | none; leer = offen
