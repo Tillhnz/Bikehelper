@@ -528,10 +528,6 @@ export default function Advisor() {
               </div>
             )}
 
-            <div className="stage-view">
-              <BikeIllustration type={form.bike_type} tireMm={form.tire_width_mm} ground={form.surface} ride className="stage-ill" title={`${BIKE_TYPES[form.bike_type]} auf ${SURFACES.find((s) => s.value === form.surface)?.label}`} />
-            </div>
-
             <div className="stage-controls">
               {!widthKnown && (
                 <Slider
