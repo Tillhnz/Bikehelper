@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28.4",
+    "date": "2026-10-28",
+    "title": "Reifen in der Garage eingeklappt",
+    "changes": [
+      "Reifensätze sind wie die Komponenten zunächst eingeklappt und zeigen Name, Kilometer und Status. „Alle aufklappen“ und „Alle zuklappen“ gelten auch für sie."
+    ]
+  },
+  {
     "id": "2026-10-28.3",
     "date": "2026-10-28",
     "title": "Sichtprüfung mit drei Ergebnissen",

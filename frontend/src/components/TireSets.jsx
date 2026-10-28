@@ -262,7 +262,9 @@ function MountRow({ m, onSave, onDelete }) {
   );
 }
 
-function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
+function SetCard({ ts, run, onEdit, hasMounted, bestWatts, expandSignal }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (expandSignal) setOpen(expandSignal.open); }, [expandSignal]);
   const [panel, setPanel] = useState(null); // "mount" | "past" | null
   const [day, setDay] = useState(today());
   const [past, setPast] = useState({ from_date: today(), to_date: today() });
@@ -273,21 +275,23 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
 
   return (
     <article className={`tire-set ${ts.mounted ? "mounted" : ""} ${ts.retired ? "retired" : ""}`}>
-      <header className="component-head">
-        <div>
+      <button type="button" className="component-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="chevron" aria-hidden="true" />
+        <span className="component-title">
           <span className="muted small">
             {[ts.brand, ts.width_mm ? `${fmtNum(ts.width_mm, 0)} mm` : null, ts.tubeless === false ? "mit Schlauch" : ts.tubeless ? "tubeless" : null]
               .filter(Boolean).join(" · ") || "Reifensatz"}
           </span>
           <h3>{ts.name}</h3>
-        </div>
-        <div className="component-km">
-          <strong><CountUp value={ts.km} /></strong> <span className="muted">km</span>
+        </span>
+        <span className="component-km">
+          <strong>{fmtKm(ts.km)}</strong> <span className="muted">km</span>
           {ts.mounted && <span className="pill pill-ok">Montiert seit {fmtDate(ts.mounted_since)}</span>}
           {ts.retired && <span className="pill pill-muted">Ausgemustert</span>}
           {!ts.retired && ts.status !== "ok" && <StatusPill status={ts.status} />}
-        </div>
-      </header>
+        </span>
+      </button>
+      {open && <div className="component-body">
 
       {ts.max_km ? (
         <>
@@ -390,6 +394,7 @@ function SetCard({ ts, run, onEdit, hasMounted, bestWatts }) {
           </ul>
         </details>
       )}
+      </div>}
     </article>
   );
 }
@@ -455,7 +460,7 @@ function CatalogManager() {
 }
 
 /** Reifensätze eines Rades: welcher Satz montiert ist und wie viele Kilometer jeder hat. */
-export default function TireSets({ bike, onChanged }) {
+export default function TireSets({ bike, onChanged, expandSignal }) {
   const [sets, setSets] = useState(null);
   const [form, setForm] = useState(null); // {mode: "add" | "edit", ts?}
   const [error, setError] = useState("");
@@ -545,7 +550,7 @@ export default function TireSets({ bike, onChanged }) {
         </div>
       ) : (
         <div className="component-list">
-          {active.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} bestWatts={bestWatts} />)}
+          {active.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} bestWatts={bestWatts} expandSignal={expandSignal} />)}
         </div>
       )}
 
@@ -555,7 +560,7 @@ export default function TireSets({ bike, onChanged }) {
         <details className="howto" style={{ marginTop: "1rem" }}>
           <summary>Ausgemusterte Sätze ({retired.length})</summary>
           <div className="component-list" style={{ marginTop: "0.75rem" }}>
-            {retired.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} />)}
+            {retired.map((ts) => <SetCard key={ts.id} ts={ts} run={run} onEdit={onEdit} hasMounted={hasMounted} expandSignal={expandSignal} />)}
           </div>
         </details>
       )}

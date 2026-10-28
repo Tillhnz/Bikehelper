@@ -704,13 +704,13 @@ export default function BikeDetail() {
         <BikeEdit bike={bike} onCancel={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />
       )}
 
-      <TireSets bike={bike} onChanged={load} />
+      <TireSets bike={bike} onChanged={load} expandSignal={expandSignal} />
 
       <header className="page-head">
         <h2>Komponenten <span className="muted small">{active.length}{dueCount > 0 ? `, ${dueCount} fällig` : ""}</span></h2>
         {!adding && (
           <div className="actions" style={{ marginTop: 0 }}>
-            {active.length > 1 && (
+            {active.length > 0 && (
               <>
                 <button className="btn small" onClick={() => setExpandSignal({ open: true })}>Alle aufklappen</button>
                 <button className="btn small" onClick={() => setExpandSignal({ open: false })}>Alle zuklappen</button>
