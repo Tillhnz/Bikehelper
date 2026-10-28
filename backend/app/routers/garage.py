@@ -13,8 +13,8 @@ from ..schemas import (
 from ..security import current_user
 from ..services import (
     apply_chain_lube, bike_total_km, component_km, component_status, create_default_components, current_tire_set,
-    effective_installed, is_tracked, measurement_points, open_mount,
-    rule_state, tire_set_km, tire_state, visual_applies, worst_status,
+    effective_installed, is_replacement_rule, is_tracked, measurement_points, open_mount,
+    rule_state, tire_set_km, tire_state, worst_status,
 )
 
 router = APIRouter(prefix="/api", tags=["garage"])
@@ -95,7 +95,7 @@ def _rule_out(db: Session, c: Component, r: MaintenanceRule) -> RuleOut:
     )
     return RuleOut(
         id=r.id, label=r.label, interval_km=interval_km, interval_months=r.interval_months,
-        wet_factor=r.wet_factor or 1.0, hint=r.hint, is_inspection=r.label in INSPECTIONS, visual_check=visual_applies(r), variants=variants, guides=guides_for(r.label), **st,
+        wet_factor=r.wet_factor or 1.0, hint=r.hint, is_inspection=r.label in INSPECTIONS, visual_check=is_replacement_rule(r), variants=variants, guides=guides_for(r.label), **st,
     )
 
 

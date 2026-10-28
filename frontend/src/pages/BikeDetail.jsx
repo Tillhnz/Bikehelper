@@ -94,11 +94,11 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
   );
 }
 
-const CHECK_RESULT = { good: "okay", watch: "im Auge behalten", replace: "austauschen" };
+const CHECK_RESULT = { good: "okay", watch: "im Auge behalten", replace: "austauschen oder warten" };
 const CHECK_OPTIONS = [
   ["good", "Völlig okay", "Keine Auffälligkeiten. Das Intervall startet ab heute neu."],
   ["watch", "Im Auge behalten", "Noch fahrbar, aber mittelfristig beobachten. Das Intervall startet neu, wird aber halbiert."],
-  ["replace", "Schlecht, austauschen", "Das Teil muss ersetzt werden. Es wird sofort als fällig markiert."],
+  ["replace", "Schlecht, austauschen oder warten", "Das Teil muss ersetzt oder gewartet werden. Die Regel wird sofort als fällig markiert."],
 ];
 
 /** Sichtprüfung einer Komponente mit drei Ergebnissen. Wirkt auf die Wechselregeln, setzt aber keine Wartung zurück. */
@@ -177,7 +177,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   const a = rule.assessment;
   const RESULTS = CHECK_RESULT;
   const visualLine = a?.visual && (a.result === "replace"
-    ? `Sichtprüfung am ${fmtDate(a.date)}: austauschen, jetzt fällig.`
+    ? `Sichtprüfung am ${fmtDate(a.date)}: Austausch oder Wartung nötig, jetzt fällig.`
     : a.result === "watch"
       ? `Sichtprüfung am ${fmtDate(a.date)}: im Auge behalten, Intervall halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
       : `Sichtprüfung am ${fmtDate(a.date)}: okay, Intervall startet neu.`);

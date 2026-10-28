@@ -138,6 +138,14 @@ def visual_applies(rule: MaintenanceRule) -> bool:
         return False  # Bremsbeläge haben ihre eigene Prüfregel
     if any(w in label for w in ("Flüssigkeit", "Dichtmilch")):
         return False
+    return is_replacement_rule(rule) or "warten" in label  # Lager (Steuersatz, Innenlager, Naben): Spiel und Lauf lassen sich prüfen
+
+
+def is_replacement_rule(rule: MaintenanceRule) -> bool:
+    """Regel zum Austausch des Teils; sie wird über Sichtprüfung oder „Teil gewechselt“ erledigt."""
+    label = rule.label
+    if label in WEAR_TO_INSPECTION or label in INSPECTIONS or any(w in label for w in ("Flüssigkeit", "Dichtmilch")):
+        return False
     return any(w in label for w in ("wechseln", "erneuern"))
 
 

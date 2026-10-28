@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-28.7",
+    "date": "2026-10-28",
+    "title": "Sichtprüfung auch für Lager",
+    "changes": [
+      "Die Sichtprüfung wirkt jetzt auch auf die Lagerwartung von Steuersatz, Innenlager und Naben: okay startet das Intervall neu, im Auge behalten halbiert es, schlecht macht die Wartung sofort fällig.",
+      "„Erledigt“ bleibt dort für die echte Wartung erhalten."
+    ]
+  },
+  {
     "id": "2026-10-28.6",
     "date": "2026-10-28",
     "title": "Weniger Knöpfe bei Wechselregeln",

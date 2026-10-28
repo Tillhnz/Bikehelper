@@ -122,9 +122,9 @@ In jeder Komponente (Garage, Rad öffnen) gibt es unter der Anleitung „Sichtpr
 
 - **Völlig okay:** Das Intervall startet am Prüftag neu, Kilometer und Monate zählen ab dann von null.
 - **Im Auge behalten:** Das Intervall startet ebenfalls neu, wird aber halbiert (Kilometer und Monate). Bei einer Kette mit 5000 km Intervall wird sie nach 2500 km wieder fällig.
-- **Schlecht, austauschen:** Die Wechselregel („… wechseln“, „… erneuern“) ist sofort fällig, bis ein neuerer Wartungseintrag existiert.
+- **Schlecht, austauschen oder warten:** Die Regel („… wechseln“, „… erneuern“, bei Lagern „… warten“) ist sofort fällig, bis ein neuerer Wartungseintrag existiert.
 
-Bei diesen Wechselregeln gibt es kein „Erledigt“ mehr: Du trägst entweder eine Sichtprüfung ein oder wählst „Teil gewechselt“. „Erledigt“ bleibt bei Schmierung, Flüssigkeiten, Dichtmilch, Lagerwartung und Prüfregeln. Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
+Bei diesen Wechselregeln gibt es kein „Erledigt“ mehr: Du trägst entweder eine Sichtprüfung ein oder wählst „Teil gewechselt“. „Erledigt“ bleibt bei Schmierung, Flüssigkeiten, Dichtmilch, Lagerwartung und Prüfregeln (bei der Lagerwartung für die echte Wartung). Die Sichtprüfung wirkt auf die Wechselregeln der Komponente und auf die Lagerwartung (Steuersatz, Innenlager, Naben: Spiel und Lauf prüfen), nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
 
 ## Startseite, Inventar, Anleitungen und Orte
 
