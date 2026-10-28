@@ -1212,3 +1212,6 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .duel-lines li span:first-child{text-align:right}
 .duel-lines .win{font-weight:700;color:var(--celeste)}
 @media (prefers-reduced-motion:reduce){.group-goal .goal-bar span{transition:none}}
+
+.tour-list{margin:.4rem 0;padding-left:1.2rem;font-size:.9rem;display:grid;gap:.35rem}
+.tour-card{max-height:calc(100vh - 7rem);overflow-y:auto}

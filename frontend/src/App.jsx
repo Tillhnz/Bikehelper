@@ -77,10 +77,12 @@ export default function App() {
   }
 
   return (
+    <>
+    {/* Außerhalb von Shell: Shell baut seinen Inhalt bei jedem Seitenwechsel neu auf, der Rundgang würde sonst bei Schritt 1 neu beginnen */}
+    <FeedbackHost />
+    {user.tour && <Tour onClose={() => setUser((u) => ({ ...u, tour: false }))} />}
+    <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
     <Shell user={user} onLogout={logout}>
-      <FeedbackHost />
-      {user.tour && <Tour onClose={() => setUser((u) => ({ ...u, tour: false }))} />}
-      <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
       <ErrorBoundary>
       <Routes>
         <Route path="/" element={<Home />} />
@@ -102,5 +104,6 @@ export default function App() {
       </Routes>
       </ErrorBoundary>
     </Shell>
+    </>
   );
 }

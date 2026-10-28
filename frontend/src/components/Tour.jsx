@@ -7,6 +7,12 @@ const STEPS = [
   { title: "Garage: deine Räder", to: "/garage", nav: "/garage", text: "Hier legst du deine Räder an, mit Typ, Marke, Kaufdatum und Kilometerstand. Beim Anlegen kann BikeHelper gleich die üblichen Komponenten wie Kette, Kassette und Bremsbeläge mit passenden Wartungsregeln mitanlegen. Eine Kachel öffnet das Rad." },
   { title: "Komponenten und Wartung", to: "/garage", nav: "/garage", text: "In jedem Rad siehst du die Komponenten mit ihrem Zustand, trägst Wartungen und Sichtprüfungen ein und bekommst Hinweise, was fällig ist. Wichtig: Gib bei Teilen das Einbaudatum an, denn ohne Datum kann BikeHelper keine Kilometer rechnen. Auch Reifensätze mit Restkilometern findest du dort." },
   { title: "Fahrten importieren", to: "/rides", nav: "/rides", text: "Die Kilometer kommen aus deinen Fahrten. Du kannst deinen Strava-Export importieren (kein Abo nötig), GPX-, FIT- und TCX-Dateien hochladen oder intervals.icu in den Einstellungen verbinden (dort hängt dein Radcomputer von Wahoo, Garmin oder Hammerhead dran), dann kommen neue Fahrten von selbst. Fahrten ohne Rad ordnest du hier zu, BikeHelper macht dir Vorschläge." },
+  { title: "Strava-Export holen", to: "/rides", nav: "/rides", text: "Mit dem Datenexport von Strava kommt deine ganze Historie auf einmal in BikeHelper. Ein Strava-Abo brauchst du dafür nicht. Das dauert, lass die Anfrage am besten gleich laufen:", list: [
+    "Strava im Browser öffnen: Einstellungen, „Mein Konto“, „Dein Konto herunterladen“, „Loslegen“, „Download anfordern“. Die Menünamen können sich ändern.",
+    "Vorher die Sprache des Strava-Kontos auf Englisch stellen, sonst werden die Räder nicht automatisch zugeordnet.",
+    "Strava schickt eine E-Mail mit dem Download-Link, das kann einige Stunden dauern.",
+    "Die ZIP-Datei unter „Fahrten“ hochladen, ohne sie zu entpacken. Die Anleitung steht dort auch unter „So bekommst du den Export“.",
+  ] },
   { title: "Start: das steht an", to: "/", nav: "/", text: "Die Startseite zeigt, was als Nächstes ansteht, deine Woche, Jahresziele und Hinweise, etwa zur Kettenpflege nach einer nassen Fahrt. Wartung, die fällig wird, erscheint hier zuerst." },
   { title: "Ratgeber", to: "/advisor", nav: "/advisor", text: "Der Ratgeber rechnet dir den Reifendruck für Gewicht, Reifen und Untergrund aus, schlägt Kleidung fürs Wetter vor und zeigt das Wetter während deiner Tour." },
   { title: "Statistik und Heatmap", to: "/stats", nav: "/stats", text: "Die Statistik zeigt Übersicht, Belastung, Leistung mit FTP, Muster und Wetter, Räder im Vergleich, Stammrunden, Jahresrückblick, Ziele, Vergleiche und besuchte Orte. Im Tab „Heatmap“ siehst du alle gefahrenen Strecken auf der Karte, mit erkundeten Kacheln und einem Zeitverlauf." },
@@ -17,15 +23,22 @@ const STEPS = [
   ] },
 ];
 
+const KEY = "bikehelper.tour.step";
+const saved = {
+  get: () => { try { const n = Number(sessionStorage.getItem(KEY)); return Number.isInteger(n) && n >= 0 && n < STEPS.length ? n : 0; } catch { return 0; } },
+  set: (n) => { try { sessionStorage.setItem(KEY, String(n)); } catch { /* ohne Speicher: beginnt bei Neuladen von vorn */ } },
+  clear: () => { try { sessionStorage.removeItem(KEY); } catch { /* egal */ } },
+};
+
 /** Geführter Rundgang für neue Konten: springt von Seite zu Seite, hebt den passenden Menüpunkt hervor. */
 export default function Tour({ onClose }) {
   const navigate = useNavigate();
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(saved.get);
   const nextRef = useRef(null);
   const step = STEPS[i];
 
   // Der erste Schritt bleibt auf der aktuellen Seite (zum Beispiel einer Gruppeneinladung); danach springt der Rundgang mit
-  useEffect(() => { if (i > 0) navigate(step.to); }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { saved.set(i); if (i > 0) navigate(step.to); }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!step.nav) return undefined;
@@ -38,6 +51,7 @@ export default function Tour({ onClose }) {
   useEffect(() => { nextRef.current?.focus(); }, [i]);
 
   async function finish(to) {
+    saved.clear();
     onClose();
     try { await api.post("/me/tour/done", {}); } catch { /* beim nächsten Start erneut */ }
     if (to) navigate(to);
@@ -48,6 +62,7 @@ export default function Tour({ onClose }) {
       <p className="muted small tour-count">Schritt {i + 1} von {STEPS.length}</p>
       <h3 id="tour-title">{step.title}</h3>
       <p>{step.text}</p>
+      {step.list && <ol className="tour-list">{step.list.map((t) => <li key={t}>{t}</li>)}</ol>}
       {step.todo && (
         <ul className="tour-todo">
           {step.todo.map(([label, to]) => <li key={to}><button className="link" onClick={() => finish(to)}>{label}</button></li>)}
