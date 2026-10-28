@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-28.6",
+    "date": "2026-10-28",
+    "title": "Weniger Knöpfe bei Wechselregeln",
+    "changes": [
+      "Bei Regeln wie „Kette wechseln“ oder „Lenkerband erneuern“ entfällt „Erledigt“. Du trägst eine Sichtprüfung ein oder nutzt „Teil gewechselt“."
+    ]
+  },
+  {
     "id": "2026-10-28.5",
     "date": "2026-10-28",
     "title": "Wetter und Wind entlang der Strecke",

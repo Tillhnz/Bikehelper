@@ -124,7 +124,7 @@ In jeder Komponente (Garage, Rad öffnen) gibt es unter der Anleitung „Sichtpr
 - **Im Auge behalten:** Das Intervall startet ebenfalls neu, wird aber halbiert (Kilometer und Monate). Bei einer Kette mit 5000 km Intervall wird sie nach 2500 km wieder fällig.
 - **Schlecht, austauschen:** Die Wechselregel („… wechseln“, „… erneuern“) ist sofort fällig, bis ein neuerer Wartungseintrag existiert.
 
-Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
+Bei diesen Wechselregeln gibt es kein „Erledigt“ mehr: Du trägst entweder eine Sichtprüfung ein oder wählst „Teil gewechselt“. „Erledigt“ bleibt bei Schmierung, Flüssigkeiten, Dichtmilch, Lagerwartung und Prüfregeln. Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
 
 ## Startseite, Inventar, Anleitungen und Orte
 

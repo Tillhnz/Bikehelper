@@ -158,6 +158,7 @@ class RuleOut(RuleIn):
     variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
     guides: list[dict] | None = None  # Anleitungen und Videos zur Aufgabe
     measure: dict | None = None  # Hochrechnung aus der letzten Kettenmessung (nur Verschleißregel der Kette)
+    visual_check: bool = False  # Wechselregel: wird über Sichtprüfung oder „Teil gewechselt“ erledigt, nicht über „Erledigt“
     is_inspection: bool = False  # Prüfregel: beim Eintragen wird ein Ergebnis gewählt
     assessment: dict | None = None  # Prüfergebnis, das Intervall dieser Regel beeinflusst (Prüf- und Wechselregel)
     km_since: float

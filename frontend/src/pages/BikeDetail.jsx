@@ -214,7 +214,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               {guideOpen ? "Anleitungen ausblenden" : "Anleitung"}
             </button>
           )}
-          {!disabled && <button className="link small" onClick={() => setOpen(!open)}>Erledigt</button>}
+          {!disabled && !rule.visual_check && <button className="link small" onClick={() => setOpen(!open)}>Erledigt</button>}
           <button className="link small" onClick={onDelete}>Regel löschen</button>
         </span>
       </div>
