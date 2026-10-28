@@ -393,18 +393,21 @@ def test_visual_check_of_a_component_has_three_results():
         today = date.today().isoformat()
 
         assert c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today}).status_code == 422  # ohne Ergebnis
+        # okay: das Intervall startet neu, das Teil gilt als geprüft
         good = c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "good"}).json()
-        w, _ = wear()
+        w, others_good = wear()
         assert good["result"] == "good" and good["rule_id"] is None
-        assert w["assessment"]["result"] == "good" and w["progress"] == w0["progress"] and round(w["km_since"]) == 1200  # setzt nichts zurück
+        assert w["assessment"]["result"] == "good" and round(w["km_since"]) == 0 and w["progress"] < w0["progress"] and w["interval_km"] == interval
+        assert all(round(r["km_since"]) == 1200 for r in others_good if "schmieren" in r["label"])  # Schmierregel läuft unabhängig weiter
 
+        # im Auge behalten: Intervall startet neu und wird halbiert
         c.delete(f"/api/logs/{good['id']}", headers=h)
         c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "watch"})
         w, _ = wear()
-        assert w["assessment"]["result"] == "watch" and round(w["interval_km"]) == round(1200 + (interval - 1200) * 0.5)  # Restlaufzeit halbiert
-        assert w["progress"] > w0["progress"] and round(w["km_since"]) == 1200
-        assert w["assessment"]["km_left"] == round(w["interval_km"] - 1200)
+        assert w["assessment"]["result"] == "watch" and round(w["km_since"]) == 0 and w["interval_km"] == round(interval * 0.5)
+        assert abs(w["assessment"]["km_left"] - w["interval_km"]) <= 1
 
+        # austauschen: sofort fällig
         c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": today, "result": "replace"})
         w, others_after = wear()
         assert w["status"] == "due" and w["assessment"]["result"] == "replace"

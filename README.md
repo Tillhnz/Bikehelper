@@ -120,11 +120,11 @@ Die Werte 50 %, 80 % und 40 % sind Schätzungen (`GOOD_MAX_RATIO`, `WATCH_MIN_RA
 
 In jeder Komponente (Garage, Rad öffnen) gibt es unter der Anleitung „Sichtprüfung eintragen“ mit drei Ergebnissen:
 
-- **Völlig okay:** Es ändert sich nichts, die Prüfung wird nur vermerkt.
-- **Im Auge behalten:** Die Restlaufzeit ab dem Prüftag wird halbiert (Kilometer und Monate). Bei 1200 von 5000 km Kettenlebensdauer bleiben dann 1900 statt 3800 km, die Kette wird früher fällig.
-- **Schlecht, austauschen:** Die Wechselregel („… wechseln“, „… erneuern“) ist sofort fällig.
+- **Völlig okay:** Das Intervall startet am Prüftag neu, Kilometer und Monate zählen ab dann von null.
+- **Im Auge behalten:** Das Intervall startet ebenfalls neu, wird aber halbiert (Kilometer und Monate). Bei einer Kette mit 5000 km Intervall wird sie nach 2500 km wieder fällig.
+- **Schlecht, austauschen:** Die Wechselregel („… wechseln“, „… erneuern“) ist sofort fällig, bis ein neuerer Wartungseintrag existiert.
 
-Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch, und sie ist keine Wartung: Zähler werden nicht zurückgesetzt. Sie gilt bis zur nächsten Wartung oder zum Wechsel dieser Regel. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
+Die Sichtprüfung wirkt auf die Wechselregeln der Komponente, nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
 
 ## Startseite, Inventar, Anleitungen und Orte
 

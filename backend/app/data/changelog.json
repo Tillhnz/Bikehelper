@@ -5,7 +5,7 @@
     "title": "Sichtprüfung mit drei Ergebnissen",
     "changes": [
       "Bei jeder Komponente kannst du eine Sichtprüfung eintragen: völlig okay, im Auge behalten oder schlecht und austauschen.",
-      "„Im Auge behalten“ halbiert die Restlaufzeit des Teils, „austauschen“ macht den Wechsel sofort fällig. Die Prüfung setzt keine Wartung zurück und steht im Wartungsverlauf."
+      "„Völlig okay“ startet das Intervall neu, „im Auge behalten“ startet es neu und halbiert es, „austauschen“ macht den Wechsel sofort fällig. Die Prüfung steht im Wartungsverlauf."
     ]
   },
   {

@@ -96,8 +96,8 @@ function ComponentForm({ bikeId, catalog, onCreated, onCancel }) {
 
 const CHECK_RESULT = { good: "okay", watch: "im Auge behalten", replace: "austauschen" };
 const CHECK_OPTIONS = [
-  ["good", "Völlig okay", "Keine Auffälligkeiten. Es ändert sich nichts, die Prüfung wird nur vermerkt."],
-  ["watch", "Im Auge behalten", "Noch fahrbar, aber mittelfristig beobachten. Die Restlaufzeit wird halbiert, das Teil wird früher fällig."],
+  ["good", "Völlig okay", "Keine Auffälligkeiten. Das Intervall startet ab heute neu."],
+  ["watch", "Im Auge behalten", "Noch fahrbar, aber mittelfristig beobachten. Das Intervall startet neu, wird aber halbiert."],
   ["replace", "Schlecht, austauschen", "Das Teil muss ersetzt werden. Es wird sofort als fällig markiert."],
 ];
 
@@ -179,8 +179,8 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   const visualLine = a?.visual && (a.result === "replace"
     ? `Sichtprüfung am ${fmtDate(a.date)}: austauschen, jetzt fällig.`
     : a.result === "watch"
-      ? `Sichtprüfung am ${fmtDate(a.date)}: im Auge behalten, Restlaufzeit halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
-      : `Sichtprüfung am ${fmtDate(a.date)}: okay.`);
+      ? `Sichtprüfung am ${fmtDate(a.date)}: im Auge behalten, Intervall halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
+      : `Sichtprüfung am ${fmtDate(a.date)}: okay, Intervall startet neu.`);
   const assessLine = visualLine || a && (rule.is_inspection
     ? `Letzte Prüfung am ${fmtDate(a.date)}: ${RESULTS[a.result]}${a.result === "watch" ? ", früher erneut prüfen" : ""}.`
     : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}, angepasstes Intervall ${fmtKm(a.interval_km)} km.`);

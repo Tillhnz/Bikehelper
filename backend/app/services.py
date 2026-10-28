@@ -88,18 +88,26 @@ def months_between(start: date, end: date) -> float:
 
 
 def is_visual_check(log: MaintenanceLog) -> bool:
-    """Sichtprüfung der ganzen Komponente (gut, beobachten, wechseln): zählt nicht als Wartung und setzt nichts zurück."""
+    """Sichtprüfung der ganzen Komponente (okay, im Auge behalten, austauschen), nicht an eine Regel gebunden."""
     return log.rule_id is None and log.result is not None
 
 
+def _counts(log: MaintenanceLog, rule: MaintenanceRule) -> bool:
+    """Gilt dieser Eintrag als Erledigt-Vermerk für die Regel? Einträge ohne Regelbezug gelten für alle Regeln der Komponente.
+    Eine Sichtprüfung mit okay oder im Auge behalten startet die Wechselregeln neu, "austauschen" tut das nicht."""
+    if is_visual_check(log):
+        return log.result in ("good", "watch") and visual_applies(rule)
+    return log.rule_id in (None, rule.id)
+
+
 def last_done(comp: Component, rule: MaintenanceRule) -> date | None:
-    """Letzte Wartung dieser Regel; Einträge ohne Regelbezug gelten für alle Regeln der Komponente."""
-    return max((l.performed_at for l in comp.logs if l.rule_id in (None, rule.id) and not is_visual_check(l)), default=None)
+    """Letzte Wartung dieser Regel."""
+    return max((l.performed_at for l in comp.logs if _counts(l, rule)), default=None)
 
 
 def last_log(comp: Component, rule: MaintenanceRule) -> MaintenanceLog | None:
     """Jüngster Wartungseintrag, der für diese Regel gilt (bei gleichem Datum der zuletzt angelegte)."""
-    logs = [l for l in comp.logs if l.rule_id in (None, rule.id) and not is_visual_check(l)]
+    logs = [l for l in comp.logs if _counts(l, rule)]
     return max(logs, key=lambda l: (l.performed_at, l.performed_time or time.min, l.id or 0), default=None)
 
 
@@ -121,7 +129,7 @@ def inspection_result(comp: Component, rule: MaintenanceRule, after: date | None
 
 
 # Die Sichtprüfung der Komponente wirkt auf Regeln, die das Teil austauschen. Flüssigkeiten und Dichtmilch lassen sich nicht ansehen.
-VISUAL_WATCH_FACTOR = 0.5  # "im Auge behalten": die Restlaufzeit wird halbiert
+VISUAL_WATCH_FACTOR = 0.5  # "im Auge behalten": das Intervall wird halbiert
 
 
 def visual_applies(rule: MaintenanceRule) -> bool:
@@ -133,10 +141,12 @@ def visual_applies(rule: MaintenanceRule) -> bool:
     return any(w in label for w in ("wechseln", "erneuern"))
 
 
-def visual_check(comp: Component, after: date | None = None) -> MaintenanceLog | None:
-    """Jüngste Sichtprüfung der Komponente (nur ab `after`, also nach der letzten Wartung dieser Regel)."""
-    logs = [l for l in comp.logs if is_visual_check(l) and (after is None or l.performed_at >= after)]
-    return max(logs, key=lambda l: (l.performed_at, l.performed_time or time.min, l.id or 0), default=None)
+def visual_replace_after(comp: Component, entry: MaintenanceLog | None) -> MaintenanceLog | None:
+    """Sichtprüfung "austauschen", die jünger ist als der letzte Erledigt-Vermerk der Regel (danach hat sich nichts getan)."""
+    def key(l):
+        return (l.performed_at, l.performed_time or time.min, l.id or 0)
+    logs = [l for l in comp.logs if is_visual_check(l) and l.result == "replace" and (entry is None or key(l) > key(entry))]
+    return max(logs, key=key, default=None)
 
 
 def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date | None = None) -> dict:
@@ -158,31 +168,24 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             if interval_months:
                 interval_months = max(1, round(interval_months * factor))
             assessment = {"result": entry.result, "date": entry.performed_at.isoformat(), "interval_km": round(interval_km) if interval_km else None}
+    # Sichtprüfung der Komponente: okay startet das Intervall neu, im Auge behalten halbiert es, austauschen macht den Wechsel fällig
+    visual_replace = False
+    if assessment is None and visual_applies(rule):
+        if entry is not None and is_visual_check(entry):
+            if entry.result == "watch":
+                if interval_km:
+                    interval_km = interval_km * VISUAL_WATCH_FACTOR
+                if interval_months:
+                    interval_months = max(1, round(interval_months * VISUAL_WATCH_FACTOR))
+            assessment = {"result": entry.result, "date": entry.performed_at.isoformat(),
+                          "interval_km": round(interval_km) if interval_km else None, "visual": True}
+        bad = visual_replace_after(comp, entry)
+        if bad is not None:
+            visual_replace = True
+            assessment = {"result": "replace", "date": bad.performed_at.isoformat(), "interval_km": None, "km_left": 0, "visual": True}
     base = last or effective_installed(comp)
     # Mit Uhrzeit zählen nur Fahrten, die nach der Wartung begannen; ohne Uhrzeit der ganze Tag
     since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
-    # Sichtprüfung der Komponente: "beobachten" halbiert die Restlaufzeit ab dem Prüftag, "wechseln" macht die Regel fällig
-    visual = visual_check(comp, last) if assessment is None and base is not None and visual_applies(rule) else None
-    visual_replace = False
-    if visual is not None:
-        if visual.result == "replace":
-            visual_replace = True
-            assessment = {"result": "replace", "date": visual.performed_at.isoformat(), "interval_km": None, "km_left": 0, "visual": True}
-        elif visual.result == "watch":
-            km_cut = months_cut = None
-            if interval_km:
-                eff_at = wear_between(db, comp.bike_id, since, visual.performed_at, rule.wet_factor)[2] + (comp.start_km if last is None else 0)
-                if eff_at < interval_km:
-                    interval_km = eff_at + (interval_km - eff_at) * VISUAL_WATCH_FACTOR
-                km_cut = round(interval_km)
-            if interval_months:
-                m_at = months_between(base, visual.performed_at)
-                if m_at < interval_months:
-                    interval_months = m_at + (interval_months - m_at) * VISUAL_WATCH_FACTOR
-                months_cut = round(interval_months, 1)
-            assessment = {"result": "watch", "date": visual.performed_at.isoformat(), "interval_km": km_cut, "interval_months": months_cut, "visual": True}
-        else:
-            assessment = {"result": "good", "date": visual.performed_at.isoformat(), "interval_km": None, "visual": True}
     if base is None:
         # Ohne Einbaudatum und ohne Wartungseintrag lässt sich nichts zählen.
         return {
