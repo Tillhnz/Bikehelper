@@ -123,42 +123,107 @@ def _round(v: float | None, n: int = 1) -> float | None:
 
 
 POWER_CURVE_SECONDS = (5, 30, 60, 300, 1200, 3600)
+DETAILS_VERSION = 2  # 2 = Sekundenauswertung (Leistungskurve, Verteilungen, NP); ältere Fahrten haben nur das Profil
+MAX_ANALYSIS_SECONDS = 16 * 3600
 
 
-def power_curve(points: list[Point]) -> dict | None:
-    """Beste Durchschnittsleistung über feste Zeiträume (Sekunden -> Watt) aus den Rohpunkten, auf 1 Hz gebracht.
-
-    Lücken über 10 s (Pausen, Funkloch) zählen als 0 W, damit eine Pause keine Spitzenwerte vortäuscht.
-    """
-    pts = [p for p in points if p.time is not None and p.pwr is not None]
+def per_second(points: list[Point], attr: str) -> list[float | None]:
+    """Messwert auf 1 Hz gebracht. Lücken über 10 s (Pause, Funkloch) und fehlende Werte sind None."""
+    pts = [p for p in points if p.time is not None and getattr(p, attr) is not None]
     if len(pts) < 10:
-        return None
+        return []
     t0 = pts[0].time
-    series: list[float] = []
+    series: list[float | None] = []
     for i, p in enumerate(pts):
         t = int((p.time - t0).total_seconds())
         if t < 0:
             continue
         nxt = int((pts[i + 1].time - t0).total_seconds()) if i + 1 < len(pts) else t + 1
         span = max(1, nxt - t)
-        val = max(0.0, float(p.pwr)) if span <= 10 else 0.0
-        fill = span if span <= 10 else 1
         while len(series) < t:
-            series.append(0.0)
-        series.extend([val] * fill)
-        if span > 10:
-            series.extend([0.0] * (span - 1))
-    if len(series) > 16 * 3600:
+            series.append(None)
+        if span <= 10:
+            series.extend([float(getattr(p, attr))] * span)
+        else:
+            series.append(float(getattr(p, attr)))
+            series.extend([None] * (span - 1))
+        if len(series) > MAX_ANALYSIS_SECONDS:
+            return []
+    return series
+
+
+def power_curve(points: list[Point], series: list[float | None] | None = None) -> dict | None:
+    """Beste Durchschnittsleistung über feste Zeiträume (Sekunden -> Watt) aus den Rohpunkten, auf 1 Hz gebracht.
+
+    Lücken über 10 s (Pausen, Funkloch) zählen als 0 W, damit eine Pause keine Spitzenwerte vortäuscht.
+    """
+    raw = per_second(points, "pwr") if series is None else series
+    if not raw:
         return None
+    vals = [max(0.0, v) if v is not None else 0.0 for v in raw]
     acc = [0.0]
-    for v in series:
+    for v in vals:
         acc.append(acc[-1] + v)
     out = {}
     for d in POWER_CURVE_SECONDS:
-        if len(series) >= d:
-            best = max(acc[i + d] - acc[i] for i in range(0, len(series) - d + 1))
+        if len(vals) >= d:
+            best = max(acc[i + d] - acc[i] for i in range(0, len(vals) - d + 1))
             out[str(d)] = round(best / d)
     return out or None
+
+
+def _hist(series: list[float | None], width: int, cap: int, include_zero: bool = True) -> dict[str, int] | None:
+    """Sekunden je Wertebereich (untere Grenze -> Sekunden). Werte über `cap` zählen in den obersten Bereich."""
+    out: dict[int, int] = {}
+    for v in series:
+        if v is None or (v <= 0 and not include_zero):
+            continue
+        k = int(min(max(v, 0.0), cap) // width * width)
+        out[k] = out.get(k, 0) + 1
+    return {str(k): n for k, n in sorted(out.items())} or None
+
+
+def _normalized_power(series: list[float | None]) -> float | None:
+    """Normalisierte Leistung: 4. Wurzel aus dem Mittel der 4. Potenz des 30-s-Schnitts (Pausen als 0 W)."""
+    vals = [max(0.0, v) if v is not None else 0.0 for v in series]
+    if len(vals) < 90:
+        return None
+    acc = [0.0]
+    for v in vals:
+        acc.append(acc[-1] + v)
+    roll = [(acc[i + 30] - acc[i]) / 30 for i in range(len(vals) - 29)]
+    return (sum(x ** 4 for x in roll) / len(roll)) ** 0.25
+
+
+def second_by_second(points: list[Point]) -> dict:
+    """Kennzahlen, die den Sekundenverlauf brauchen: Leistung (NP, Arbeit, Verteilung), Puls- und Frequenzverteilung, Entkopplung."""
+    out: dict = {}
+    pw, hr, cd = per_second(points, "pwr"), per_second(points, "hr"), per_second(points, "cad")
+    if pw:
+        valid = [v for v in pw if v is not None]
+        out["pc"] = power_curve(points, pw)
+        out["ph"] = _hist(pw, 10, 1500)
+        np_ = _normalized_power(pw)
+        out["np"] = round(np_) if np_ else None
+        out["kj"] = round(sum(max(0.0, v) for v in valid) / 1000)
+        out["pt"] = len(valid)  # Sekunden mit Leistungswert
+    hr = [v if v is None or v > 0 else None for v in hr]
+    if hr:
+        out["hh"] = _hist(hr, 5, 250)
+    if cd:
+        out["ch"] = _hist(cd, 10, 200)
+    # Entkopplung: Verhältnis Leistung zu Puls in der ersten und zweiten Hälfte
+    if pw and hr:
+        n = min(len(pw), len(hr))
+        pairs = [(pw[i], hr[i]) for i in range(n) if pw[i] is not None and hr[i] is not None]
+        if len(pairs) >= 2400:
+            half = len(pairs) // 2
+            def ef(chunk):
+                return (sum(a for a, _ in chunk) / len(chunk)) / (sum(b for _, b in chunk) / len(chunk))
+            e1, e2 = ef(pairs[:half]), ef(pairs[half:])
+            if e1 > 0:
+                out["dec"] = round((e1 - e2) / e1 * 100, 1)
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def build_details(points: list[Point], cum: list[float], segs: list[tuple[float, float]], total_m: float) -> dict | None:
@@ -245,7 +310,8 @@ def build_details(points: list[Point], cum: list[float], segs: list[tuple[float,
         "avg_cadence": _round(_avg(cads), 0),
         "avg_power": _round(_avg(pwrs), 0),
         "max_power": _round(max(pwrs), 0) if pwrs else None,
-        "pc": power_curve(points) if pwrs else None,
+        **(second_by_second(points) if (pwrs or hrs or cads) else {}),
+        "v": DETAILS_VERSION,
         "profile": profile,
     }
 

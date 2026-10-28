@@ -367,3 +367,122 @@ export function RideImpact({ id }) {
     </section>
   );
 }
+
+// ---------- Leistungsanalyse einer Fahrt (Fahrtseite) ----------
+
+function ZoneBars({ zones, colors }) {
+  const max = Math.max(1, ...zones.map((z) => z.seconds));
+  return (
+    <ul className="hbars zone-bars">
+      {zones.map((z, i) => (
+        <li key={z.name}>
+          <span className="hbar-label">{z.name}<br /><span className="muted small">{z.to == null ? `ab ${z.from}` : `${z.from}–${z.to}`}</span></span>
+          <span className="hbar-track"><span className="hbar-fill" style={{ width: `${(z.seconds / max) * 100}%`, background: colors[i % colors.length] }} /></span>
+          <span className="hbar-val">{fmtDuration(z.seconds)}<br /><span className="muted small">{fmtNum(z.pct, 0)} %</span></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const ZONE_COLORS = ["#7fb6ff", "#6fd3c3", "#8fd16a", "#f2b84b", "#ff9a52", "#ff6b6b", "#b48cf2"];
+const HR_COLORS = ["#7fb6ff", "#6fd3c3", "#f2b84b", "#ff9a52", "#ff6b6b"];
+
+export function RideAnalysis({ id }) {
+  const [d, setD] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setD(null);
+    setFailed(false);
+    api.get(`/stats/ride-analysis/${id}`).then(setD).catch(() => setFailed(true));
+  }, [id]);
+  if (failed || !d) return null;
+  const { power: p, hr, cadence: cad } = d;
+  if (!p && !hr && !cad) return null;
+  return (
+    <section className="panel" style={{ marginTop: "1.25rem" }}>
+      <h2>Leistungsanalyse</h2>
+      {!d.exact && (
+        <p className="muted small">
+          Diese Fahrt wurde importiert, bevor BikeHelper Sekundenwerte auswertete. Zonen und Spitzen sind aus dem Streckenprofil genähert und liegen eher zu niedrig.
+          Lade dieselbe Datei oder denselben Strava-Export noch einmal hoch, dann werden sie exakt (die Fahrt wird dabei ergänzt, nicht doppelt angelegt).
+        </p>
+      )}
+      {p && (
+        <>
+          <h3 className="chart-title">Leistung</h3>
+          <div className="kpis">
+            <Kpi value={fmtNum(p.avg, 0)} unit="W" label="Durchschnitt" />
+            {p.np && <Kpi value={fmtNum(p.np, 0)} unit="W" label="Normalisiert (NP)" />}
+            {p.max && <Kpi value={fmtNum(p.max, 0)} unit="W" label="Spitze" />}
+            {p.wkg && <Kpi value={fmtNum(p.wkg, 2)} unit="W/kg" label="Ø pro Kilo" />}
+            {p.kj && <Kpi value={fmtNum(p.kj, 0)} unit="kJ" label="Arbeit" />}
+            {p.vi && <Kpi value={fmtNum(p.vi, 2)} label="Variabilität (NP ÷ Ø)" />}
+            {p.if && <Kpi value={fmtNum(p.if, 2)} label="Intensität (IF)" />}
+            {p.tss && <Kpi value={fmtNum(p.tss, 0)} label="Trainingspunkte (TSS)" />}
+          </div>
+          <Insights items={[
+            p.vi && (p.vi < 1.05 ? "Sehr gleichmäßig gefahren (Variabilität unter 1,05)." : p.vi > 1.2 ? "Sehr unruhig gefahren, viele Antritte oder Wechsel (Variabilität über 1,2)." : null),
+            p.if && (p.if >= 1 ? "Intensität über 1,0: Das war an oder über deiner FTP." : p.if < 0.6 ? "Intensität unter 0,6: lockere Ausfahrt oder Erholung." : null),
+            !p.np && "Die normalisierte Leistung (NP) braucht den Sekundenverlauf und fehlt bei dieser Fahrt.",
+          ]} />
+          {p.zones ? (
+            <>
+              <h3 className="chart-title">Zeit in den Wattzonen <span className="muted small">(FTP {p.ftp} W)</span></h3>
+              <ZoneBars zones={p.zones} colors={ZONE_COLORS} />
+              <p className="muted small">{p.ftp_note}. Zonen nach Coggan.</p>
+            </>
+          ) : <p className="muted small">Für Wattzonen fehlt noch eine FTP-Schätzung. Sie entsteht aus Fahrten mit mindestens 20 Minuten Leistungsdaten.</p>}
+          {p.peaks.length > 0 && (
+            <>
+              <h3 className="chart-title">Spitzenwerte dieser Fahrt</h3>
+              <div className="scroll-x">
+                <table className="plain-table">
+                  <thead><tr><th>Dauer</th><th>Watt</th><th>W/kg</th><th>Dein Bestwert</th><th /></tr></thead>
+                  <tbody>
+                    {p.peaks.map((x) => (
+                      <tr key={x.label}>
+                        <td>{x.label}</td><td>{fmtNum(x.watts, 0)} W</td><td>{x.wkg ? fmtNum(x.wkg, 2) : "–"}</td>
+                        <td>{fmtNum(x.best, 0)} W</td>
+                        <td>{x.is_best ? "🏅 Bestwert" : `${fmtNum(x.pct_of_best, 0)} %`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {hr && (
+        <>
+          <h3 className="chart-title">Puls</h3>
+          <div className="kpis">
+            <Kpi value={fmtNum(hr.avg, 0)} unit="bpm" label={hr.avg_pct ? `Durchschnitt (${hr.avg_pct} % vom Maximum)` : "Durchschnitt"} />
+            {hr.max && <Kpi value={fmtNum(hr.max, 0)} unit="bpm" label="Höchster Puls" />}
+            {hr.ef && <Kpi value={fmtNum(hr.ef, 2)} label="Effizienz (Watt je Herzschlag)" />}
+            {hr.decoupling != null && <Kpi value={`${hr.decoupling > 0 ? "+" : ""}${fmtNum(hr.decoupling, 1)}`} unit="%" label="Entkopplung (Leistung zu Puls)" />}
+          </div>
+          {hr.decoupling != null && (
+            <Insights items={[hr.decoupling > 5
+              ? "Der Puls ist im Verhältnis zur Leistung in der zweiten Hälfte deutlich gestiegen (über 5 %). Das spricht für Ermüdung oder Hitze, bei langen Fahrten ist etwas Anstieg normal."
+              : hr.decoupling < 3 ? "Kaum Entkopplung (unter 3 %): Grundlage hält die Fahrt locker durch." : null]} />
+          )}
+          {hr.zones ? (
+            <>
+              <h3 className="chart-title">Zeit in den Pulszonen <span className="muted small">(Maximalpuls {hr.max_used})</span></h3>
+              <ZoneBars zones={hr.zones} colors={HR_COLORS} />
+              <p className="muted small">Maximalpuls: {hr.max_note}. Zonen in Prozent davon. <Link className="link" to="/settings">Maximalpuls einstellen</Link></p>
+            </>
+          ) : <p className="muted small">Für Pulszonen fehlt der Maximalpuls. <Link className="link" to="/settings">In den Einstellungen eintragen</Link>.</p>}
+        </>
+      )}
+      {cad && (
+        <>
+          <h3 className="chart-title">Trittfrequenz <span className="muted small">(Ø {fmtNum(cad.avg, 0)} U/min)</span></h3>
+          <HBars color="#7fb6ff" rows={cad.buckets.map((b) => ({ label: b.label, value: b.seconds, text: `${fmtDuration(b.seconds)} · ${fmtNum(b.pct, 0)} %` }))} />
+        </>
+      )}
+    </section>
+  );
+}

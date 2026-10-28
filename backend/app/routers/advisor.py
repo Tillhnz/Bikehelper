@@ -22,13 +22,15 @@ USER_AGENT = "BikeHelper (self-hosted)"
 
 class ProfileIn(BaseModel):
     weight_kg: float | None = Field(default=None, ge=30, le=250)
+    max_hr: int | None = Field(default=None, ge=120, le=230)
 
 
 @router.put("/settings/profile")
 def save_profile(data: ProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     user.weight_kg = data.weight_kg
+    user.max_hr = data.max_hr
     db.commit()
-    return {"weight_kg": user.weight_kg}
+    return {"weight_kg": user.weight_kg, "max_hr": user.max_hr}
 
 
 @router.get("/advisor/defaults")

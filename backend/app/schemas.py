@@ -54,6 +54,7 @@ class UserOut(BaseModel):
     strava_configured: bool
     strava_connected: bool
     weight_kg: float | None = None
+    max_hr: int | None = None
     is_admin: bool = False
     role: str = "user"
     mechanic_enabled: bool = False

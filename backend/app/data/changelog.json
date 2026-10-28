@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-10-28.2",
+    "date": "2026-10-28",
+    "title": "Leistungsanalyse pro Fahrt",
+    "changes": [
+      "Auf der Seite jeder Fahrt gibt es eine Leistungsanalyse: Zeit in den Wattzonen, normalisierte Leistung (NP), Intensität, Trainingspunkte, Arbeit in kJ und deine Spitzenwerte im Vergleich zu deinen Bestwerten.",
+      "Dazu Pulszonen, Effizienz und Entkopplung von Leistung und Puls sowie die Verteilung der Trittfrequenz.",
+      "Den Maximalpuls für die Pulszonen kannst du in den Einstellungen eintragen, sonst gilt der höchste Wert deiner Fahrten.",
+      "Neu importierte Fahrten werden sekundengenau ausgewertet. Ältere Fahrten sind genähert; lädst du dieselbe Datei oder denselben Strava-Export noch einmal hoch, werden sie ergänzt."
+    ]
+  },
+  {
     "id": "2026-10-28.1",
     "date": "2026-10-28",
     "title": "Einfluss jeder Fahrt auf Fitness und FTP",

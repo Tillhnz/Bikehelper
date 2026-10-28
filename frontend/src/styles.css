@@ -1217,3 +1217,5 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .tour-card{max-height:calc(100vh - 7rem);overflow-y:auto}
 .impact-kpi .kpi-value small{margin-left:.45rem;font-size:.95rem;font-weight:600}
 .impact-good{color:var(--celeste)}.impact-neutral{color:var(--amber)}
+.zone-bars li{align-items:center}
+.zone-bars .hbar-label{line-height:1.25}.zone-bars .hbar-val{text-align:right;line-height:1.25;min-width:5.5rem}

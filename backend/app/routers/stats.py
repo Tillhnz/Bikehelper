@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -54,7 +54,9 @@ def _load(db: Session, user: User, bike_id: int | None, year: int | None, with_t
         )))
         if with_power and a.avg_power and a.avg_power > 0 and a.details:
             try:
-                rows[-1][1].curve, rows[-1][1].curve_approx = D.ride_curve(json.loads(a.details))
+                det = json.loads(a.details)
+                rows[-1][1].curve, rows[-1][1].curve_approx = D.ride_curve(det)
+                rows[-1][1].np = det.get("np")
             except ValueError:
                 pass
     return tz, rows
@@ -280,4 +282,48 @@ def stats_ride_impact(activity_id: int, user: User = Depends(current_user), db: 
     out = D.ride_impact([r for _, r in rows], activity_id, tz)
     if out is None:
         raise HTTPException(404, "Fahrt nicht gefunden")
+    return out
+
+
+def _ensure_max_hr(db: Session, user_id: int) -> float | None:
+    """Höchster gemessener Puls über alle Fahrten. Fehlende Werte werden einmalig aus den Details gelesen und gespeichert."""
+    todo = db.scalars(select(Activity).where(Activity.user_id == user_id, Activity.max_hr.is_(None), Activity.details.is_not(None))).all()
+    for i, a in enumerate(todo, 1):
+        try:
+            a.max_hr = float(json.loads(a.details).get("max_hr") or 0)
+        except (ValueError, AttributeError):
+            a.max_hr = 0.0
+        if i % 200 == 0:
+            db.commit()
+    if todo:
+        db.commit()
+    best = db.scalar(select(func.max(Activity.max_hr)).where(Activity.user_id == user_id, Activity.max_hr < 230))
+    return float(best) if best else None
+
+
+@router.get("/stats/ride-analysis/{activity_id}")
+def stats_ride_analysis(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Wattzonen, Pulszonen, Frequenz und Kennzahlen (NP, IF, TSS, Entkopplung) einer Fahrt."""
+    a = db.scalar(select(Activity).where(Activity.id == activity_id, Activity.user_id == user.id))
+    if a is None:
+        raise HTTPException(404, "Fahrt nicht gefunden")
+    try:
+        details = json.loads(a.details) if a.details else None
+    except ValueError:
+        details = None
+    tz, rows = _load(db, user, None, None, with_tiles=False, with_power=True)
+    rr = [r for _, r in rows]
+    day = local(a.start_date, tz).date()
+    items = [(local(r.start, tz).date(), {int(k): v for k, v in r.curve.items()}, r.curve_approx) for r in rr if r.curve]
+    ftp = D._ftp_at(items, day)
+    if ftp is None and items:  # sonst die jüngste bekannte Schätzung (Fahrt liegt vor dem Zeitraum mit Leistungsdaten)
+        ftp = D._ftp_at(items, max(i[0] for i in items))
+    best = {k: v["watts"] for k, v in D._best_curve(items).items()}
+    if user.max_hr:
+        max_hr, note = float(user.max_hr), "aus deinen Einstellungen"
+    else:
+        max_hr, note = _ensure_max_hr(db, user.id), "höchster Puls deiner Fahrten (in den Einstellungen änderbar)"
+    out = D.ride_analysis(details, ftp=ftp, ftp_note="Schätzung aus deinen Fahrten der 90 Tage davor" if ftp else None,
+                          max_hr=max_hr, max_hr_note=note if max_hr else None, weight_kg=user.weight_kg,
+                          best_curve=best, moving_time_s=a.moving_time_s)
     return out

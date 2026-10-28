@@ -175,12 +175,12 @@ def build_power(rows: list[Row], tz, today: date, weight_kg: float | None) -> di
 def ride_tss(r: Row, ftp: float) -> float:
     """Belastungspunkte einer Fahrt nach Coggan (TSS), genähert über die Durchschnittsleistung.
 
-    Die normalisierte Leistung fehlt in den gespeicherten Daten. Der Faktor 1,06 gleicht die typische Unruhe einer
-    Ausfahrt aus; echte Intervalleinheiten werden dadurch unterschätzt.
+    Mit gespeicherter normalisierter Leistung (neu importierte Fahrten) wird sie genommen. Sonst gleicht der Faktor 1,06
+    die typische Unruhe einer Ausfahrt aus; echte Intervalleinheiten werden dadurch unterschätzt.
     """
     if not r.avg_power or r.avg_power <= 0 or ftp <= 0:
         return 0.0
-    intensity = min(1.4, r.avg_power * 1.06 / ftp)
+    intensity = min(1.4, (r.np or r.avg_power * 1.06) / ftp)
     return r.time_s / 3600 * intensity * intensity * 100
 
 
@@ -567,4 +567,96 @@ def ride_impact(rows: list[Row], ride_id: int, tz) -> dict | None:
             ftp.update({"intensity_pct": round(ratio * 100), "zone": _zone_of(ratio),
                         "tss": _r(ride_tss(ride, ftp_after), 0)})
     out["ftp"] = ftp
+    return out
+
+
+# ---------- Analyse einer einzelnen Fahrt: Zonen, NP, Puls, Frequenz ----------
+
+HR_ZONES = [(0.0, 0.60, "Z1 Sehr leicht"), (0.60, 0.70, "Z2 Grundlage"), (0.70, 0.80, "Z3 Tempo"),
+            (0.80, 0.90, "Z4 Schwelle"), (0.90, 9.99, "Z5 Maximal")]
+CADENCE_BUCKETS = [(0, 10, "Ausrollen (unter 10)"), (10, 60, "10–59"), (60, 80, "60–79"), (80, 90, "80–89"), (90, 100, "90–99"), (100, 999, "100 und mehr")]
+
+
+def _zone_rows(hist: dict[str, int], width: int, zones: list[tuple[float, float, str]]) -> list[dict]:
+    """Verteilt ein Histogramm (untere Grenze -> Sekunden) auf Zonen; ein Bereich zählt nach seiner Mitte."""
+    secs = [0] * len(zones)
+    for k, n in hist.items():
+        mid = int(k) + width / 2
+        for i, (lo, hi, _) in enumerate(zones):
+            if lo <= mid < hi:
+                secs[i] += n
+                break
+    total = sum(secs) or 1
+    return [{"name": z[2], "from": round(z[0]) if z[0] else 0, "to": None if z[1] == float("inf") else round(z[1]),
+             "seconds": s, "pct": _r(s / total * 100)} for z, s in zip(zones, secs)]
+
+
+def _profile_hist(details: dict, key: str, width: int) -> dict[str, int] | None:
+    """Näherung für Fahrten ohne Sekundenauswertung: Verteilung aus dem verdichteten Profil, gewichtet mit der Dauer je Abschnitt."""
+    prof = (details or {}).get("profile") or {}
+    d, s, v = prof.get("d"), prof.get("s"), prof.get(key)
+    if not d or not s or not v:
+        return None
+    out: dict[int, int] = {}
+    prev = 0.0
+    for dist, spd, val in zip(d, s, v):
+        step = (dist - prev) * 1000
+        prev = dist
+        if val is None or not spd or spd <= 1 or step <= 0:
+            continue
+        sec = round(step / (spd / 3.6))
+        k = int(val // width * width)
+        out[k] = out.get(k, 0) + sec
+    return {str(k): n for k, n in sorted(out.items())} or None
+
+
+def ride_analysis(details: dict | None, *, ftp: float | None, ftp_note: str | None, max_hr: float | None, max_hr_note: str | None,
+                  weight_kg: float | None, best_curve: dict[int, int] | None, moving_time_s: int) -> dict:
+    """Wattzonen, Pulszonen, Frequenzverteilung und Kennzahlen (NP, VI, IF, TSS, Arbeit, Entkopplung) einer Fahrt."""
+    d = details or {}
+    exact = bool(d.get("v"))
+    out: dict = {"exact": exact}
+
+    # Leistung
+    ph = d.get("ph") if exact else _profile_hist(d, "p", 10)
+    avg_p = d.get("avg_power")
+    if ph and avg_p:
+        np_ = d.get("np")
+        hours = (d.get("pt") or moving_time_s) / 3600
+        power: dict = {"avg": round(avg_p), "max": d.get("max_power"), "np": np_, "kj": d.get("kj"),
+                       "vi": _r(np_ / avg_p, 2) if np_ and avg_p else None,
+                       "wkg": _r(avg_p / weight_kg, 2) if weight_kg else None,
+                       "ftp": round(ftp) if ftp else None, "ftp_note": ftp_note}
+        if ftp:
+            base = np_ or avg_p * 1.06
+            power["if"] = _r(base / ftp, 2)
+            power["tss"] = _r(hours * (min(1.4, base / ftp) ** 2) * 100, 0)
+            power["zones"] = _zone_rows(ph, 10, [(lo * ftp, hi * ftp if hi < 5 else float("inf"), n) for lo, hi, n in ZONES])
+        peaks = []
+        for k, w in sorted(((int(k), v) for k, v in (d.get("pc") or {}).items())):
+            if k in CURVE_LABELS:
+                best = max(w, (best_curve or {}).get(k, 0))
+                peaks.append({"label": CURVE_LABELS[k], "watts": w, "best": best, "pct_of_best": _r(w / best * 100, 0),
+                              "is_best": w >= best, "wkg": _r(w / weight_kg, 2) if weight_kg else None})
+        power["peaks"] = peaks
+        out["power"] = power
+
+    # Puls
+    hh = d.get("hh") if exact else _profile_hist(d, "h", 5)
+    if hh and d.get("avg_hr"):
+        hr: dict = {"avg": d.get("avg_hr"), "max": d.get("max_hr"), "max_used": round(max_hr) if max_hr else None, "max_note": max_hr_note}
+        if max_hr:
+            hr["zones"] = _zone_rows(hh, 5, [(lo * max_hr, hi * max_hr if hi < 5 else float("inf"), n) for lo, hi, n in HR_ZONES])
+            hr["avg_pct"] = _r(d["avg_hr"] / max_hr * 100, 0)
+        if avg_p and d.get("avg_hr"):
+            hr["ef"] = _r((d.get("np") or avg_p) / d["avg_hr"], 2)
+        if d.get("dec") is not None:
+            hr["decoupling"] = d["dec"]
+        out["hr"] = hr
+
+    # Trittfrequenz
+    ch = d.get("ch") if exact else _profile_hist(d, "c", 10)
+    if ch and d.get("avg_cadence"):
+        rows = _zone_rows(ch, 10, [(lo, hi if hi < 900 else float("inf"), label) for lo, hi, label in CADENCE_BUCKETS])
+        out["cadence"] = {"avg": d["avg_cadence"], "buckets": [{"label": r["name"], "seconds": r["seconds"], "pct": r["pct"]} for r in rows]}
     return out

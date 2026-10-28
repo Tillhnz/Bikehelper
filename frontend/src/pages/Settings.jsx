@@ -6,6 +6,7 @@ import { getTheme, setTheme } from "../theme.js";
 
 function ProfileSettings({ user, onChange }) {
   const [weight, setWeight] = useState(user.weight_kg ?? "");
+  const [maxHr, setMaxHr] = useState(user.max_hr ?? "");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
@@ -14,8 +15,8 @@ function ProfileSettings({ user, onChange }) {
     setMsg("");
     setError("");
     try {
-      const r = await api.put("/settings/profile", { weight_kg: weight === "" ? null : Number(weight) });
-      onChange?.({ ...user, weight_kg: r.weight_kg });
+      const r = await api.put("/settings/profile", { weight_kg: weight === "" ? null : Number(weight), max_hr: maxHr === "" ? null : Number(maxHr) });
+      onChange?.({ ...user, weight_kg: r.weight_kg, max_hr: r.max_hr });
       setMsg("Gespeichert.");
     } catch (err) {
       setError(err.message);
@@ -25,11 +26,13 @@ function ProfileSettings({ user, onChange }) {
   return (
     <section className="panel">
       <h2>Profil</h2>
-      <p className="muted">Dein Gewicht nutzt der Ratgeber für den Reifendruck. Es bleibt auf deinem Server.</p>
+      <p className="muted">Deine Werte bleiben auf deinem Server.</p>
       <form className="inline-form" onSubmit={save}>
         <label>Körpergewicht (kg)<input type="number" min="30" max="250" step="0.5" value={weight} onChange={(e) => setWeight(e.target.value)} /></label>
+        <label>Maximalpuls (bpm)<input type="number" min="120" max="230" step="1" value={maxHr} onChange={(e) => setMaxHr(e.target.value)} placeholder="automatisch" /></label>
         <button className="btn primary">Speichern</button>
       </form>
+      <p className="muted small">Gewicht für Reifendruck und Watt pro Kilo, Maximalpuls für die Pulszonen. Ohne Maximalpuls nimmt BikeHelper den höchsten Wert deiner Fahrten.</p>
       {msg && <p className="ok" role="status">{msg}</p>}
       {error && <p className="error" role="alert">{error}</p>}
     </section>

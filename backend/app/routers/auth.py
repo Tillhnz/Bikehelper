@@ -25,6 +25,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         strava_configured=bool(u.strava_client_id and u.strava_client_secret),
         strava_connected=bool(u.strava_refresh_token),
         weight_kg=u.weight_kg,
+        max_hr=u.max_hr,
         is_admin=admin,
         role="admin" if admin else "user",
         mechanic_enabled=bool(u.mechanic_enabled),

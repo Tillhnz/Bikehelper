@@ -34,6 +34,7 @@ class Row:
     terrain: str | None = None
     curve: dict | None = None  # beste Leistung je Dauer (Sekunden -> Watt), siehe stats/deep.py
     curve_approx: bool = False
+    np: float | None = None  # normalisierte Leistung, wenn aus dem Sekundenverlauf bekannt
 
 
 def get_tz(name: str):

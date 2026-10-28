@@ -96,9 +96,11 @@ def backfill_existing(
     if bike is not None and existing.bike_id is None:
         existing.bike_id = bike.id
         changed = True
-    if details and not existing.details:
+    # Ältere Details (ohne Sekundenauswertung) werden beim erneuten Import ersetzt, damit Leistungskurve und Zonen exakt werden
+    if details and (not existing.details or (details.get("v") and '"v":' not in existing.details)):
         existing.details = json.dumps(details, separators=(",", ":"))
         existing.avg_power, existing.avg_cadence = features_from_details(details)
+        existing.max_hr = float(details.get("max_hr") or 0)
         changed = True
     return changed
 
@@ -139,6 +141,7 @@ def store_activity(
         avg_power=features_from_details(parsed.details)[0],
         avg_cadence=features_from_details(parsed.details)[1],
         terrain=terrain_of(sport_type) or terrain_of(parsed.sport) or "",
+        max_hr=float((parsed.details or {}).get("max_hr") or 0),
     )
     try:
         with db.begin_nested():

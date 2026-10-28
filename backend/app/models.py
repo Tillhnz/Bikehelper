@@ -25,6 +25,7 @@ class User(Base):
     strava_athlete_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)  # Körpergewicht für den Ratgeber
+    max_hr: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Maximalpuls für die Pulszonen; leer = höchster gemessener Wert
     # Kartenhintergrund: eigener CARTO-Schlüssel (hat Vorrang vor dem Schlüssel des Servers)
     carto_api_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
@@ -231,6 +232,7 @@ class Activity(Base):
     avg_power: Mapped[float | None] = mapped_column(Float, nullable=True)
     avg_cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
     terrain: Mapped[str | None] = mapped_column(String(10), nullable=True)  # road | gravel | mtb | ebike | "" (unbekannt)
+    max_hr: Mapped[float | None] = mapped_column(Float, nullable=True)  # höchster Puls der Fahrt; NULL = noch nicht gelesen, 0 = kein Puls
 
 
 class RuleNotice(Base):
