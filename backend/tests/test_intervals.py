@@ -43,7 +43,9 @@ def _fake(calls, status_for_list=200):
             return httpx.Response(200, content=gpx)
         return httpx.Response(404)
 
-    return httpx.Client(transport=httpx.MockTransport(handler), base_url="https://intervals.icu")
+    # Anmeldung wie im Betrieb (new_client): HTTP Basic mit API_KEY und dem Schlüssel
+    return httpx.Client(transport=httpx.MockTransport(handler), base_url="https://intervals.icu",
+                        auth=service.new_client("abcdef123456").auth)
 
 
 def _user(c, email):
@@ -64,13 +66,14 @@ def test_sync_imports_once_skips_strava_and_other_sports(monkeypatch):
         calls = []
         with SessionLocal() as db:
             res = service.sync_user(db, db.get(User, uid), http=_fake(calls))
-            # i1 importiert, i2 hat dieselbe Datei (Duplikat), i3 Strava und i4 Laufen werden übersprungen
+            # neueste zuerst: i2 wird importiert, i1 hat dieselbe Datei (Duplikat, trägt aber den Radnamen nach),
+            # i3 Strava und i4 Laufen werden übersprungen
             assert (res.imported, res.duplicates, res.skipped, res.remaining) == (1, 1, 2, 0)
             assert (res.found, res.strava, res.other_sport) == (4, 1, 1) and "von Strava" in res.text()
             act = db.scalars(select(Activity).where(Activity.user_id == uid, Activity.source == "intervals")).one()
             assert act.gear_name == "Canyon" and act.bike_id is not None  # Rad über den Namen aus intervals.icu gefunden
             seen = {s.activity_id: s.status for s in db.scalars(select(IntervalsSeen).where(IntervalsSeen.user_id == uid))}
-            assert seen == {"i1": "imported", "i2": "duplicate", "i3": "skipped", "i4": "skipped"}
+            assert seen == {"i1": "duplicate", "i2": "imported", "i3": "skipped", "i4": "skipped"}
             assert db.get(User, uid).icu_synced_until is not None
         assert all(a == "Basic " for _, a in calls)
 
@@ -128,10 +131,13 @@ def test_version_endpoint_reports_installed_version():
 def test_changelog_shows_only_newer_entries():
     items = changelog.entries()
     ids = [e["id"] for e in items]
-    assert len(ids) == len(set(ids)) and ids == sorted(ids, reverse=True)  # eindeutig, neueste zuerst
+    def key(i):  # 2026-10-27.11 kommt nach 2026-10-27.9
+        day, _, n = i.partition(".")
+        return day, int(n or 0)
+    assert len(ids) == len(set(ids)) and ids == sorted(ids, key=key, reverse=True)  # eindeutig, neueste zuerst
     assert all(e["title"] and e["date"] and e["changes"] for e in items)
     assert changelog.unseen(ids[0]) == [] and [e["id"] for e in changelog.unseen(ids[1])] == [ids[0]]
-    assert [e["id"] for e in changelog.unseen("intervals-2026-10")] == ids[: ids.index("2026-10-27.1")]  # alte Kennung
+    assert [e["id"] for e in changelog.unseen("intervals-2026-10")] == ids[: ids.index("2026-10-27.1")][: changelog.MAX_SHOWN]  # alte Kennung
     assert len(changelog.unseen("unbekannt")) == min(5, len(ids))
 
 

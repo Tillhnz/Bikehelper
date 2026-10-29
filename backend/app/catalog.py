@@ -341,6 +341,12 @@ GUIDES: dict[str, tuple[Guide, ...]] = {
     "Pedalgewinde fetten, Lager prüfen": (
         Guide("Pedale aus- und einbauen", _PT + "pedal-installation-and-removal", PT),
     ),
+    "Schaltröllchen prüfen und wechseln": (
+        Guide("Schaltwerk zerlegen und warten (mit Schaltröllchen)", _PT + "rear-derailleur-overhaul", PT, True),
+    ),
+    "Gewinde fetten, Schrauben nachziehen": (
+        Guide("Drehmomente und Gewinde richtig vorbereiten", _PT + "torque-specifications-and-concepts", PT),
+    ),
     "Nabenlager warten": (
         Guide("Nabe warten und einstellen (Konuslager)", _PT.replace("en-us", "en-int") + "hub-overhaul-and-adjustment", PT, True),
         Guide("Freilaufkörper warten", _PT.replace("en-us", "en-int") + "freehub-service", PT),

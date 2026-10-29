@@ -323,6 +323,16 @@ def test_chain_measurement_drives_the_wear_rule():
                       json={"measured_at": date.today().isoformat(), "wear_pct": 0.1}).status_code == 404
 
 
+def _catalog_rules(c, h, comp):
+    """Legt die Regeln aus dem Katalog an, so wie die Oberfläche beim Hinzufügen einer Komponente."""
+    from app.catalog import CATALOG, chain_rules
+    rules = chain_rules(None) if comp["category"] == "chain" else CATALOG[comp["category"]].rules
+    for r in rules:
+        c.post(f"/api/components/{comp['id']}/rules", headers=h, json={
+            "label": r.label, "interval_km": r.interval_km, "interval_months": r.interval_months,
+            "wet_factor": r.wet_factor, "hint": r.hint or None})
+
+
 def test_brake_pad_inspection_result_adjusts_intervals():
     with TestClient(app) as c:
         h = _user(c, "pads@example.com")
@@ -332,6 +342,7 @@ def test_brake_pad_inspection_result_adjusts_intervals():
         comp = c.post("/api/components", headers=h, json={
             "bike_id": bike["id"], "category": "brake_pads", "name": "Beläge", "installed_at": start.isoformat(),
         }).json()
+        _catalog_rules(c, h, comp)
         with SessionLocal() as db:
             for i in range(3):
                 db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=400.0,
@@ -377,6 +388,7 @@ def test_visual_check_of_a_component_has_three_results():
         comp = c.post("/api/components", headers=h, json={
             "bike_id": bike["id"], "category": "chain", "name": "Kette", "installed_at": start.isoformat(),
         }).json()
+        _catalog_rules(c, h, comp)
         with SessionLocal() as db:
             for i in range(3):
                 db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=400.0,

@@ -231,6 +231,11 @@ def _import_one(db: Session, user: User, http: httpx.Client, a: dict, default: B
         db, user.id, parsed, name=(a.get("name") or None), strava_id=None, gear_name=gear,
         bike=bike, sport_type=None, source="intervals",
     )
+    if not stored and (gear or bike):
+        # Dieselbe Fahrt kam schon (z. B. von einem anderen Gerät ohne Radangabe): Radname und Rad nachtragen
+        existing = imports.find_duplicate(db, user.id, parsed, None)
+        if existing is not None:
+            imports.backfill_existing(existing, None, gear, bike)
     _mark(db, user, aid, "imported" if stored else "duplicate")
     if stored:
         result.imported += 1

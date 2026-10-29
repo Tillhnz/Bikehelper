@@ -26,7 +26,8 @@ def test_shop_url_validation_and_copy_on_replace():
         comp = c.post("/api/components", headers=h, json={**base, "shop_url": " https://shop.example/kmc "}).json()
         assert comp["shop_url"] == "https://shop.example/kmc"
         r = c.post(f"/api/components/{comp['id']}/replace", headers=h, json={"performed_at": date.today().isoformat()}).json()
-        new = [x for x in c.get(f"/api/components?bike_id={bike['id']}", headers=h).json() if x["id"] != comp["id"]]
+        # das Rad hat Standardkomponenten; gesucht ist das neu eingebaute Teil
+        new = [x for x in c.get(f"/api/components?bike_id={bike['id']}", headers=h).json() if x["id"] == r["id"]]
         assert new and new[0]["shop_url"] == "https://shop.example/kmc", r
 
 

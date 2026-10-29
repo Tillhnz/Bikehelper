@@ -66,7 +66,7 @@ def test_group_invite_join_ranking_and_privacy():
         assert [g["name"] for g in c.get("/api/groups", headers=b).json()] == ["Pendler"]
         assert c.delete(f"/api/groups/{gid}/me", headers=b).status_code == 204  # allein: Gruppe verschwindet
         with SessionLocal() as db:
-            assert db.scalar(select(GroupInvite.id)) is None
+            assert db.scalar(select(GroupInvite.id).where(GroupInvite.group_id == gid)) is None
         assert c.get(f"/api/groups/{gid}", headers=b).status_code == 404
 
 
@@ -177,7 +177,7 @@ def test_group_goal_duel_and_fair_rank():
         # Ziel: nur Admins setzen, alle sehen es
         today = datetime.utcnow().date()
         body = {"metric": "km", "target": 1000, "start": (today - timedelta(days=100)).isoformat(), "end": (today + timedelta(days=100)).isoformat(), "title": "Herbst"}
-        assert c.put(f"/api/groups/{gid}/goal", headers=b, json=body).status_code == 404
+        assert c.put(f"/api/groups/{gid}/goal", headers=b, json=body).status_code == 403  # Mitglied, aber kein Admin
         assert c.put(f"/api/groups/{gid}/goal", headers=a, json={**body, "metric": "bpm"}).status_code == 422
         assert c.put(f"/api/groups/{gid}/goal", headers=a, json={**body, "end": (today - timedelta(days=200)).isoformat()}).status_code == 422
         g = c.put(f"/api/groups/{gid}/goal", headers=a, json=body).json()["goal"]
@@ -188,7 +188,7 @@ def test_group_goal_duel_and_fair_rank():
         c.put(f"/api/groups/{gid}/me", headers=b, json={"share": False})
         assert c.get(f"/api/groups/{gid}/goal", headers=a).json()["goal"]["done"] == 100
         c.put(f"/api/groups/{gid}/me", headers=b, json={"share": True})
-        assert c.delete(f"/api/groups/{gid}/goal", headers=b).status_code == 404
+        assert c.delete(f"/api/groups/{gid}/goal", headers=b).status_code == 403
         assert c.delete(f"/api/groups/{gid}/goal", headers=a).status_code == 204
         assert c.get(f"/api/groups/{gid}/goal", headers=a).json() == {"goal": None}
 

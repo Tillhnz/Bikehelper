@@ -429,10 +429,10 @@ def mount_tire_set(db: Session, ts: TireSet, day: date) -> None:
         if other.id == ts.id:
             return  # ist schon montiert
         if m.from_date >= day:
-            db.delete(m)  # war keinen vollen Tag montiert
+            other.mounts.remove(m)  # war keinen vollen Tag montiert (delete-orphan löscht die Zeile)
         else:
             m.to_date = day - timedelta(days=1)
-    db.add(TireMount(tire_set_id=ts.id, from_date=day, to_date=None))
+    ts.mounts.append(TireMount(from_date=day, to_date=None))  # über die Beziehung, damit ts.mounts sofort stimmt
     sync_bike_tires(ts.bike, ts)
     db.flush()
 
@@ -442,7 +442,7 @@ def unmount_tire_set(db: Session, ts: TireSet, day: date) -> None:
     if m is None:
         return
     if m.from_date >= day:
-        db.delete(m)
+        ts.mounts.remove(m)
     else:
         m.to_date = day - timedelta(days=1)
     db.flush()

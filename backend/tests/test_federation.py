@@ -96,7 +96,8 @@ def test_host_admin_can_remove_remote_member_and_goal_counts_remote_days(monkeyp
         c.put(f"/api/groups/{gid}/goal", headers=a, json={"metric": "km", "target": 100, "start": (today - timedelta(days=5)).isoformat(),
                                                            "end": (today + timedelta(days=5)).isoformat()})
         goal = c.get(f"/api/groups/{gid}/goal", headers=a).json()["goal"]
-        assert goal["done"] == 60.0 and [m["display_name"] for m in goal["members"]] == ["Fern"]
+        # alle teilenden Mitglieder stehen in der Liste, auch mit 0 km; der Gast vom anderen Server zählt mit
+        assert goal["done"] == 60.0 and [(m["display_name"], m["value"]) for m in goal["members"]] == [("Fern", 60.0), ("Anna", 0.0)]
         # Der Gast sieht dasselbe Ziel
         assert c.get("/api/federation/goal", headers=h).json()["goal"]["done"] == 60.0
 
