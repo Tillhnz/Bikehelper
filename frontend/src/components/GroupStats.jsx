@@ -1,3 +1,4 @@
+import { isExpert, useUiMode } from "../uiMode.js";
 import { useEffect, useState } from "react";
 import { api, fmtDuration, fmtNum } from "../api.js";
 import { Kpi, Panel } from "./statsui.jsx";
@@ -342,7 +343,8 @@ export default function GroupStats({ d, groupId }) {
   const rows = d.rows;
   const color = colorMap(rows);
   const has = (cat) => rows.some((r) => r.extras[cat]);
-  const tabs = TAB_LIST.filter(([k]) => !["rhythm", "records", "load", "weather"].includes(k) || has(k));
+  const expert = isExpert(useUiMode());
+  const tabs = TAB_LIST.filter(([k]) => (expert || !["duel", "rhythm", "load", "weather"].includes(k)) && (!["rhythm", "records", "load", "weather"].includes(k) || has(k)));
   const active = tabs.some(([k]) => k === tab) ? tab : "overview";
   const sum = (m) => rows.reduce((s, r) => s + (r[m] || 0), 0);
   const secs = sum("time_s");

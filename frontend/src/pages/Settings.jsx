@@ -384,6 +384,39 @@ function TourSettings({ user, onChange }) {
   );
 }
 
+function ModeSettings({ user, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const mode = user.ui_mode ?? "expert";
+  async function pick(m) {
+    if (m === mode) return;
+    setBusy(true);
+    try {
+      const r = await api.put("/me/ui", { mode: m });
+      onChange({ ...user, ui_mode: r.mode });
+      toast(m === "expert" ? "Expertenmodus ist an." : "Einfacher Modus ist an.");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel">
+      <h2>Funktionsumfang</h2>
+      <div className="seg" role="radiogroup" aria-label="Funktionsumfang">
+        {[["simple", "Einfach"], ["expert", "Experte"]].map(([k, label]) => (
+          <button key={k} type="button" role="radio" aria-checked={mode === k} className={`btn ${mode === k ? "primary" : ""}`} disabled={busy} onClick={() => pick(k)}>{label}</button>
+        ))}
+      </div>
+      <p className="muted small">
+        Einfach zeigt Garage, Wartung, Fahrten und die wichtigsten Statistiken. Experte blendet zusätzlich Belastung, Leistungsanalyse, Muster und Wetter,
+        Vergleiche und das Gruppen-Duell ein sowie weitere Blöcke für die Startseite. Deine Daten und Einstellungen bleiben in beiden Modi gleich.
+      </p>
+      <p><Link to="/?customize=1" className="link">Startseite anpassen →</Link></p>
+    </section>
+  );
+}
+
 function AppearanceSettings() {
   const [mode, setMode] = useState(getTheme());
   function pick(m) { setMode(m); setTheme(m); }
@@ -435,6 +468,7 @@ export default function Settings({ user, onChange }) {
       </section>
 
       <ProfileSettings user={user} onChange={onChange} />
+      <ModeSettings user={user} onChange={onChange} />
 
       <AppearanceSettings />
 

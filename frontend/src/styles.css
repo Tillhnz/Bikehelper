@@ -1231,3 +1231,29 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .check-option.on.check-good{border-color:var(--celeste)}
 .check-option.on.check-watch{border-color:var(--amber)}
 .check-option.on.check-replace{border-color:var(--signal)}
+
+/* Startseite: frei wählbare Blöcke */
+.home-blocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;margin-bottom:1.25rem;align-items:start}
+.home-cell{min-width:0}
+.home-cell>.panel{margin-bottom:0}
+.home-wide{grid-column:1 / -1}
+.home-cell>.home-bikes{margin-bottom:0}
+@media (max-width:800px){.home-blocks{grid-template-columns:minmax(0,1fr)}}
+.home-editor{margin-bottom:1.25rem}
+.home-editor h3{margin:1rem 0 .4rem;font-size:1.05rem}
+.home-editor-list{margin:.25rem 0}
+.home-editor-list li{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
+.home-editor-list .row-actions{display:flex;gap:.4rem;align-items:center;flex-shrink:0}
+.page-head .btn.small{align-self:flex-start}
+
+/* schmale Kopfzeile: kurze Beschriftungen, nichts bricht um */
+.lbl-short{display:none}
+@media (max-width:800px){
+  .lbl-long{display:none}
+  .lbl-short{display:inline}
+  .sidebar{gap:.5rem}
+  .brand-row{flex:0 1 auto;min-width:0}
+  .sidebar-foot{flex-wrap:nowrap;gap:.6rem}
+  .sidebar-foot a,.sidebar-foot button{white-space:nowrap;font-size:.9rem}
+  .update-hint{white-space:nowrap}
+}

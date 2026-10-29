@@ -1,15 +1,17 @@
 from datetime import date, datetime, time, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import home_blocks
 from ..config import settings
 from ..database import get_db
 from ..models import Activity, Bike, Component, Goal, MaintenanceLog, User
 from ..security import current_user
 from ..stats import extra as X
-from ..stats.overview import get_tz, local
+from ..stats.overview import Row, get_tz, local
 from . import garage, mechanic
 from .stats import _goal_targets, _load
 
@@ -113,6 +115,59 @@ def _wet_notices(db: Session, user: User, acts, bikes: dict, tz) -> list[dict]:
     return build_wet_notices(rides, now, care)
 
 
+def _mode(user: User) -> str:
+    return user.ui_mode if user.ui_mode in ("simple", "expert") else "expert"
+
+
+@router.get("/home/layout")
+def home_layout(user: User = Depends(current_user)):
+    """Welche Blöcke die Startseite zeigt (in dieser Reihenfolge) und welche es gibt."""
+    mode = _mode(user)
+    saved = home_blocks.parse_layout(user.home_layout)
+    layout = home_blocks.DEFAULT_LAYOUT if saved is None else saved
+    avail = {c["id"]: c["available"] for c in home_blocks.catalog(mode)}
+    return {"mode": mode, "layout": [i for i in layout if avail.get(i)], "custom": saved is not None, "catalog": home_blocks.catalog(mode)}
+
+
+class UiIn(BaseModel):
+    mode: str | None = None
+    layout: list[str] | None = None
+    reset: bool = False  # True = zurück zur Standardanordnung
+
+
+@router.put("/me/ui")
+def set_ui(data: UiIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if data.mode is not None:
+        if data.mode not in ("simple", "expert"):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unbekannter Modus")
+        user.ui_mode = data.mode
+    if data.reset:
+        user.home_layout = None
+    elif data.layout is not None:
+        try:
+            user.home_layout = home_blocks.clean_layout(data.layout)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    db.commit()
+    return home_layout(user)
+
+
+@router.get("/home/blocks")
+def home_block_data(ids: str = Query(default="", max_length=200), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Daten der Analyse-Blöcke (Eddington-Zahl, Serie, Rekorde, Form), nur für die angefragten."""
+    want = [i for i in ids.split(",") if i in home_blocks.CATALOG]
+    if _mode(user) != "expert":
+        want = [i for i in want if not home_blocks.CATALOG[i][3]]
+    if not home_blocks.needs_data(want):
+        return {}
+    tz = get_tz(settings.timezone)
+    today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
+    rows = [Row(id=i, name="", bike_id=None, start=s, km=km or 0.0, time_s=t or 0, elev_m=e or 0.0)
+            for i, s, km, t, e in db.execute(select(Activity.id, Activity.start_date, Activity.distance_km, Activity.moving_time_s,
+                                                    Activity.elevation_m).where(Activity.user_id == user.id))]
+    return home_blocks.compute(want, rows, tz, today)
+
+
 @router.get("/home")
 def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
     tz = get_tz(settings.timezone)
@@ -151,7 +206,7 @@ def home(user: User = Depends(current_user), db: Session = Depends(get_db)):
         "week": week,
         "year": {"year": today.year, "km": round(year_km, 1), "goal_km": goal.target if goal else None,
                  "days_left": (date(today.year, 12, 31) - today).days, "goals": goals},
-        "maintenance": {"status": maintenance["status"], "items": maintenance["items"][:6], "total": len(maintenance["items"])},
+        "maintenance": {"status": maintenance["status"], "items": maintenance["items"][:5], "total": len(maintenance["items"])},
         "bikes": bike_out,
         "wet_notices": wet_notices,
         "recent": [{"id": a.id, "name": a.name, "date": local(a.start_date, tz).isoformat(), "km": round(a.distance_km, 1),

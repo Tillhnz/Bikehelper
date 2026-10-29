@@ -8,11 +8,15 @@ import { Kpi, Panel } from "../components/statsui.jsx";
 import { CompareView, GoalsView, LoadView, PlacesView, ReviewView } from "../components/StatsExtra.jsx";
 import { BikesView, PatternsView, PowerView, RoutesView } from "../components/StatsDeep.jsx";
 import { Loading } from "../components/feedback.jsx";
+import { isExpert, useUiMode } from "../uiMode.js";
 
-const TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["power", "Leistung"], ["patterns", "Muster & Wetter"], ["bikes", "Räder"], ["routes", "Strecken"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"], ["heatmap", "Heatmap"]];
+const EXPERT_TABS = ["load", "power", "patterns", "compare"]; // im einfachen Modus ausgeblendet
+const ALL_TABS = [["overview", "Übersicht"], ["load", "Belastung"], ["power", "Leistung"], ["patterns", "Muster & Wetter"], ["bikes", "Räder"], ["routes", "Strecken"], ["review", "Jahresrückblick"], ["goals", "Ziele"], ["compare", "Vergleiche"], ["places", "Orte"], ["heatmap", "Heatmap"]];
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
 export default function Stats() {
+  const mode = useUiMode();
+  const TABS = isExpert(mode) ? ALL_TABS : ALL_TABS.filter(([k]) => !EXPERT_TABS.includes(k));
   const [filters, setFilters] = useState({ year: "", bike_id: "" });
   const [options, setOptions] = useState({ years: [], bikes: [] });
   const [d, setD] = useState(null);

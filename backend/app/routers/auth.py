@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from .. import audit, changelog, notify
+from .. import audit, changelog, home_blocks, notify
 from ..config import settings
 from ..database import get_db
 from .. import ratelimit
@@ -29,6 +29,8 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         is_admin=admin,
         role="admin" if admin else "user",
         mechanic_enabled=bool(u.mechanic_enabled),
+        ui_mode=u.ui_mode if u.ui_mode in ("simple", "expert") else "expert",
+        home_layout=home_blocks.parse_layout(u.home_layout),
         tour=bool(u.tour_pending),
         whatsnew=changelog.unseen(u.whatsnew_seen) or None,
     )
@@ -68,7 +70,7 @@ def register(data: RegisterIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_409_CONFLICT, "E-Mail bereits vergeben")
     user = User(email=email, password_hash=hash_password(data.password), token_version=0,
                 role="admin" if first_user else "user", active=True,
-                whatsnew_seen=changelog.latest_id(), tour_pending=True)  # neue Konten brauchen den Hinweis nicht
+                whatsnew_seen=changelog.latest_id(), tour_pending=True, ui_mode="simple")  # neue Konten brauchen den Hinweis nicht
     db.add(user)
     if invite is not None:
         invite.used_by_email, invite.used_at = email, datetime.utcnow()

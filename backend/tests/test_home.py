@@ -47,3 +47,44 @@ def test_wet_notice_window_and_chain_care():
     assert build_wet_notices([ride], datetime(2026, 10, 24, 13, 0), {}) == []           # nach 4 Stunden weg
     assert build_wet_notices([ride], datetime(2026, 10, 24, 10, 0), {7: [datetime(2026, 10, 24, 9, 30)]}) == []  # Kette schon gepflegt
     assert build_wet_notices([ride], datetime(2026, 10, 24, 10, 0), {7: [datetime(2026, 10, 24, 8, 30)]}) != []  # Pflege vor der Fahrt zählt nicht
+
+
+def test_home_layout_and_analysis_blocks():
+    from datetime import datetime, timedelta
+    from fastapi.testclient import TestClient
+    from app.database import SessionLocal
+    from app.main import app
+    from app.models import Activity
+
+    with TestClient(app) as c:
+        r = c.post("/api/auth/register", json={"email": "layout@example.com", "password": "geheim1234"})
+        h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        me = c.get("/api/me", headers=h).json()
+        assert me["ui_mode"] == "simple" and me["home_layout"] is None  # neue Konten starten einfach
+        lay = c.get("/api/home/layout", headers=h).json()
+        assert lay["layout"] == ["week", "maintenance", "bikes", "goal", "recent"] and lay["custom"] is False
+        assert next(b for b in lay["catalog"] if b["id"] == "form")["available"] is False  # nur für Experten
+
+        # Anordnung speichern; der Expertenblock bleibt gespeichert, wird im einfachen Modus aber nicht angezeigt
+        out = c.put("/api/me/ui", headers=h, json={"layout": ["recent", "form", "eddington"]}).json()
+        assert out["layout"] == ["recent", "eddington"] and out["custom"] is True
+        assert c.put("/api/me/ui", headers=h, json={"layout": ["week", "week"]}).status_code == 422
+        assert c.put("/api/me/ui", headers=h, json={"layout": ["gibtesnicht"]}).status_code == 422
+        assert c.put("/api/me/ui", headers=h, json={"mode": "chaos"}).status_code == 422
+        assert c.put("/api/me/ui", headers=h, json={"mode": "expert"}).json()["layout"] == ["recent", "form", "eddington"]
+
+        uid = c.get("/api/me", headers=h).json()["id"]
+        with SessionLocal() as db:
+            for i in range(4):
+                db.add(Activity(user_id=uid, name="x", start_date=datetime.utcnow() - timedelta(days=i), distance_km=10.0 * (i + 1),
+                                moving_time_s=3600, elevation_m=100))
+            db.commit()
+        data = c.get("/api/home/blocks?ids=eddington,streaks,records,form,week", headers=h).json()
+        assert set(data) == {"eddington", "streaks", "records", "form"}
+        assert data["eddington"]["value"] == 4 and data["streaks"]["current"] == 4 and data["records"]["longest"]["km"] == 40.0
+        assert data["form"]["fitness"] is not None
+
+        assert c.put("/api/me/ui", headers=h, json={"reset": True}).json()["custom"] is False
+        # Einfacher Modus: Form wird nicht geliefert
+        c.put("/api/me/ui", headers=h, json={"mode": "simple"})
+        assert "form" not in c.get("/api/home/blocks?ids=form,streaks", headers=h).json()

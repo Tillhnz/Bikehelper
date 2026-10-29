@@ -2,10 +2,10 @@ import { useState } from "react";
 import { api, today } from "../api.js";
 import { toast } from "./feedback.jsx";
 
-/** Knopf „Erledigt“: trägt eine Wartung mit heutigem Datum ein. Prüfungen brauchen ein Ergebnis und gehen deshalb zum Rad. */
+/** Knopf „Gewartet“: trägt eine Wartung mit heutigem Datum ein. Prüfungen brauchen ein Ergebnis und gehen deshalb zum Rad. */
 export default function QuickDone({ item, onDone }) {
   const [busy, setBusy] = useState(false);
-  if (!item.rule_id || item.is_inspection) return null;
+  if (!item.rule_id || item.is_inspection || item.visual_check) return null;  // Prüfungen und Austauschregeln gehen über das Rad
   async function done() {
     setBusy(true);
     try {
@@ -19,8 +19,8 @@ export default function QuickDone({ item, onDone }) {
     }
   }
   return (
-    <button className="btn small" onClick={done} disabled={busy} aria-label={`${item.rule} heute als erledigt eintragen`}>
-      {busy ? "…" : "Erledigt"}
+    <button className="btn small" onClick={done} disabled={busy} aria-label={`${item.rule} heute als gewartet eintragen`}>
+      {busy ? "…" : "Gewartet"}
     </button>
   );
 }

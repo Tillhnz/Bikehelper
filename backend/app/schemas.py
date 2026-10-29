@@ -58,6 +58,8 @@ class UserOut(BaseModel):
     is_admin: bool = False
     role: str = "user"
     mechanic_enabled: bool = False
+    ui_mode: str = "expert"
+    home_layout: list[str] | None = None  # None = Standardanordnung
     tour: bool = False  # Rundgang durch die App zeigen (neues Konto oder von Hand gestartet)
     whatsnew: list[dict] | None = None  # noch nicht gezeigte Versionshinweise, neueste zuerst
 

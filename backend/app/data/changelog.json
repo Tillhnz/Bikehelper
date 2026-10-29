@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-10-29.3",
+    "date": "2026-10-29",
+    "title": "Startseite nach Wunsch, einfacher oder Expertenmodus",
+    "changes": [
+      "Startseite anpassen: Du wählst, welche Blöcke du siehst, und sortierst sie. Neu sind Blöcke für Eddington-Zahl, Serie, Rekorde und Form und Fitness.",
+      "Einstellungen → Funktionsumfang: Im einfachen Modus fehlen die tiefen Analysen. Bestehende Konten bleiben im Expertenmodus, neue starten einfach.",
+      "Einheitliche Begriffe: „Gewartet“ für Schmieren, Warten und Prüfen, „Getauscht“ für ein neues Teil.",
+      "Die Kopfzeile auf dem Handy bricht nicht mehr um."
+    ]
+  },
+  {
     "id": "2026-10-29.2",
     "date": "2026-10-29",
     "title": "Eddington-Zahl",

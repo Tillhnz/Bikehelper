@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { BIKE_TYPES, api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { Kpi, Panel } from "../components/statsui.jsx";
@@ -66,15 +66,137 @@ function weekTitle(w) {
   return `KW ${kw}, ${range}${mon.getFullYear() !== new Date().getFullYear() ? ` ${mon.getFullYear()}` : ""}`;
 }
 
+const DATA_BLOCKS = ["eddington", "streaks", "records", "form"];
+
+/** Auswahl und Reihenfolge der Blöcke auf der Startseite. */
+function HomeEditor({ lay, onSave, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const byId = Object.fromEntries(lay.catalog.map((c) => [c.id, c]));
+  const on = lay.layout;
+  const off = lay.catalog.filter((c) => !on.includes(c.id));
+
+  async function save(body) {
+    setBusy(true); setError("");
+    try { await onSave(body); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+  const move = (i, dir) => {
+    const next = [...on];
+    const j = i + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    save({ layout: next });
+  };
+  // Im einfachen Modus ausgeblendete Expertenblöcke bleiben in der gespeicherten Anordnung erhalten (sie liegen nicht in `on`)
+  return (
+    <section className="panel home-editor" aria-label="Startseite anpassen">
+      <h2>Startseite anpassen</h2>
+      <p className="muted small">Wähle, welche Blöcke du auf der Startseite sehen willst, und bring sie in die passende Reihenfolge. Das gilt nur für dein Konto.</p>
+      {error && <p className="error" role="alert">{error}</p>}
+      <h3>Auf deiner Startseite</h3>
+      {on.length === 0 ? <p className="muted">Keine Blöcke. Füge unten welche hinzu.</p> : (
+        <ol className="plain home-editor-list">
+          {on.map((id, i) => (
+            <li key={id}>
+              <span><strong>{byId[id]?.title ?? id}</strong><br /><span className="muted small">{byId[id]?.text}</span></span>
+              <span className="row-actions">
+                <button className="btn small" onClick={() => move(i, -1)} disabled={busy || i === 0} aria-label={`${byId[id]?.title} nach oben`}>▲</button>
+                <button className="btn small" onClick={() => move(i, 1)} disabled={busy || i === on.length - 1} aria-label={`${byId[id]?.title} nach unten`}>▼</button>
+                <button className="link small danger" onClick={() => save({ layout: on.filter((x) => x !== id) })} disabled={busy}>Entfernen</button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {off.length > 0 && (
+        <>
+          <h3>Weitere Blöcke</h3>
+          <ul className="plain home-editor-list">
+            {off.map((c) => (
+              <li key={c.id}>
+                <span><strong>{c.title}</strong><br /><span className="muted small">{c.text}{!c.available ? " (nur im Expertenmodus, einstellbar unter Einstellungen)" : ""}</span></span>
+                <button className="btn small" onClick={() => save({ layout: [...on, c.id] })} disabled={busy || !c.available}>Hinzufügen</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <div className="actions">
+        <button className="btn primary" onClick={onClose}>Fertig</button>
+        {lay.custom && <button className="btn" onClick={() => save({ reset: true })} disabled={busy}>Standard wiederherstellen</button>}
+      </div>
+    </section>
+  );
+}
+
+function AnalysisPanel({ id, data }) {
+  const titles = { eddington: "Eddington-Zahl", streaks: "Serie", records: "Rekorde", form: "Form und Fitness" };
+  if (!data) return <Panel title={titles[id]}><Loading rows={2} /></Panel>;
+  if (id === "eddington") {
+    return (
+      <Panel title="Eddington-Zahl">
+        <div className="goal-num"><strong>{data.value}</strong></div>
+        <p className="small muted">An {data.value} Tagen bist du mindestens {data.value} km gefahren. Für {data.next} fehlen {data.missing_days} {data.missing_days === 1 ? "Tag" : "Tage"} mit mindestens {data.next} km.</p>
+        <p><Link to="/stats" className="link small">Zur Statistik →</Link></p>
+      </Panel>
+    );
+  }
+  if (id === "streaks") {
+    return (
+      <Panel title="Serie">
+        <div className="goal-num"><strong>{data.current}</strong> <span className="muted">{data.current === 1 ? "Tag" : "Tage"} in Folge</span></div>
+        <p className="small muted">Deine längste Serie war {data.longest} {data.longest === 1 ? "Tag" : "Tage"}.</p>
+      </Panel>
+    );
+  }
+  if (id === "records") {
+    return (
+      <Panel title="Rekorde">
+        <ul className="record-list">
+          {data.longest && <li><span>Längste Fahrt<br /><Link className="small" to={`/rides/${data.longest.id}`}>ansehen</Link></span><strong>{fmtNum(data.longest.km)} km</strong></li>}
+          {data.best_day && <li><span>Bester Tag<br /><span className="muted small">{fmtDate(data.best_day.date)}</span></span><strong>{fmtNum(data.best_day.km)} km</strong></li>}
+          {data.climb && <li><span>Meiste Höhenmeter<br /><Link className="small" to={`/rides/${data.climb.id}`}>ansehen</Link></span><strong>{fmtKm(data.climb.m)} m</strong></li>}
+        </ul>
+        {!data.longest && <p className="muted">Noch keine Fahrten.</p>}
+      </Panel>
+    );
+  }
+  return (
+    <Panel title="Form und Fitness" sub="Geschätzt aus Fahrzeit, Höhenmetern und Tempo, ohne Puls oder Leistung.">
+      {data.form == null ? <p className="muted">Noch keine Fahrten.</p> : (
+        <>
+          <div className="goal-num"><strong>{fmtNum(data.form, 0)}</strong> <span className="muted">Form, {data.state}</span></div>
+          <p className="small muted">Fitness {fmtNum(data.fitness, 0)}, Ermüdung {fmtNum(data.fatigue, 0)}. Positiv heißt ausgeruht, stark negativ heißt müde.</p>
+        </>
+      )}
+      <p><Link to="/stats?tab=load" className="link small">Zur Belastung →</Link></p>
+    </Panel>
+  );
+}
+
 export default function Home() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [offset, setOffset] = useState(0);
   const [past, setPast] = useState(null); // Daten einer früheren Woche
   const [weekError, setWeekError] = useState("");
+  const [lay, setLay] = useState(null);
+  const [extra, setExtra] = useState({});
+  const [params] = useSearchParams();
+  const [editing, setEditing] = useState(params.get("customize") === "1");
 
   const reload = () => api.get("/home").then(setD).catch((e) => setError(e.message));
   useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    api.get("/home/layout").then(setLay).catch(() => setLay({ mode: "expert", layout: ["week", "maintenance", "bikes", "goal", "recent"], custom: false, catalog: [] }));
+  }, []);
+  const dataKey = lay ? lay.layout.filter((i) => DATA_BLOCKS.includes(i)).join(",") : "";
+  useEffect(() => {
+    if (!dataKey) { setExtra({}); return undefined; }
+    let live = true;
+    api.get(`/home/blocks?ids=${dataKey}`).then((r) => { if (live) setExtra(r); }).catch(() => { if (live) setExtra({}); });
+    return () => { live = false; };
+  }, [dataKey]);
 
   useEffect(() => {
     if (offset === 0) { setPast(null); return undefined; }
@@ -85,33 +207,15 @@ export default function Home() {
   }, [offset]);
 
   if (error) return <p className="error" role="alert">{error}</p>;
-  if (!d) return <Loading />;
+  if (!d || !lay) return <Loading />;
 
   const { week, year, maintenance: m, bikes, recent } = d;
   const shown = offset === 0 || !past ? week : past;
   const t = shown.totals;
   const isCurrent = offset === 0;
 
-  return (
-    <>
-      <header className="page-head">
-        <h1>{greeting()}</h1>
-        <p className="muted">{new Date(d.today + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
-      </header>
-
-      <MechanicRequests items={d.mechanic_requests} />
-
-      {!d.has_rides && bikes.length === 0 ? (
-        <EmptyState title="Willkommen bei BikeHelper" text="Lege zuerst dein Rad an und importiere dann deine Fahrten.">
-          <div className="actions">
-            <Link className="btn primary" to="/garage">Rad anlegen</Link>
-            <Link className="btn" to="/rides">Fahrten importieren</Link>
-          </div>
-        </EmptyState>
-      ) : (
-        <>
-          <WetNotice items={d.wet_notices} />
-          <div className="home-grid">
+  const blocks = {
+    week: (
             <Panel title={weekTitle(shown)} className="home-week">
               <div className="week-nav">
                 <button className="btn small" onClick={() => setOffset(offset - 1)} disabled={!shown.has_earlier || (offset !== 0 && !past)} aria-label="Eine Woche zurück">‹ Zurück</button>
@@ -131,7 +235,8 @@ export default function Home() {
                 <span>{isCurrent ? "Vorwoche" : "Woche davor"} gesamt {fmtKm(shown.last_week_km)} km</span>
               </div>
             </Panel>
-
+    ),
+    maintenance: (
             <Panel title="Wartung" className="home-maint">
               {m.items.length === 0 ? (
                 <p className="ok">Alles in Ordnung. Nichts ist bald fällig.</p>
@@ -154,9 +259,8 @@ export default function Home() {
               {m.total > m.items.length && <p className="muted small">und {m.total - m.items.length} weitere</p>}
               <p style={{ marginTop: "0.75rem" }}><Link to="/garage" className="link">Zur Garage →</Link></p>
             </Panel>
-          </div>
-
-          {bikes.length > 0 && (
+    ),
+    bikes: bikes.length > 0 ? (
             <section className="home-bikes" aria-label="Deine Räder">
               {bikes.map((b) => (
                 <Link key={b.id} to={`/bikes/${b.id}`} className="home-bike">
@@ -170,9 +274,8 @@ export default function Home() {
                 </Link>
               ))}
             </section>
-          )}
-
-          <div className="home-grid">
+    ) : null,
+    goal: (
             <Panel title={`Dein Ziel ${year.year}`} sub={year.goals?.length ? `Noch ${year.days_left} Tage bis Jahresende` : undefined}>
               {year.goals?.length ? (
                 <ul className="goal-list">
@@ -214,6 +317,8 @@ export default function Home() {
                 </>
               )}
             </Panel>
+    ),
+    recent: (
             <Panel title="Letzte Fahrten">
               {recent.length === 0 ? <p className="muted">Noch keine Fahrten importiert.</p> : (
                 <ol className="top-list">
@@ -227,6 +332,41 @@ export default function Home() {
                 </ol>
               )}
             </Panel>
+    ),
+  };
+  const wide = new Set(lay.catalog.filter((c) => c.wide).map((c) => c.id));
+
+  return (
+    <>
+      <header className="page-head">
+        <h1>{greeting()}</h1>
+        <p className="muted">{new Date(d.today + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
+        {!(!d.has_rides && bikes.length === 0) && (
+          <button className="btn small" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>{editing ? "Fertig" : "Startseite anpassen"}</button>
+        )}
+      </header>
+
+      <MechanicRequests items={d.mechanic_requests} />
+
+      {!d.has_rides && bikes.length === 0 ? (
+        <EmptyState title="Willkommen bei BikeHelper" text="Lege zuerst dein Rad an und importiere dann deine Fahrten.">
+          <div className="actions">
+            <Link className="btn primary" to="/garage">Rad anlegen</Link>
+            <Link className="btn" to="/rides">Fahrten importieren</Link>
+          </div>
+        </EmptyState>
+      ) : (
+        <>
+          <WetNotice items={d.wet_notices} />
+          {editing && <HomeEditor lay={lay} onSave={async (body) => setLay(await api.put("/me/ui", body))} onClose={() => setEditing(false)} />}
+          {lay.layout.length === 0 && !editing && (
+            <p className="muted">Deine Startseite ist leer. <button className="link" onClick={() => setEditing(true)}>Blöcke hinzufügen</button></p>
+          )}
+          <div className="home-blocks">
+            {lay.layout.map((id) => {
+              const node = blocks[id] ?? (DATA_BLOCKS.includes(id) ? <AnalysisPanel id={id} data={extra[id]} /> : null);
+              return node ? <div key={id} className={`home-cell ${wide.has(id) ? "home-wide" : ""}`}>{node}</div> : null;
+            })}
           </div>
         </>
       )}

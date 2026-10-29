@@ -88,7 +88,7 @@ Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entste
 
 **Wie belastbar die Zahlen sind:** Für die Kette gibt es einen Labortest eines Schmierstoffherstellers (nass etwa 1,5-fach, sehr nass etwa 2,3-fach Verschleiß). Die Intervalle der übrigen Teile sind Richtwerte aus Werkstatt-Ratgebern und Herstellerangaben und streuen stark; die übrigen Nässefaktoren sind begründete Schätzungen. Wer es genauer weiß, ändert sie an der Regel. Die Kettenlehre schlägt jede Rechnung.
 
-Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum fehlt“, bis du ein Datum einträgst oder eine Regel als erledigt abhakst. Erst dann kann gezählt werden. Mit „Teil gewechselt“ wird das alte Teil ausgemustert und das neue übernimmt alle Regeln.
+Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum fehlt“, bis du ein Datum einträgst oder eine Regel als gewartet abhakst. Erst dann kann gezählt werden. Mit „Teil getauscht“ wird das alte Teil ausgemustert und das neue übernimmt alle Regeln.
 
 Quellen: Park Tool (Kettenverschleiß), BikeGremlin, Slowtwitch, Zero Friction Cycling, Geekay, BikeRadar, Lennard Zinn, CX Magazine, Michelin sowie Herstellerangaben von SRAM, Shimano und TRP.
 
@@ -124,11 +124,13 @@ In jeder Komponente (Garage, Rad öffnen) gibt es unter der Anleitung „Sichtpr
 - **Im Auge behalten:** Das Intervall startet ebenfalls neu, wird aber halbiert (Kilometer und Monate). Bei einer Kette mit 5000 km Intervall wird sie nach 2500 km wieder fällig.
 - **Schlecht, austauschen oder warten:** Die Regel („… wechseln“, „… erneuern“, bei Lagern „… warten“) ist sofort fällig, bis ein neuerer Wartungseintrag existiert.
 
-Bei diesen Wechselregeln gibt es kein „Erledigt“ mehr: Du trägst entweder eine Sichtprüfung ein oder wählst „Teil gewechselt“. „Erledigt“ bleibt bei Schmierung, Flüssigkeiten, Dichtmilch, Lagerwartung und Prüfregeln (bei der Lagerwartung für die echte Wartung). Die Sichtprüfung wirkt auf die Wechselregeln der Komponente und auf die Lagerwartung (Steuersatz, Innenlager, Naben: Spiel und Lauf prüfen), nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
+Bei diesen Wechselregeln gibt es kein „Gewartet“ mehr: Du trägst entweder eine Sichtprüfung ein oder wählst „Teil getauscht“. „Gewartet“ (bei Prüfregeln „Geprüft“) bleibt bei Schmierung, Flüssigkeiten, Dichtmilch, Lagerwartung und Prüfregeln (bei der Lagerwartung für die echte Wartung). Die Sichtprüfung wirkt auf die Wechselregeln der Komponente und auf die Lagerwartung (Steuersatz, Innenlager, Naben: Spiel und Lauf prüfen), nicht auf Schmierregeln, Flüssigkeiten oder Dichtmilch. Eine Prüfung mit „okay“ oder „im Auge behalten“ ersetzt ältere Kettenverschleiß-Messungen. Bremsbeläge behalten ihre eigene Prüfregel (siehe oben). Die Prüfung steht im Wartungsverlauf und lässt sich dort löschen. Den Faktor 0,5 legt `VISUAL_WATCH_FACTOR` in `services.py` fest.
 
 ## Startseite, Inventar, Anleitungen und Orte
 
-- **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche (mit „‹ Zurück“ blätterst du durch frühere Wochen, ein Tipp auf einen Tag öffnet dessen Fahrten), die wichtigsten Wartungen mit Knopf „Erledigt“, deine Räder, deine Jahresziele mit nötigem Pensum pro Woche und die letzten Fahrten. Auf der Seite einer Fahrt steht, was am Rad zu tun ist, und lässt sich direkt abhaken.
+- **Startseite:** Kilometer der Woche je Tag mit Vergleich zur Vorwoche (mit „‹ Zurück“ blätterst du durch frühere Wochen, ein Tipp auf einen Tag öffnet dessen Fahrten), die wichtigsten fünf Wartungen mit Knopf „Gewartet“, deine Räder, deine Jahresziele mit nötigem Pensum pro Woche und die letzten Fahrten. Mit „Startseite anpassen“ wählst du selbst, welche Blöcke du siehst, und sortierst sie mit ▲ und ▼. Zusätzlich gibt es Blöcke für die Eddington-Zahl, die Serie, Rekorde und (im Expertenmodus) Form und Fitness. Die Auswahl gilt nur für dein Konto; „Standard wiederherstellen“ setzt sie zurück.
+
+**Einfach oder Experte:** Unter Einstellungen → Funktionsumfang wählst du, wie viel BikeHelper zeigt. Neue Konten starten im einfachen Modus: Er blendet in der Statistik Belastung, Leistung, Muster & Wetter und Vergleiche aus, in Gruppen Duell, Rhythmus, Belastung und Wetter, und auf der Startseite den Block „Form und Fitness“. Bestehende Konten bleiben im Expertenmodus. Deine Daten ändern sich dabei nicht. Auf der Seite einer Fahrt steht, was am Rad zu tun ist, und lässt sich direkt abhaken.
 - **Nasse Fahrt:** Nach einer Fahrt mit mindestens 5 Minuten Regen oder nasser Straße (laut Wetterdaten) erscheint auf der Startseite ein Hinweis zur Kette. Er verschwindet 4 Stunden nach dem Ende der Fahrt, mit „Verstanden“ oder sobald du die Kette gepflegt einträgst. Bei Öl heißt es abwischen und bei Bedarf neu schmieren, bei Wachs abwischen und trocknen lassen, neu wachsen nur bei Dreck, Rost oder sehr nasser Fahrt. Das Wetter für eine Fahrt kommt erst nach dem Hochladen und kann einen Moment dauern.
 - **Suche:** Der Knopf „Suche“ oder die Taste `/` durchsucht Fahrten, Räder, Teile und Lager.
 - **Einkaufsliste** (Garage): Was bald oder jetzt gewechselt werden muss, abgeglichen mit dem Lager, zum Kopieren oder Drucken.
@@ -188,7 +190,7 @@ Jeder Reifensatz zeigt, wie viele Kilometer er gefahren ist und (wenn du eine er
 
 ## Einkaufslinks und Mechanics-Modus
 
-**Einkaufslink:** Bei jeder Komponente und jedem Reifensatz kannst du einen Link hinterlegen, wo du das Teil nachkaufst (nur `http`/`https`). Er gehört zu deinem Rad, erscheint als „Nachkaufen“, steht in der Einkaufsliste und wird bei „Teil gewechselt“ ans neue Teil übernommen.
+**Einkaufslink:** Bei jeder Komponente und jedem Reifensatz kannst du einen Link hinterlegen, wo du das Teil nachkaufst (nur `http`/`https`). Er gehört zu deinem Rad, erscheint als „Nachkaufen“, steht in der Einkaufsliste und wird bei „Teil getauscht“ ans neue Teil übernommen.
 
 **Mechanics-Modus:** In den Einstellungen schaltest du den Bereich „Werkstatt“ in der Garage frei. Dort fragst du mit der E-Mail-Adresse eines Partner-Kontos den Zugriff an. Die Antwort verrät nicht, ob es das Konto gibt; ist der E-Mail-Versand eingerichtet, bekommt der Partner zusätzlich eine Mail. Er sieht die Anfrage auf seiner Startseite und lässt sie zu oder lehnt sie ab. Entziehen kann er den Zugriff jederzeit in den Einstellungen, der Mechaniker kann ihn zurückgeben.
 

@@ -18,6 +18,7 @@ import Advisor from "./pages/Advisor.jsx";
 import RideDetail from "./pages/RideDetail.jsx";
 import Stats from "./pages/Stats.jsx";
 import Settings from "./pages/Settings.jsx";
+import { UiModeContext } from "./uiMode.js";
 import Groups, { GroupDetail, GroupJoin, pendingGroupToken } from "./pages/Groups.jsx";
 
 /** Einladungslink ohne Anmeldung: Schlüssel merken, anmelden lassen, danach weiter zur Einladung. */
@@ -82,6 +83,7 @@ export default function App() {
     <FeedbackHost />
     {user.tour && <Tour onClose={() => setUser((u) => ({ ...u, tour: false }))} />}
     <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
+    <UiModeContext.Provider value={user.ui_mode ?? "expert"}>
     <Shell user={user} onLogout={logout}>
       <ErrorBoundary>
       <Routes>
@@ -104,6 +106,7 @@ export default function App() {
       </Routes>
       </ErrorBoundary>
     </Shell>
+    </UiModeContext.Provider>
     </>
   );
 }

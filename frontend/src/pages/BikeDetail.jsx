@@ -214,7 +214,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               {guideOpen ? "Anleitungen ausblenden" : "Anleitung"}
             </button>
           )}
-          {!disabled && !rule.visual_check && <button className="link small" onClick={() => setOpen(!open)}>Erledigt</button>}
+          {!disabled && !rule.visual_check && <button className="link small" onClick={() => setOpen(!open)}>{rule.is_inspection ? "Geprüft" : "Gewartet"}</button>}
           <button className="link small" onClick={onDelete}>Regel löschen</button>
         </span>
       </div>
@@ -256,13 +256,13 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               Ergebnis
               <select value={done.result} onChange={(e) => setDone({ ...done, result: e.target.value })}>
                 <option value="good">Gut, noch lange nutzbar</option>
-                <option value="watch">Beobachtung, bald wechseln</option>
-                <option value="replace">Wechseln, jetzt</option>
+                <option value="watch">Beobachten, bald tauschen</option>
+                <option value="replace">Tauschen, jetzt</option>
               </select>
             </label>
           )}
           <label className="grow">Notiz<input value={done.note} onChange={(e) => setDone({ ...done, note: e.target.value })} /></label>
-          <button className="btn primary">Als erledigt eintragen</button>
+          <button className="btn primary">{rule.is_inspection ? "Als geprüft eintragen" : "Als gewartet eintragen"}</button>
           <button type="button" className="btn" onClick={() => setOpen(false)}>Abbrechen</button>
           <p className="hint" style={{ flexBasis: "100%" }}>Mit Uhrzeit zählen nur Fahrten, die danach begonnen haben. Ohne Uhrzeit zählt der ganze Tag.</p>
         </form>
@@ -520,10 +520,10 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
 
       {panel === "replace" && (
         <form className="inline-form" onSubmit={replace}>
-          <label>Gewechselt am<input type="date" value={repl.performed_at} onChange={(e) => setRepl({ ...repl, performed_at: e.target.value })} required /></label>
+          <label>Getauscht am<input type="date" value={repl.performed_at} onChange={(e) => setRepl({ ...repl, performed_at: e.target.value })} required /></label>
           <label className="grow">Neues Teil<input value={repl.name} onChange={(e) => setRepl({ ...repl, name: e.target.value })} /></label>
           <label>Marke<input value={repl.brand} onChange={(e) => setRepl({ ...repl, brand: e.target.value })} /></label>
-          <button className="btn primary">Teil wechseln</button>
+          <button className="btn primary">Teil tauschen</button>
           <button type="button" className="btn" onClick={() => setPanel(null)}>Abbrechen</button>
           <p className="hint span-all">Das alte Teil wird ausgemustert, das neue übernimmt alle Wartungsregeln und zählt ab 0 km.</p>
         </form>
@@ -547,9 +547,9 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
           <button className={`btn small ${noDate ? "primary" : ""}`} onClick={() => setPanel("date")}>
             {noDate ? "Einbaudatum eintragen" : "Einbaudatum ändern"}
           </button>
-          <button className="btn small" onClick={() => setPanel("replace")}>Teil gewechselt</button>
+          <button className="btn small" onClick={() => setPanel("replace")}>Teil getauscht</button>
           <button className="btn small" onClick={() => setPanel("shop")}>{comp.shop_url ? "Einkaufslink ändern" : "Einkaufslink"}</button>
-          <button className="btn small" onClick={() => setPanel("log")}>Wartung eintragen</button>
+          <button className="btn small" onClick={() => setPanel("log")}>Gewartet eintragen</button>
           <button className="btn small" onClick={() => setPanel("rule")}>Regel hinzufügen</button>
           <button className="btn small" onClick={retire}>Ausmustern</button>
           <button className="link small danger" onClick={remove}>Löschen</button>
