@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fmtDate, fmtNum } from "../api.js";
+import { api, fmtDate, fmtDateTime, fmtNum } from "../api.js";
 import { copyText } from "../clipboard.js";
 import { EmptyState } from "../components/ui.jsx";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
@@ -64,11 +64,13 @@ export default function Groups() {
           {groups.map((g) => (
             <Link key={g.id} to={`/groups/${g.id}`} className="panel group-card">
               <h2>{g.name}</h2>
-              <p className="muted small">{g.members} {g.members === 1 ? "Mitglied" : "Mitglieder"}{g.role === "admin" ? " · du bist Administrator" : ""}{g.share ? "" : " · du pausierst"}</p>
+              <p className="muted small">{g.members} {g.members === 1 ? "Mitglied" : "Mitglieder"}{g.role === "admin" ? " · du bist Administrator" : ""}{g.share ? "" : " · du pausierst"}{g.remote ? ` · Gruppe auf ${g.host}` : ""}</p>
+              {g.error && <p className="error small">{g.error}</p>}
             </Link>
           ))}
         </div>
       )}
+      <JoinRemote onJoined={(id) => navigate(`/groups/${id}`)} />
       <section className="panel">
         <h2>Neue Gruppe</h2>
         <form className="inline-form" onSubmit={create}>
@@ -78,6 +80,60 @@ export default function Groups() {
         </form>
       </section>
     </>
+  );
+}
+
+// ---------- Gruppe auf einem anderen Server ----------
+
+function JoinRemote({ onJoined }) {
+  const [enabled, setEnabled] = useState(false);
+  const [link, setLink] = useState("");
+  const [info, setInfo] = useState(null);
+  const [name, setName] = useState("");
+  const [share, setShare] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { api.get("/groups/remote/status").then((r) => setEnabled(!!r.enabled)).catch(() => setEnabled(false)); }, []);
+  if (!enabled) return null;
+
+  async function check(e) {
+    e.preventDefault();
+    setError(""); setInfo(null); setBusy(true);
+    try { setInfo(await api.post("/groups/remote/preview", { link })); } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+  async function join(e) {
+    e.preventDefault();
+    setError(""); setBusy(true);
+    try {
+      const r = await api.post("/groups/remote/join", { link, display_name: name, share });
+      toast("Du bist jetzt in der Gruppe. Deine Werte werden gleich gesendet.");
+      onJoined(r.id);
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <details className="panel howto">
+      <summary>Gruppe auf einem anderen BikeHelper-Server beitreten</summary>
+      <p className="muted small">
+        Hat dich jemand in eine Gruppe auf seinem eigenen BikeHelper-Server eingeladen, füge hier den Einladungslink ein. Dein Server sendet dem anderen nur Tageswerte
+        (Datum, Kilometer, Fahrten, Zeit, Höhenmeter, längste Fahrt) unter dem Namen, den du wählst. Keine Strecken, Orte, Räder oder Fahrtnamen.
+        Rhythmus, Rekorde, Belastung und Wetter werden für Mitglieder von anderen Servern noch nicht geteilt.
+      </p>
+      {error && <p className="error" role="alert">{error}</p>}
+      <form className="inline-form" onSubmit={check}>
+        <label className="grow">Einladungslink<input value={link} onChange={(e) => { setLink(e.target.value); setInfo(null); }} placeholder="https://…/groups/join/…" required /></label>
+        <button className="btn" disabled={busy}>Prüfen</button>
+      </form>
+      {info && (
+        <form className="inline-form" onSubmit={join}>
+          <p className="span-all">Gruppe <strong>„{info.group}“</strong> auf <strong>{info.host}</strong>{info.members ? `, ${info.members} Mitglieder` : ""}. Der Administrator dieses Servers sieht deinen Anzeigenamen und deine Tageswerte.</p>
+          <label className="grow">Dein Anzeigename in der Gruppe<input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required autoFocus /></label>
+          <label className="check"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span>Meine Tageswerte sofort teilen</span></label>
+          <button className="btn primary" disabled={busy}>Beitreten</button>
+        </form>
+      )}
+    </details>
   );
 }
 
@@ -263,6 +319,7 @@ function Board({ groupId, isAdmin }) {
         {!d && !error && <Loading rows={3} />}
         {d && d.rows.length === 0 && <p className="muted">Niemand in dieser Gruppe teilt gerade Kennzahlen.</p>}
         {d?.not_sharing.length > 0 && <p className="muted small">Pausieren: {d.not_sharing.join(", ")}</p>}
+        {d?.has_remote && <p className="muted small">Mitglieder von anderen Servern zeigen nur die Grundwerte (Kilometer, Höhenmeter, Zeit, Fahrten, Tempo, längste Fahrt). Rhythmus, Rekorde, Belastung und Wetter gibt es für sie noch nicht.</p>}
         {d?.rows.length > 0 && <p className="muted small">Mehr Bereiche (Rhythmus, Rekorde, Belastung, Wetter) erscheinen, sobald Mitglieder sie unter „Meine Teilnahme“ freigeben. Orte, Strecken, Räder und Wartung werden nie geteilt.</p>}
       </section>
       {d?.rows.length > 0 && <GroupStats d={d} groupId={groupId} />}
@@ -320,10 +377,10 @@ function Members({ g, reload }) {
       <ul className="plain group-members">
         {g.members.map((m) => (
           <li key={m.user_id}>
-            <span>{m.display_name}{m.is_me ? " (du)" : ""} <span className="muted small">{m.role === "admin" ? "Administrator" : "Mitglied"}{m.share ? "" : " · pausiert"}{m.share && m.shared.length ? ` · teilt zusätzlich: ${m.shared.map((k) => g.categories.find((c) => c.key === k)?.label || k).join(", ")}` : ""}</span></span>
+            <span>{m.display_name}{m.is_me ? " (du)" : ""} <span className="muted small">{m.remote ? "Mitglied von einem anderen Server" : m.role === "admin" ? "Administrator" : "Mitglied"}{m.share ? "" : " · pausiert"}{m.share && m.shared.length ? ` · teilt zusätzlich: ${m.shared.map((k) => g.categories.find((c) => c.key === k)?.label || k).join(", ")}` : ""}</span></span>
             {isAdmin && !m.is_me && (
               <span className="row-actions">
-                <button className="link small" onClick={() => run(() => api.put(`/groups/${g.id}/members/${m.user_id}/role`, { role: m.role === "admin" ? "member" : "admin" }))}>{m.role === "admin" ? "Zum Mitglied machen" : "Zum Administrator machen"}</button>
+                {!m.remote && <button className="link small" onClick={() => run(() => api.put(`/groups/${g.id}/members/${m.user_id}/role`, { role: m.role === "admin" ? "member" : "admin" }))}>{m.role === "admin" ? "Zum Mitglied machen" : "Zum Administrator machen"}</button>}
                 <button className="link small danger" onClick={async () => { if (await confirmDialog(`„${m.display_name}“ aus der Gruppe entfernen?`)) run(() => api.del(`/groups/${g.id}/members/${m.user_id}`), "Entfernt."); }}>Entfernen</button>
               </span>
             )}
@@ -340,7 +397,7 @@ function Members({ g, reload }) {
         <input type="checkbox" checked={g.share} onChange={(e) => run(() => api.put(`/groups/${g.id}/me`, { share: e.target.checked }))} />
         <span>Meine Kennzahlen in dieser Gruppe zeigen (aus: du erscheinst nicht in den Ranglisten)</span>
       </label>
-      {g.share && <ShareChoices categories={g.categories} value={g.shared} onChange={(v) => run(() => api.put(`/groups/${g.id}/me`, { shared: v }))} />}
+      {g.share && g.categories.length > 0 && <ShareChoices categories={g.categories} value={g.shared} onChange={(v) => run(() => api.put(`/groups/${g.id}/me`, { shared: v }))} />}
       <p>
         <button className="link danger" onClick={async () => { if (await confirmDialog(`Gruppe „${g.name}“ verlassen?`)) { try { await api.del(`/groups/${g.id}/me`); navigate("/groups"); } catch (e) { setError(e.message); } } }}>Gruppe verlassen</button>
       </p>
@@ -407,6 +464,25 @@ function GroupAdmin({ g, reload }) {
   );
 }
 
+function RemoteStatus({ g, reload }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function sync() {
+    setBusy(true); setError("");
+    try { await api.post("/groups/remote/sync"); await reload(); toast("Werte gesendet."); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <section className="panel">
+      <p className="muted small">
+        Diese Gruppe liegt auf dem Server <strong>{g.host}</strong>. Dein Server sendet dorthin nur Tageswerte, nach dem Beitritt, nach Importen alle paar Stunden und auf Knopfdruck.
+        {g.last_sync_at ? ` Zuletzt gesendet: ${fmtDateTime(g.last_sync_at)}.` : " Noch nichts gesendet."}
+      </p>
+      {(g.error || error) && <p className="error" role="alert">{g.error || error}</p>}
+      <button className="btn small" onClick={sync} disabled={busy}>Jetzt senden</button>
+    </section>
+  );
+}
+
 export function GroupDetail() {
   const { id } = useParams();
   const [g, setG] = useState(null);
@@ -420,6 +496,7 @@ export function GroupDetail() {
     <>
       <p><Link to="/groups" className="link">← Alle Gruppen</Link></p>
       <header className="page-head"><h1>{g.name}</h1></header>
+      {g.remote && <RemoteStatus g={g} reload={load} />}
       <Board groupId={g.id} isAdmin={g.role === "admin"} key={`${g.id}-${g.share}-${g.shared.join()}`} />
       <Members g={g} reload={load} />
     </>

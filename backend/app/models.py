@@ -436,6 +436,55 @@ class GroupMember(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class RemoteMember(Base):
+    """Mitglied einer Gruppe dieses Servers, dessen Konto auf einem anderen BikeHelper-Server liegt.
+
+    Dieser Server kennt von ihm nur Anzeigename, die Freigabe und Tageswerte (RemoteDay). Der Schlüssel, mit dem sich der andere
+    Server meldet, ist hier nur als SHA-256-Wert gespeichert."""
+    __tablename__ = "remote_members"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    display_name: Mapped[str] = mapped_column(String(60))
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    share: Mapped[bool] = mapped_column(Boolean, default=True)
+    shared: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    origin: Mapped[str | None] = mapped_column(String(200), nullable=True)  # Adresse des anderen Servers, nur zur Anzeige
+    joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_push_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RemoteDay(Base):
+    """Tageswerte eines externen Mitglieds (in dessen lokaler Zeitzone), mehr wird nicht übertragen."""
+    __tablename__ = "remote_days"
+
+    member_id: Mapped[int] = mapped_column(ForeignKey("remote_members.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    km: Mapped[float] = mapped_column(Float, default=0.0)
+    rides: Mapped[int] = mapped_column(Integer, default=0)
+    time_s: Mapped[int] = mapped_column(Integer, default=0)
+    elev_m: Mapped[float] = mapped_column(Float, default=0.0)
+    longest_km: Mapped[float] = mapped_column(Float, default=0.0)
+
+
+class RemoteMembership(Base):
+    """Mitgliedschaft eines Nutzers dieses Servers in einer Gruppe auf einem anderen BikeHelper-Server."""
+    __tablename__ = "remote_memberships"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    host_url: Mapped[str] = mapped_column(String(200))  # Adresse des Gastgeber-Servers, ohne Pfad
+    group_name: Mapped[str] = mapped_column(String(80))
+    members: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    display_name: Mapped[str] = mapped_column(String(60))
+    share: Mapped[bool] = mapped_column(Boolean, default=True)
+    member_key: Mapped[str] = mapped_column(String(80))  # geheim, wie der intervals.icu-Schlüssel
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    full_synced: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class GroupInvite(Base):
     """Einladung per Link (einmal gültig, 14 Tage)."""
     __tablename__ = "group_invites"

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     # intervals.icu: Fahrten (auch von Garmin, Zwift, Polar …) mit dem persönlichen API-Schlüssel abholen
     intervals_enabled: bool = True
+    # Gruppen über mehrere BikeHelper-Server (Gastgeber und Gäste). Standardmäßig aus; der Administrator schaltet es in der Oberfläche ein.
+    federation_enabled: bool = False
+    federation_allow_private: bool = False  # nur für Tests im eigenen Netz: Adressen im lokalen Netz und http erlauben
     intervals_api_url: str = "https://intervals.icu"
 
     class Config:

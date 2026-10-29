@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-10-29.1",
+    "date": "2026-10-29",
+    "title": "Gruppen über mehrere Server",
+    "changes": [
+      "Du kannst jetzt Mitglied einer Gruppe sein, die auf einem anderen BikeHelper-Server liegt. Füge den Einladungslink unter Gruppen ein.",
+      "Gesendet werden nur Tageswerte (Datum, Kilometer, Fahrten, Zeit, Höhenmeter, längste Fahrt), keine Strecken oder Orte. Der Administrator schaltet die Funktion zuerst unter Administration → Funktionen ein.",
+      "Rangliste, Verlauf, Ziel und Duell funktionieren auch mit externen Mitgliedern. Rhythmus, Rekorde, Belastung und Wetter gibt es für sie noch nicht."
+    ]
+  },
+  {
     "id": "2026-10-28.7",
     "date": "2026-10-28",
     "title": "Sichtprüfung auch für Lager",

@@ -7,17 +7,19 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import date, datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from .. import federation as fed
 from .. import notify
 from ..config import settings
 from ..database import get_db
-from ..models import Activity, Group, GroupGoal, GroupInvite, GroupMember, User
+from ..models import Activity, Group, GroupGoal, GroupInvite, GroupMember, RemoteDay, RemoteMember, RemoteMembership, User
 from ..security import current_user
 from ..stats.extra import DAYPARTS, MILESTONES, load_series, longest_week_streak, ride_load
 from ..stats.overview import DISTANCE_BUCKETS, Row, _bucket, get_tz, local, streaks
@@ -98,6 +100,48 @@ def _shared(m: GroupMember) -> list[str]:
     return [c for c in (m.shared or "").split(",") if c in CATEGORIES]
 
 
+@dataclass
+class _Mem:
+    """Mitglied einer Gruppe, lokal (uid = Nutzer-ID) oder von einem anderen Server (uid = negative ID des externen Mitglieds)."""
+    uid: int
+    display_name: str
+    share: bool
+    shared: str | None
+    remote: bool = False
+    role: str = "member"
+    origin: str | None = None
+
+
+def _members(db: Session, group_id: int) -> list[_Mem]:
+    out = [_Mem(m.user_id, m.display_name, m.share, m.shared, False, m.role)
+           for m in db.scalars(select(GroupMember).where(GroupMember.group_id == group_id))]
+    out += [_Mem(-r.id, r.display_name, r.share, None, True, "member", r.origin)
+            for r in db.scalars(select(RemoteMember).where(RemoteMember.group_id == group_id))]
+    return out
+
+
+def _drop_remote(db: Session, group_id: int) -> None:
+    ids = db.scalars(select(RemoteMember.id).where(RemoteMember.group_id == group_id)).all()
+    if ids:
+        db.execute(delete(RemoteDay).where(RemoteDay.member_id.in_(ids)))
+        db.execute(delete(RemoteMember).where(RemoteMember.group_id == group_id))
+
+
+def _remote(db: Session, user: User, group_id: int, method: str, path: str, *, params: dict | None = None, json: dict | None = None):
+    """Gruppe auf einem anderen Server: Anfrage an den Gastgeber weiterreichen."""
+    ms = fed.membership(db, user.id, group_id)
+    if ms is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Gruppe nicht gefunden")
+    try:
+        return fed.call(ms.host_url, method, path, key=ms.member_key, params=params, json=json)
+    except fed.FederationError as e:
+        if e.status_code in (401, 404):
+            ms.last_error = "Der Gastgeber kennt dich nicht mehr. Du wurdest entfernt oder die Gruppe gibt es nicht mehr."
+            db.commit()
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, ms.last_error)
+        raise HTTPException(e.status_code if e.status_code in (409, 422) else status.HTTP_502_BAD_GATEWAY, e.message)
+
+
 def _clean(name: str) -> str:
     n = " ".join(name.split())
     if not n:
@@ -105,11 +149,14 @@ def _clean(name: str) -> str:
     return n
 
 
-def _unique_name(db: Session, group_id: int, name: str, except_user: int | None = None) -> None:
+def _unique_name(db: Session, group_id: int, name: str, except_user: int | None = None, except_remote: int | None = None) -> None:
     q = select(GroupMember.user_id).where(GroupMember.group_id == group_id, func.lower(GroupMember.display_name) == name.lower())
     if except_user is not None:
         q = q.where(GroupMember.user_id != except_user)
-    if db.scalar(q) is not None:
+    q2 = select(RemoteMember.id).where(RemoteMember.group_id == group_id, func.lower(RemoteMember.display_name) == name.lower())
+    if except_remote is not None:
+        q2 = q2.where(RemoteMember.id != except_remote)
+    if db.scalar(q) is not None or db.scalar(q2) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Diesen Anzeigenamen gibt es in der Gruppe schon")
 
 
@@ -132,12 +179,14 @@ def find_invite(db: Session, token: str | None) -> GroupInvite | None:
 
 def leave_all(db: Session, user_id: int) -> None:
     """Beim Löschen eines Kontos: aus allen Gruppen entfernen; ohne Admin rückt das dienstälteste Mitglied nach, leere Gruppen verschwinden."""
+    fed.leave_all(db, user_id)
     gids = db.scalars(select(GroupMember.group_id).where(GroupMember.user_id == user_id)).all()
     db.execute(delete(GroupMember).where(GroupMember.user_id == user_id))
     db.flush()
     for gid in gids:
         rest = db.scalars(select(GroupMember).where(GroupMember.group_id == gid).order_by(GroupMember.joined_at, GroupMember.user_id)).all()
         if not rest:
+            _drop_remote(db, gid)
             db.execute(delete(GroupInvite).where(GroupInvite.group_id == gid))
             db.execute(delete(GroupGoal).where(GroupGoal.group_id == gid))
             db.execute(delete(Group).where(Group.id == gid))
@@ -155,7 +204,13 @@ def my_groups(user: User = Depends(current_user), db: Session = Depends(get_db))
         .where(GroupMember.user_id == user.id).order_by(Group.name)
     ).all()
     counts = dict(db.execute(select(GroupMember.group_id, func.count()).group_by(GroupMember.group_id)).all())
-    return [{"id": g.id, "name": g.name, "role": m.role, "members": counts.get(g.id, 0), "share": m.share} for g, m in rows]
+    for gid, n in db.execute(select(RemoteMember.group_id, func.count()).group_by(RemoteMember.group_id)).all():
+        counts[gid] = counts.get(gid, 0) + n
+    out = [{"id": g.id, "name": g.name, "role": m.role, "members": counts.get(g.id, 0), "share": m.share, "remote": False} for g, m in rows]
+    for ms in db.scalars(select(RemoteMembership).where(RemoteMembership.user_id == user.id).order_by(RemoteMembership.group_name)):
+        out.append({"id": fed.REMOTE_BASE + ms.id, "name": ms.group_name, "role": "member", "members": ms.members or 0, "share": ms.share,
+                    "remote": True, "host": fed.host_label(ms), "error": ms.last_error})
+    return out
 
 
 @router.get("/invitations")
@@ -201,7 +256,7 @@ def join(data: JoinIn, user: User = Depends(current_user), db: Session = Depends
             db.delete(inv)
         db.commit()
         return {"id": gid}
-    if db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == gid)) >= MAX_MEMBERS:
+    if len(_members(db, gid)) >= MAX_MEMBERS:
         raise HTTPException(status.HTTP_409_CONFLICT, "Die Gruppe ist voll")
     if db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.user_id == user.id)) >= MAX_GROUPS_PER_USER:
         raise HTTPException(status.HTTP_409_CONFLICT, f"Mehr als {MAX_GROUPS_PER_USER} Gruppen sind nicht möglich")
@@ -217,21 +272,34 @@ def join(data: JoinIn, user: User = Depends(current_user), db: Session = Depends
 
 @router.get("/{group_id}")
 def group_info(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if fed.is_remote_id(group_id):
+        info = _remote(db, user, group_id, "GET", "/info")
+        ms = fed.membership(db, user.id, group_id)
+        return {**info, "id": group_id, "remote": True, "host": fed.host_label(ms), "last_sync_at": ms.last_sync_at.isoformat() + "Z" if ms.last_sync_at else None,
+                "error": ms.last_error, "display_name": ms.display_name, "share": ms.share}
     me = _member(db, group_id, user)
+    return _info(db, group_id, me.role, me.display_name, me.share, _shared(me), user.id, is_local=True)
+
+
+def _info(db: Session, group_id: int, role: str, display_name: str, share: bool, shared: list[str], me_uid: int, *, is_local: bool) -> dict:
+    """Gruppenübersicht. Für Mitglieder von anderen Servern (is_local False) ohne Einladungen und Mailfunktion."""
     g = db.get(Group, group_id)
-    members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id).order_by(GroupMember.display_name)).all()
+    members = sorted(_members(db, group_id), key=lambda m: m.display_name.lower())
     out = {
-        "id": g.id, "name": g.name, "role": me.role, "display_name": me.display_name, "share": me.share, "shared": _shared(me),
-        "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()],
-        "members": [{"user_id": m.user_id, "display_name": m.display_name, "role": m.role, "share": m.share, "shared": _shared(m), "is_me": m.user_id == user.id} for m in members],
+        "id": g.id, "name": g.name, "role": role, "display_name": display_name, "share": share, "shared": shared,
+        "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()] if is_local else [],
+        "members": [{"user_id": m.uid, "display_name": m.display_name, "role": m.role, "share": m.share, "shared": [] if m.remote else _shared(m),
+                     "is_me": m.uid == me_uid, "remote": m.remote} for m in members],
         "invites": [],
-        "mail_enabled": notify.smtp_configured(),
+        "mail_enabled": notify.smtp_configured() if is_local else False,
     }
-    if me.role == "admin":
-        invs = db.scalars(select(GroupInvite).where(GroupInvite.group_id == group_id).order_by(GroupInvite.id.desc())).all()
-        out["invites"] = [{"id": i.id, "email": i.email, "expired": not _fresh(i)} for i in invs if not i.multi]
-        shared = next((i for i in invs if i.multi and _fresh(i)), None)
-        out["invite_link"] = f"{settings.public_url.rstrip('/')}/groups/join/{shared.token}" if shared else None
+    if not is_local or role != "admin":
+        return out
+    invs = db.scalars(select(GroupInvite).where(GroupInvite.group_id == group_id).order_by(GroupInvite.id.desc())).all()
+    out["invites"] = [{"id": i.id, "email": i.email, "expired": not _fresh(i)} for i in invs if not i.multi]
+    link = next((i for i in invs if i.multi and _fresh(i)), None)
+    out["invite_link"] = f"{settings.public_url.rstrip('/')}/groups/join/{link.token}" if link else None
+    out["federation"] = settings.federation_enabled
     return out
 
 
@@ -246,6 +314,7 @@ def rename(group_id: int, data: RenameIn, user: User = Depends(current_user), db
 @router.delete("/{group_id}", status_code=204)
 def delete_group(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _admin(db, group_id, user)
+    _drop_remote(db, group_id)
     db.execute(delete(GroupInvite).where(GroupInvite.group_id == group_id))
     db.execute(delete(GroupMember).where(GroupMember.group_id == group_id))
     db.execute(delete(GroupGoal).where(GroupGoal.group_id == group_id))
@@ -318,6 +387,8 @@ def delete_invite(group_id: int, invite_id: int, user: User = Depends(current_us
 
 @router.put("/{group_id}/me")
 def update_me(group_id: int, data: MeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if fed.is_remote_id(group_id):
+        return _update_remote_me(db, user, group_id, data)
     m = _member(db, group_id, user)
     if data.display_name is not None:
         name = _clean(data.display_name)
@@ -331,10 +402,39 @@ def update_me(group_id: int, data: MeIn, user: User = Depends(current_user), db:
     return {"ok": True}
 
 
+def _update_remote_me(db: Session, user: User, group_id: int, data: MeIn) -> dict:
+    ms = fed.membership(db, user.id, group_id)
+    if ms is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Gruppe nicht gefunden")
+    body: dict = {}
+    if data.display_name is not None:
+        body["display_name"] = _clean(data.display_name)
+    if data.share is not None:
+        body["share"] = data.share
+    if body:
+        _remote(db, user, group_id, "PUT", "/me", json=body)  # der Gastgeber prüft den Namen (eindeutig in der Gruppe)
+        ms.display_name = body.get("display_name", ms.display_name)
+        ms.share = body.get("share", ms.share)
+        db.commit()
+        fed.trigger(user.id)
+    return {"ok": True}
+
+
 @router.delete("/{group_id}/me", status_code=204)
 def leave(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if fed.is_remote_id(group_id):
+        ms = fed.membership(db, user.id, group_id)
+        if ms is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Gruppe nicht gefunden")
+        try:
+            fed.call(ms.host_url, "DELETE", "/leave", key=ms.member_key)
+        except fed.FederationError as e:
+            log.info("Austritt beim Gastgeber nicht bestätigt: %s", e.message)  # lokal wird trotzdem ausgetreten
+        db.delete(ms)
+        db.commit()
+        return
     m = _member(db, group_id, user)
-    others = db.scalar(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id != user.id))
+    others = len(_members(db, group_id)) - 1
     if m.role == "admin" and _admin_count(db, group_id) <= 1 and others:
         raise HTTPException(status.HTTP_409_CONFLICT, "Du bist der einzige Gruppenadministrator. Ernenne zuerst jemand anderen oder lösche die Gruppe.")
     db.delete(m)
@@ -348,6 +448,8 @@ def leave(group_id: int, user: User = Depends(current_user), db: Session = Depen
 @router.put("/{group_id}/members/{member_id}/role")
 def set_role(group_id: int, member_id: int, data: RoleIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _admin(db, group_id, user)
+    if member_id < 0:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Mitglieder von anderen Servern können nicht Administrator werden")
     if data.role not in ("admin", "member"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unbekannte Rolle")
     m = db.get(GroupMember, (group_id, member_id))
@@ -365,6 +467,13 @@ def remove_member(group_id: int, member_id: int, user: User = Depends(current_us
     _admin(db, group_id, user)
     if member_id == user.id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Zum Verlassen der Gruppe nutze „Gruppe verlassen“")
+    if member_id < 0:
+        rm = db.get(RemoteMember, -member_id)
+        if rm is not None and rm.group_id == group_id:
+            db.execute(delete(RemoteDay).where(RemoteDay.member_id == rm.id))
+            db.delete(rm)
+        db.commit()
+        return
     db.execute(delete(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == member_id))
     db.commit()
 
@@ -495,9 +604,62 @@ def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -
     return out
 
 
+def _rows_from_days(days) -> list[_R]:
+    """Tageswerte eines externen Mitglieds als einzelne Fahrten, damit die bestehende Auswertung unverändert rechnet. Die Summen
+    (Kilometer, Zeit, Höhenmeter, Fahrten) und die längste Fahrt stimmen; die Uhrzeit ist mittags angenommen."""
+    out: list[_R] = []
+    for d in days:
+        n = max(1, d.rides or 1)
+        total = max(0.0, d.km or 0.0)
+        longest = min(total, max(d.longest_km or 0.0, total / n)) if n > 1 else total
+        kms = [longest] + [(total - longest) / (n - 1)] * (n - 1) if n > 1 else [total]
+        t_left, e_left = int(d.time_s or 0), float(d.elev_m or 0.0)
+        for i, km in enumerate(kms):
+            frac = km / total if total > 0 else 1.0 / n
+            last = i == n - 1
+            secs = t_left if last else min(t_left, round((d.time_s or 0) * frac))
+            elev = e_left if last else min(e_left, (d.elev_m or 0.0) * frac)
+            t_left -= secs
+            e_left -= elev
+            start = datetime.combine(d.day, time(12))
+            r = _R(id=0, name="", bike_id=None, start=start, km=km, time_s=secs, elev_m=elev)
+            r.day, r.hour, r.start_local = d.day, 12, start
+            out.append(r)
+    return out
+
+
+def _load_rows(db: Session, sharing: dict[int, _Mem], tz) -> dict[int, list[_R]]:
+    rows_by_user: dict[int, list[_R]] = {uid: [] for uid in sharing}
+    local_ids = [uid for uid in sharing if uid > 0]
+    if local_ids:
+        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.moving_time_s, Activity.elevation_m,
+                   Activity.temp_c, Activity.precip_mm, Activity.wet_minutes, Activity.weather_status).where(Activity.user_id.in_(local_ids))
+        for uid, start, km, secs, elev, temp, precip, wetm, wstat in db.execute(q):
+            ldt = local(start, tz)
+            r = _R(id=0, name="", bike_id=None, start=start, km=km or 0.0, time_s=secs or 0, elev_m=elev or 0.0,
+                   temp_c=temp, precip_mm=precip, wet_minutes=wetm, weather_status=wstat)
+            r.day, r.hour, r.start_local = ldt.date(), ldt.hour, ldt
+            rows_by_user[uid].append(r)
+    remote_ids = [-uid for uid in sharing if uid < 0]
+    if remote_ids:
+        by_member: dict[int, list[RemoteDay]] = {}
+        for d in db.scalars(select(RemoteDay).where(RemoteDay.member_id.in_(remote_ids))):
+            by_member.setdefault(d.member_id, []).append(d)
+        for mid, days in by_member.items():
+            rows_by_user[-mid] = _rows_from_days(days)
+    return rows_by_user
+
+
 @router.get("/{group_id}/stats")
 def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if fed.is_remote_id(group_id):
+        return _remote(db, user, group_id, "GET", "/stats", params={"period": period, "offset": offset})
     _member(db, group_id, user)
+    return compute_stats(db, group_id, period, offset, user.id)
+
+
+def compute_stats(db: Session, group_id: int, period: str, offset: int, me_uid: int) -> dict:
+    """Rangliste und Verlauf einer Gruppe. me_uid markiert die Zeile des Betrachters (Nutzer-ID, bei externen Mitgliedern negativ)."""
     if period not in PERIODS:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unbekannter Zeitraum")
     offset = min(0, max(-520, offset))
@@ -505,8 +667,8 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
     today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
     lo, hi, label = _bounds(period, offset, today)
     plo, phi, _ = _bounds(period, offset - 1, today) if period != "all" else (None, None, "")
-    members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id)).all()
-    sharing = {m.user_id: m for m in members if m.share}
+    members = _members(db, group_id)
+    sharing = {m.uid: m for m in members if m.share}
 
     # Beschriftung und Zuordnung der Verlaufspunkte (Tage, Monate oder Jahre, je nach Zeitraum)
     if period == "week":
@@ -527,16 +689,7 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
             return d.month - 1
         return d.year
 
-    rows_by_user: dict[int, list[_R]] = {uid: [] for uid in sharing}
-    if sharing:
-        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.moving_time_s, Activity.elevation_m,
-                   Activity.temp_c, Activity.precip_mm, Activity.wet_minutes, Activity.weather_status).where(Activity.user_id.in_(sharing))
-        for uid, start, km, secs, elev, temp, precip, wetm, wstat in db.execute(q):
-            ldt = local(start, tz)
-            r = _R(id=0, name="", bike_id=None, start=start, km=km or 0.0, time_s=secs or 0, elev_m=elev or 0.0,
-                   temp_c=temp, precip_mm=precip, wet_minutes=wetm, weather_status=wstat)
-            r.day, r.hour, r.start_local = ldt.date(), ldt.hour, ldt
-            rows_by_user[uid].append(r)
+    rows_by_user = _load_rows(db, sharing, tz)
 
     def within(rs, a, b):
         return [r for r in rs if (a is None or r.day >= a) and (b is None or r.day < b)]
@@ -545,11 +698,11 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
     for uid, m in sharing.items():
         rs = rows_by_user[uid]
         cur = within(rs, lo, hi)
-        row = {"user_id": uid, "display_name": m.display_name, "is_me": uid == user.id, **_totals(cur), "shared": _shared(m)}
+        row = {"user_id": uid, "display_name": m.display_name, "is_me": uid == me_uid, **_totals(cur), "shared": [] if m.remote else _shared(m), "remote": m.remote}
         if period != "all":
             row["prev"] = {k: v for k, v in _totals(within(rs, plo, phi)).items() if k in ("km", "elev_m", "time_s", "rides")}
         end_day = min(today, (hi - timedelta(days=1)) if hi else today)
-        row["extras"] = _extras(_shared(m), cur, rs, end_day, tz)
+        row["extras"] = {} if m.remote else _extras(_shared(m), cur, rs, end_day, tz)  # Zusatzbereiche gibt es für externe Mitglieder noch nicht
         first_day = lo if lo else min((r.day for r in cur), default=None)
         row["rides_per_week"] = rides_per_week(len(cur), first_day, end_day)
         if period != "all":
@@ -588,6 +741,7 @@ def group_stats(group_id: int, period: str = "week", offset: int = 0, user: User
         "rows": result,
         "categories": [{"key": k, "label": v[0], "text": v[1]} for k, v in CATEGORIES.items()],
         "not_sharing": sorted(m.display_name for m in members if not m.share),
+        "has_remote": any(m.remote for m in members),
         "series": {"labels": labels,
                    "members": [{"display_name": r["display_name"], "is_me": r["is_me"],
                                 "km": [round(series_raw[r["user_id"]].get(k, 0.0), 1) for k in slots]} for r in result]},
@@ -635,32 +789,46 @@ def goal_progress(goal: GroupGoal, daily: dict[str, dict[date, float]], names: d
     }
 
 
-def _goal_daily(db: Session, goal: GroupGoal, sharing: dict[int, GroupMember], tz) -> dict[int, dict[date, float]]:
+def _goal_daily(db: Session, goal: GroupGoal, sharing: dict[int, _Mem], tz) -> dict[int, dict[date, float]]:
     daily: dict[int, dict[date, float]] = {uid: {} for uid in sharing}
     if not sharing:
         return daily
-    lo = datetime.combine(goal.start - timedelta(days=1), datetime.min.time())
-    hi = datetime.combine(goal.end + timedelta(days=2), datetime.min.time())
-    q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m).where(
-        Activity.user_id.in_(sharing), Activity.start_date >= lo, Activity.start_date < hi)
-    for uid, start, km, elev in db.execute(q):
-        d = local(start, tz).date()
-        value = {"km": km or 0.0, "elev_m": elev or 0.0, "rides": 1.0}[goal.metric]
-        daily[uid][d] = daily[uid].get(d, 0.0) + value
+    local_ids = [uid for uid in sharing if uid > 0]
+    if local_ids:
+        lo = datetime.combine(goal.start - timedelta(days=1), datetime.min.time())
+        hi = datetime.combine(goal.end + timedelta(days=2), datetime.min.time())
+        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m).where(
+            Activity.user_id.in_(local_ids), Activity.start_date >= lo, Activity.start_date < hi)
+        for uid, start, km, elev in db.execute(q):
+            d = local(start, tz).date()
+            value = {"km": km or 0.0, "elev_m": elev or 0.0, "rides": 1.0}[goal.metric]
+            daily[uid][d] = daily[uid].get(d, 0.0) + value
+    remote_ids = [-uid for uid in sharing if uid < 0]
+    if remote_ids:
+        q2 = select(RemoteDay).where(RemoteDay.member_id.in_(remote_ids), RemoteDay.day >= goal.start, RemoteDay.day <= goal.end)
+        for rd in db.scalars(q2):
+            value = {"km": rd.km or 0.0, "elev_m": rd.elev_m or 0.0, "rides": float(rd.rides or 0)}[goal.metric]
+            daily[-rd.member_id][rd.day] = value
     return daily
 
 
 @router.get("/{group_id}/goal")
 def get_goal(group_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if fed.is_remote_id(group_id):
+        return _remote(db, user, group_id, "GET", "/goal")
     _member(db, group_id, user)
+    return goal_state(db, group_id)
+
+
+def goal_state(db: Session, group_id: int) -> dict:
     goal = db.scalar(select(GroupGoal).where(GroupGoal.group_id == group_id))
     if goal is None:
         return {"goal": None}
     tz = get_tz(settings.timezone)
     today = local(datetime.now(timezone.utc).replace(tzinfo=None), tz).date()
-    members = db.scalars(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.share.is_(True))).all()
-    sharing = {m.user_id: m for m in members}
-    names = {m.user_id: m.display_name for m in members}
+    members = [m for m in _members(db, group_id) if m.share]
+    sharing = {m.uid: m for m in members}
+    names = {m.uid: m.display_name for m in members}
     return {"goal": goal_progress(goal, _goal_daily(db, goal, sharing, tz), names, today)}
 
 
@@ -693,10 +861,16 @@ def delete_goal(group_id: int, user: User = Depends(current_user), db: Session =
 @router.get("/{group_id}/duel")
 def duel(group_id: int, a: int, b: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Zwei Mitglieder im direkten Vergleich über die letzten 12 Wochen. Nur wer teilt, kann verglichen werden."""
+    if fed.is_remote_id(group_id):
+        return _remote(db, user, group_id, "GET", "/duel", params={"a": a, "b": b})
     _member(db, group_id, user)
+    return compute_duel(db, group_id, a, b, user.id)
+
+
+def compute_duel(db: Session, group_id: int, a: int, b: int, me_uid: int) -> dict:
     if a == b:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Bitte zwei verschiedene Mitglieder wählen.")
-    members = {m.user_id: m for m in db.scalars(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id.in_([a, b])))}
+    members = {m.uid: m for m in _members(db, group_id) if m.uid in (a, b)}
     if a not in members or b not in members:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Mitglied nicht gefunden")
     if not (members[a].share and members[b].share):
@@ -707,21 +881,30 @@ def duel(group_id: int, a: int, b: int, user: User = Depends(current_user), db: 
     since = datetime.combine(first - timedelta(days=1), datetime.min.time())
     weeks = [first + timedelta(weeks=i) for i in range(12)]
     acc = {uid: {w: {"km": 0.0, "elev_m": 0.0, "rides": 0, "time_s": 0} for w in weeks} for uid in (a, b)}
-    q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m, Activity.moving_time_s).where(
-        Activity.user_id.in_([a, b]), Activity.start_date >= since)
-    for uid, start, km, elev, secs in db.execute(q):
-        d = local(start, tz).date()
+
+    def add(uid: int, d: date, km: float, elev: float, rides: int, secs: int) -> None:
         w = d - timedelta(days=d.weekday())
         if w in acc[uid]:
             x = acc[uid][w]
             x["km"] += km or 0.0
             x["elev_m"] += elev or 0.0
-            x["rides"] += 1
+            x["rides"] += rides
             x["time_s"] += secs or 0
+
+    local_ids = [uid for uid in (a, b) if uid > 0]
+    if local_ids:
+        q = select(Activity.user_id, Activity.start_date, Activity.distance_km, Activity.elevation_m, Activity.moving_time_s).where(
+            Activity.user_id.in_(local_ids), Activity.start_date >= since)
+        for uid, start, km, elev, secs in db.execute(q):
+            add(uid, local(start, tz).date(), km, elev, 1, secs)
+    remote_ids = [-uid for uid in (a, b) if uid < 0]
+    if remote_ids:
+        for rd in db.scalars(select(RemoteDay).where(RemoteDay.member_id.in_(remote_ids), RemoteDay.day >= first)):
+            add(-rd.member_id, rd.day, rd.km, rd.elev_m, rd.rides or 0, rd.time_s)
     out = {}
     for uid in (a, b):
         tot = {k: sum(acc[uid][w][k] for w in weeks) for k in ("km", "elev_m", "rides", "time_s")}
-        out[uid] = {"display_name": members[uid].display_name, "is_me": uid == user.id,
+        out[uid] = {"display_name": members[uid].display_name, "is_me": uid == me_uid,
                     "km_by_week": [round(acc[uid][w]["km"], 1) for w in weeks],
                     "totals": {"km": round(tot["km"], 1), "elev_m": round(tot["elev_m"]), "rides": int(tot["rides"]), "time_s": int(tot["time_s"]),
                                "avg_speed": round(tot["km"] / (tot["time_s"] / 3600), 1) if tot["time_s"] >= 600 else None}}

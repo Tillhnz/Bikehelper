@@ -8,9 +8,9 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 
-from . import audit, notify, suggest
+from . import audit, federation, notify, suggest
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router
+from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router, federation as federation_router
 from . import server_settings
 from .services import migrate_legacy_lube
 from .geo import service as geo_service
@@ -53,6 +53,7 @@ async def lifespan(app: FastAPI):
     geo_service.start_background()
     intervals_service.start_background()
     suggest.start_backfill()
+    federation.start_background()
     yield
 
 
@@ -148,6 +149,8 @@ app.include_router(notifications.router)
 app.include_router(places_router.router)
 app.include_router(intervals_router.router)
 app.include_router(groups_router.router)
+app.include_router(federation_router.router)
+app.include_router(federation_router.guest)
 app.include_router(version_router.router)
 
 
