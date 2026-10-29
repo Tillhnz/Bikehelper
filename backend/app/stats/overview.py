@@ -70,6 +70,29 @@ def streaks(days: set[date], today: date) -> tuple[int, int]:
     return best, cur
 
 
+def eddington(day_km) -> int:
+    """Eddington-Zahl: das größte E, für das es mindestens E Tage mit mindestens E km gibt. day_km: Kilometer je Tag."""
+    e = 0
+    for i, v in enumerate(sorted(day_km, reverse=True), 1):
+        if v < i:
+            break  # die Werte fallen, der Zähler steigt: ab hier passt keiner mehr
+        e = i
+    return e
+
+
+def eddington_block(per_day: dict[str, float]) -> dict:
+    """Zahl, wie viele Tage bis zur nächsten fehlen, Zahl je Jahr (nur dessen Tage) und Verlauf (alle Tage bis Jahresende)."""
+    value = eddington(per_day.values())
+    nxt = value + 1
+    have = sum(1 for v in per_day.values() if v >= nxt)
+    years = sorted({int(k[:4]) for k in per_day})
+    return {
+        "value": value, "next": nxt, "missing_days": nxt - have,
+        "by_year": [{"year": y, "value": eddington(v for k, v in per_day.items() if int(k[:4]) == y)} for y in years],
+        "history": [{"year": y, "value": eddington(v for k, v in per_day.items() if int(k[:4]) <= y)} for y in years],
+    }
+
+
 def _bucket(value: float, buckets) -> str | None:
     for lo, hi, label in buckets:
         if lo <= value < hi:
@@ -206,6 +229,7 @@ def build_overview(rows: list[Row], tz, today: date, bike_names: dict[int, str] 
                    "km": _r(v["km"]), "rides": v["rides"], "time_s": v["time_s"], "elev_m": round(v["elev_m"])}
                   for k, v in sorted(per_bike.items(), key=lambda kv: -kv[1]["km"])],
         "records": records,
+        "eddington": eddington_block(per_day),
         "streaks": {"longest_days": longest, "current_days": cur},
         "tiles": tiles_block,
         "weather": weather,

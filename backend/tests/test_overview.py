@@ -51,3 +51,14 @@ def test_tiles_block_new_per_year():
     b = row(2, date(2026, 5, 1), tiles={(2, 2), (3, 3)})
     t = build_overview([a, b], get_tz("UTC"), date(2026, 6, 1))["tiles"]
     assert t["count"] == 5 and t["max_square"] == 2 and t["by_year_new"] == {2025: 4, 2026: 1}
+
+
+def test_eddington_number():
+    from app.stats.overview import eddington, eddington_block
+    assert eddington([]) == 0
+    assert eddington([100, 80, 60, 3, 2, 2, 1]) == 3
+    assert eddington([5] * 5) == 5
+    assert eddington([59.9] * 60) == 59  # 59,9 km zählt nicht als 60
+    b = eddington_block({"2024-05-01": 70, "2024-05-02": 50, "2024-05-03": 10, "2025-06-01": 45, "2025-06-02": 40, "2025-06-03": 30})
+    assert (b["value"], b["next"], b["missing_days"]) == (6, 7, 1)
+    assert [h["value"] for h in b["history"]] == [3, 6] and [h["value"] for h in b["by_year"]] == [3, 3]

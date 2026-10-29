@@ -22,7 +22,7 @@ from ..database import get_db
 from ..models import Activity, Group, GroupGoal, GroupInvite, GroupMember, RemoteDay, RemoteMember, RemoteMembership, User
 from ..security import current_user
 from ..stats.extra import DAYPARTS, MILESTONES, load_series, longest_week_streak, ride_load
-from ..stats.overview import DISTANCE_BUCKETS, Row, _bucket, get_tz, local, streaks
+from ..stats.overview import DISTANCE_BUCKETS, Row, _bucket, eddington, get_tz, local, streaks
 
 log = logging.getLogger("bikehelper.groups")
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/groups", tags=["groups"])
 # Es sind nur Summen und Verteilungen. Nie geteilt werden Strecken, Orte, Karten, Räder, Wartung, Fahrtnamen oder Ziele.
 CATEGORIES = {
     "rhythm": ("Fahrrhythmus", "Wochentage, Tageszeiten und Streckenlängen als Verteilung"),
-    "records": ("Rekorde", "längste Fahrt, meiste Höhenmeter, bester Tag, schnellster Schnitt und Serien, ohne Datum und Namen"),
+    "records": ("Rekorde", "längste Fahrt, meiste Höhenmeter, bester Tag, schnellster Schnitt, Eddington-Zahl und Serien, ohne Datum und Namen"),
     "load": ("Belastung und Form", "geschätzt aus Fahrzeit, Höhenmetern und Tempo"),
     "weather": ("Wetter", "Kilometer bei Regen, Durchschnittstemperatur, kälteste und wärmste Fahrt, ohne Orte"),
 }
@@ -550,6 +550,13 @@ def crossed_milestone(before_km: float, after_km: float) -> int | None:
     return hit[-1] if hit else None
 
 
+def _day_totals(rows: list) -> dict[date, float]:
+    out: dict[date, float] = {}
+    for r in rows:
+        out[r.day] = out.get(r.day, 0.0) + r.km
+    return out
+
+
 def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -> dict:
     """Nur die Bereiche, die das Mitglied freigegeben hat. Summen und Verteilungen, keine einzelnen Fahrten."""
     out: dict = {}
@@ -579,6 +586,7 @@ def _extras(cats: list[str], period_rows: list, all_rows: list, end: date, tz) -
             "most_climb_m": round(max((r.elev_m or 0 for r in period_rows), default=0)),
             "best_day_km": round(max(per_day.values(), default=0.0), 1),
             "fastest_avg": round(max((r.km / (r.time_s / 3600) for r in fast), default=0.0), 1) or None,
+            "eddington": eddington(_day_totals([r for r in all_rows if r.day <= end]).values()),
             "day_streak": streaks(days, end)[0],
             "week_streak": longest_week_streak(days),
             "week_streak_now": current_week_streak({r.day for r in all_rows if r.day <= end}, end),

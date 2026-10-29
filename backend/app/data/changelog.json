@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-10-29.2",
+    "date": "2026-10-29",
+    "title": "Eddington-Zahl",
+    "changes": [
+      "Die Statistik zeigt jetzt deine Eddington-Zahl: an wie vielen Tagen du mindestens so viele Kilometer gefahren bist, dazu wie viele Tage bis zur nächsten fehlen und der Verlauf über die Jahre.",
+      "In Gruppen steht sie bei den Rekorden, wenn ein Mitglied diesen Bereich freigibt."
+    ]
+  },
+  {
     "id": "2026-10-29.1",
     "date": "2026-10-29",
     "title": "Gruppen über mehrere Server",

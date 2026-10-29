@@ -459,6 +459,7 @@ export default function GroupStats({ d, groupId }) {
         <div className="record-grid">
           <RecordCard title="Längste Fahrt" rows={rows} color={color} get={ex("records", "longest_km")} fmt={(v) => `${fmtNum(v, 1)} km`} />
           <RecordCard title="Meiste Höhenmeter (eine Fahrt)" rows={rows} color={color} get={ex("records", "most_climb_m")} fmt={(v) => `${fmtNum(v, 0)} m`} />
+          <RecordCard title="Eddington-Zahl (Tage mit mindestens so vielen km)" rows={rows} color={color} get={ex("records", "eddington")} fmt={(v) => `${v}`} />
           <RecordCard title="Bester Tag" rows={rows} color={color} get={ex("records", "best_day_km")} fmt={(v) => `${fmtNum(v, 1)} km`} />
           <RecordCard title="Schnellster Schnitt" rows={rows} color={color} get={ex("records", "fastest_avg")} fmt={(v) => `${fmtNum(v, 1)} km/h`} />
           <RecordCard title="Längste Serie (Tage)" rows={rows} color={color} get={ex("records", "day_streak")} fmt={(v) => `${v} Tage`} />

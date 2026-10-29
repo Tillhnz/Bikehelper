@@ -161,7 +161,18 @@ export default function Stats() {
             {r.fastest_avg && <li><span>Schnellster Schnitt (ab 10 km)<br /><span className="muted small">{rideLink(r.fastest_avg)}</span></span><strong>{fmtNum(r.fastest_avg.value)} km/h</strong></li>}
             <li><span>Längste Serie<br /><span className="muted small">Tage in Folge mit Fahrt</span></span><strong>{d.streaks.longest_days} Tage</strong></li>
             <li><span>Aktuelle Serie</span><strong>{d.streaks.current_days} Tage</strong></li>
+            {d.eddington && (
+              <li>
+                <span>Eddington-Zahl<br /><span className="muted small">an {d.eddington.value} Tagen mindestens {d.eddington.value} km. Für {d.eddington.next} fehlen {d.eddington.missing_days} {d.eddington.missing_days === 1 ? "Tag" : "Tage"} mit mindestens {d.eddington.next} km.</span></span>
+                <strong>{d.eddington.value}</strong>
+              </li>
+            )}
           </ul>
+          {d.eddington?.history.length > 1 && (
+            <p className="muted small" style={{ marginTop: "0.75rem" }}>
+              Eddington-Zahl im Verlauf: {d.eddington.history.map((h) => `${h.year}: ${h.value}`).join(", ")}. Nur dieses Jahr zählt: {d.eddington.by_year[d.eddington.by_year.length - 1].value}.
+            </p>
+          )}
         </Panel>
       </div>
 
