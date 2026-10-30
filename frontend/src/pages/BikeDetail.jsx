@@ -117,7 +117,7 @@ function VisualCheck({ comp, logs, disabled, onSaved }) {
       await api.post(`/components/${comp.id}/inspections`, { performed_at: form.performed_at, result: form.result, note: form.note || null });
       setOpen(false);
       setForm({ result: "good", performed_at: today(), note: "" });
-      toast("Sichtprüfung eingetragen.");
+      toast("Zustand eingetragen.");
       await onSaved();
     } catch (err) {
       setError(err.message);
@@ -130,9 +130,9 @@ function VisualCheck({ comp, logs, disabled, onSaved }) {
     <div className="visual-check">
       <div className="visual-check-head">
         <span className="muted small">
-          {last ? `Letzte Sichtprüfung am ${fmtDate(last.performed_at)}: ${CHECK_RESULT[last.result]}` : "Noch keine Sichtprüfung eingetragen."}
+          {last ? `Zustand geprüft am ${fmtDate(last.performed_at)}: ${CHECK_RESULT[last.result]}` : "Zustand noch nicht geprüft."}
         </span>
-        {!disabled && !open && <button className="link small" onClick={() => setOpen(true)}>Sichtprüfung eintragen</button>}
+        {!disabled && !open && <button className="link small" onClick={() => setOpen(true)}>Zustand prüfen</button>}
       </div>
       {open && (
         <form className="visual-check-form" onSubmit={save}>
@@ -159,6 +159,12 @@ function VisualCheck({ comp, logs, disabled, onSaved }) {
   );
 }
 
+const RULE_KINDS = {
+  service: { key: "service", name: "Warten", title: "Schmieren, reinigen oder einstellen. Danach tippst du auf Gewartet." },
+  check: { key: "check", name: "Prüfen", title: "Ansehen oder messen. Danach tippst du auf Geprüft." },
+  replace: { key: "replace", name: "Tauschen", title: "Verschleißteil: Das Intervall ist der Tauschzeitpunkt. Mit Zustand prüfen kannst du ihn verschieben oder vorziehen." },
+};
+
 function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax", result: "good" });
@@ -166,6 +172,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   const [guideOpen, setGuideOpen] = useState(false);
   const unknown = rule.status === "unknown";
   const wet = rule.wet_factor > 1;
+  const kind = rule.is_inspection ? RULE_KINDS.check : rule.visual_check ? RULE_KINDS.replace : RULE_KINDS.service;
 
   const variantName = rule.variants?.find((v) => v.key === rule.variant)?.name;
   const limits = [
@@ -177,10 +184,10 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
   const a = rule.assessment;
   const RESULTS = CHECK_RESULT;
   const visualLine = a?.visual && (a.result === "replace"
-    ? `Sichtprüfung am ${fmtDate(a.date)}: Austausch oder Wartung nötig, jetzt fällig.`
+    ? `Zustand am ${fmtDate(a.date)}: schlecht, jetzt fällig.`
     : a.result === "watch"
-      ? `Sichtprüfung am ${fmtDate(a.date)}: im Auge behalten, Intervall halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
-      : `Sichtprüfung am ${fmtDate(a.date)}: okay, Intervall startet neu.`);
+      ? `Zustand am ${fmtDate(a.date)}: im Auge behalten, Intervall halbiert${a.km_left != null ? `, noch etwa ${fmtKm(a.km_left)} km` : ""}.`
+      : `Zustand am ${fmtDate(a.date)}: okay, Intervall startet neu.`);
   const assessLine = visualLine || a && (rule.is_inspection
     ? `Letzte Prüfung am ${fmtDate(a.date)}: ${RESULTS[a.result]}${a.result === "watch" ? ", früher erneut prüfen" : ""}.`
     : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}, angepasstes Intervall ${fmtKm(a.interval_km)} km.`);
@@ -196,12 +203,13 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
     <li className="rule-row">
       <div className="rule-top">
         <strong>{rule.label}</strong>
+        <span className={`rule-kind kind-${kind.key}`} title={kind.title}>{kind.name}</span>
         <StatusPill status={rule.status} />
       </div>
       {!unknown && <Gauge progress={rule.progress} status={rule.status} />}
       <div className="rule-bottom">
         <span className="muted small">
-          {unknown ? "Trage unten ein Einbaudatum ein oder hake die Aufgabe als erledigt ab." : limits}
+          {unknown ? "Trage unten ein Einbaudatum ein oder tippe auf Gewartet." : limits}
         </span>
         <span className="rule-actions">
           {rule.hint && (
@@ -477,7 +485,7 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
                 <li key={l.id}>
                   <span>
                     <strong>{fmtDate(l.performed_at)}{l.performed_time ? `, ${l.performed_time.slice(0, 5)} Uhr` : ""}</strong>{" "}
-                    <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : l.result ? "Sichtprüfung" : "ganze Komponente"}</span>
+                    <span className="muted">{r ? r.label : l.rule_id ? "Regel gelöscht" : l.result ? "Zustand geprüft" : "ganze Komponente"}</span>
                     {variant ? `, ${variant}` : ""}{l.result ? `, Ergebnis: ${CHECK_RESULT[l.result]}` : ""}{l.note ? ` – ${l.note}` : ""}
                     {l.performed_by && <span className="muted small"> (durch {l.performed_by})</span>}
                   </span>
@@ -722,6 +730,14 @@ export default function BikeDetail() {
         )}
       </header>
       {error && <p className="error" role="alert">{error}</p>}
+
+      {active.length > 0 && (
+        <p className="rule-legend small">
+          <span className="rule-kind kind-service">Warten</span> schmieren oder einstellen: <em>Gewartet</em>.{" "}
+          <span className="rule-kind kind-check">Prüfen</span> ansehen oder messen: <em>Geprüft</em>.{" "}
+          <span className="rule-kind kind-replace">Tauschen</span> Verschleißteil, das Intervall ist der Tauschzeitpunkt: <em>Zustand prüfen</em> oder <em>Teil getauscht</em>.
+        </p>
+      )}
 
       {adding && (
         <ComponentForm bikeId={bike.id} catalog={catalog} onCreated={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />

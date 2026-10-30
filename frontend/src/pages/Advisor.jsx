@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BIKE_TYPES, WEATHER_TEXT, api, fmtNum } from "../api.js";
 import BikeIllustration from "../components/BikeIllustration.jsx";
-import { GroupIcon, Segmented, Slider, StopSlider, Switch } from "../components/controls.jsx";
+import { Segmented, Slider, StopSlider, Switch } from "../components/controls.jsx";
 import { CountUp, useTween } from "../components/motion.jsx";
 import { Loading } from "../components/feedback.jsx";
+import { GearTiles } from "../components/gear.jsx";
 
 const STORE = "bikehelper_advisor_v2";
 const TYPICAL_WIDTH = { road: 28, gravel: 40, mtb: 58, other: 38 };
@@ -110,31 +111,53 @@ function Dial({ label, bar, psi }) {
   );
 }
 
-function TiresResult({ t, missing }) {
+/** Immer sichtbar ganz oben: der Reifendruck, wichtigster Wert des Ratgebers. */
+function PressureBar({ t, missing, ready }) {
   if (!t) {
     return (
-      <section className="panel result-card">
-        <h2>Reifendruck</h2>
-        <p className="muted">
-          {missing.length ? `Dafür fehlt noch: ${missing.join(" und ")}. Stelle es links ein.` : "Stelle links Gewicht und Reifenbreite ein."}
-        </p>
-      </section>
+      <div className="pressure-bar empty" role="status">
+        <span className="muted">
+          {!ready ? "Der Reifendruck erscheint hier, sobald Ort oder Wetter gewählt ist."
+            : missing.length ? `Reifendruck: Dafür fehlt noch ${missing.join(" und ")}.` : "Reifendruck: Stelle Gewicht und Reifenbreite ein."}
+        </span>
+      </div>
     );
   }
+  return (
+    <div className="pressure-bar" role="status" aria-label={`Reifendruck vorne ${fmtNum(t.front_bar, 1)} bar, hinten ${fmtNum(t.rear_bar, 1)} bar`}>
+      <div className="pressure-cell front">
+        <span className="pressure-where">Vorne</span>
+        <span className="pressure-num">{fmtNum(t.front_bar, 1)}<small>bar</small></span>
+        <span className="pressure-psi">{t.front_psi} psi</span>
+      </div>
+      <div className="pressure-cell rear">
+        <span className="pressure-where">Hinten</span>
+        <span className="pressure-num">{fmtNum(t.rear_bar, 1)}<small>bar</small></span>
+        <span className="pressure-psi">{t.rear_psi} psi</span>
+      </div>
+    </div>
+  );
+}
+
+function TiresResult({ t }) {
+  if (!t) return null;
   const wet = { dry: "trocken", damp: "feucht", wet: "nass" }[t.wetness];
   return (
-    <section className="panel result-card">
+    <section className="panel result-card tone-blue">
       <h2>Reifendruck</h2>
       <div className="dials">
         <Dial label="Vorne" bar={t.front_bar} psi={t.front_psi} />
         <Dial label="Hinten" bar={t.rear_bar} psi={t.rear_psi} />
       </div>
-      <p className="muted small">
-        Gerechnet mit {fmtNum(t.system_kg)} kg Systemgewicht und {fmtNum(t.real_width_mm)} mm echter Reifenbreite, Straße {wet}. Ein Startwert:
-        Passe ihn um 0,1 bis 0,2 bar an, bis es sich richtig anfühlt.
-      </p>
-      {t.notes.length > 0 && <ul className="steps">{t.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
       {t.warnings.map((w) => <p key={w} className={/Hookless|niedrig|Mountain/.test(w) ? "error" : "muted small"}>{w}</p>)}
+      <details className="howto">
+        <summary>So wurde gerechnet</summary>
+        <p className="muted small">
+          {fmtNum(t.system_kg)} kg Systemgewicht, {fmtNum(t.real_width_mm)} mm echte Reifenbreite, Straße {wet}. Es ist ein Startwert:
+          Ändere ihn um 0,1 bis 0,2 bar, bis es sich richtig anfühlt.
+        </p>
+        {t.notes.length > 0 && <ul className="steps">{t.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+      </details>
     </section>
   );
 }
@@ -155,19 +178,20 @@ function ThermoScale({ temp }) {
   );
 }
 
+const GROUP_NAMES = { Oberkörper: "Oben", Beine: "Beine", Hände: "Hände", Füße: "Füße", "Kopf & Hals": "Kopf & Hals", "Regen & Wind": "Regen & Wind", Sonne: "Sonne", Mitnehmen: "Dabei", Sichtbarkeit: "Sichtbar" };
+
 function ClothingResult({ c }) {
   return (
-    <section className="panel result-card">
+    <section className="panel result-card tone-amber">
       <h2>Das ziehst du an</h2>
       <p className="advice-headline" key={c.headline}>{c.headline}</p>
       <ThermoScale temp={c.effective_temp} />
-      <p className="muted small">Es fühlt sich für diese Fahrt an wie {fmtNum(c.effective_temp, 0)} °C. Oben {c.top.toLowerCase()}, unten {c.legs.toLowerCase()}.</p>
       {c.warnings.map((w) => <p key={w} className="error" role="alert">{w}</p>)}
-      <div className="advice-groups">
+      <div className="gear-groups">
         {Object.entries(c.groups).map(([name, items], i) => (
-          <div key={`${name}:${items.join("|")}`} className="advice-group" style={{ "--i": i }}>
-            <h3><GroupIcon name={name} />{name}</h3>
-            <ul>{items.map((it) => <li key={it}>{it}</li>)}</ul>
+          <div key={`${name}:${items.join("|")}`} className="gear-group" style={{ "--i": i }}>
+            <h3>{GROUP_NAMES[name] ?? name}</h3>
+            <GearTiles items={items} />
           </div>
         ))}
       </div>
@@ -504,7 +528,7 @@ export default function Advisor() {
   return (
     <>
       <header className="page-head"><h1>Ratgeber</h1></header>
-      <p className="muted lead">Stelle deine Tour ein. Reifendruck und Kleidung passen sich sofort an.</p>
+      <PressureBar t={result?.tires ?? null} missing={result?.tires_missing ?? []} ready={!!result} />
 
       <div className="advisor">
         <div className="advisor-controls">
@@ -655,12 +679,11 @@ export default function Advisor() {
           )}
           {result && (
             <>
-              <TiresResult t={result.tires} missing={result.tires_missing} />
+              <TiresResult t={result.tires} />
               <ClothingResult c={result.clothing} />
               <WeatherResult w={result.weather} />
               <p className="muted small">
-                Alle Werte sind Richtwerte. Reifendruck: Formel nach Frank Bertos 15-%-Regel mit Zuschlägen für Untergrund und Nässe.
-                Kleidung: Mittel aus gängigen Temperaturtabellen. Die Quellen stehen in der README.
+                Richtwerte. Quellen und Formeln stehen in der README.
               </p>
             </>
           )}

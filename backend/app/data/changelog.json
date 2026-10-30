@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-10-30.1",
+    "date": "2026-10-30",
+    "title": "Mehr Farbe, wischbare Woche, schlankerer Ratgeber",
+    "changes": [
+      "Mehr Farbe: Karten, Kennzahlen, Menü und Diagramme haben jetzt eigene Akzentfarben.",
+      "Die Wochenkarte auf der Startseite blätterst du mit dem Finger: nach rechts wischen für die Vorwoche, nach links für die nächste.",
+      "Wartungsregeln tragen jetzt ein Schild: Warten (Gewartet), Prüfen (Geprüft) oder Tauschen (Zustand prüfen oder Teil getauscht). Die „Sichtprüfung“ heißt „Zustand prüfen“.",
+      "Ratgeber: Der Reifendruck steht ganz oben und bleibt beim Scrollen sichtbar. Die Kleidung erscheint als einheitliche Symbole statt als Textlisten."
+    ]
+  },
+  {
     "id": "2026-10-29.3",
     "date": "2026-10-29",
     "title": "Startseite nach Wunsch, einfacher oder Expertenmodus",

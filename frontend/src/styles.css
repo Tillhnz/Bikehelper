@@ -1257,3 +1257,114 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
   .sidebar-foot a,.sidebar-foot button{white-space:nowrap;font-size:.9rem}
   .update-hint{white-space:nowrap}
 }
+
+/* ---------- Farbe: Akzente je Bereich ---------- */
+:root {
+  --sky: #5aa9ff; --violet: #a78bfa; --rose: #ff7ab0; --lime: #a3e063; --orange: #ff9a52;
+}
+:root[data-theme="light"] { --sky: #1f6fd1; --violet: #6d4fd6; --rose: #c2336f; --lime: #3f8a14; --orange: #c2570a; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --sky: #1f6fd1; --violet: #6d4fd6; --rose: #c2336f; --lime: #3f8a14; --orange: #c2570a; }
+}
+
+/* Karten bekommen einen farbigen Streifen oben und einen farbigen Titelpunkt. */
+.panel { --accent: var(--celeste); border-top: 3px solid var(--accent); }
+.panel > h2::before { content: ""; display: inline-block; width: .55em; height: .55em; border-radius: 50%; background: var(--accent); margin-right: .5rem; vertical-align: .08em; }
+.panel.home-maint { --accent: var(--amber); }
+.panel.tone-blue { --accent: var(--sky); }
+.panel.tone-amber { --accent: var(--amber); }
+.home-cell.cell-week > .panel { --accent: var(--celeste); }
+.home-cell.cell-maintenance > .panel { --accent: var(--amber); }
+.home-cell.cell-goal > .panel { --accent: var(--violet); }
+.home-cell.cell-recent > .panel { --accent: var(--rose); }
+.home-cell.cell-eddington > .panel { --accent: var(--lime); }
+.home-cell.cell-streaks > .panel { --accent: var(--orange); }
+.home-cell.cell-records > .panel { --accent: var(--rose); }
+.home-cell.cell-form > .panel { --accent: var(--sky); }
+.panel:nth-of-type(4n+2) { --accent: var(--sky); }
+.panel:nth-of-type(4n+3) { --accent: var(--violet); }
+.panel:nth-of-type(4n+4) { --accent: var(--rose); }
+
+/* Kennzahlen in wechselnden Farben */
+.kpis .kpi { border-left: 3px solid var(--celeste); }
+.kpis .kpi:nth-child(4n+2) { border-left-color: var(--sky); }
+.kpis .kpi:nth-child(4n+3) { border-left-color: var(--violet); }
+.kpis .kpi:nth-child(4n+4) { border-left-color: var(--amber); }
+.kpis .kpi:nth-child(4n+2) .kpi-value small { color: var(--sky); }
+.kpis .kpi:nth-child(4n+3) .kpi-value small { color: var(--violet); }
+.kpis .kpi:nth-child(4n+4) .kpi-value small { color: var(--amber); }
+
+/* Wochenbalken als Verlauf, heute in Bernstein */
+.week-fill { background: linear-gradient(180deg, var(--sky), var(--celeste)); }
+.week-day.today .week-fill { background: linear-gradient(180deg, var(--orange), var(--amber)); }
+
+/* Seitenleiste: jeder Bereich hat seine Farbe */
+.sidebar nav a { --nav: var(--celeste); }
+.sidebar nav a .nav-icon { stroke: var(--nav); }
+.sidebar nav a.active .nav-icon { stroke: currentColor; }
+.sidebar nav a:nth-child(1) { --nav: var(--celeste); }
+.sidebar nav a:nth-child(2) { --nav: var(--amber); }
+.sidebar nav a:nth-child(3) { --nav: var(--sky); }
+.sidebar nav a:nth-child(4) { --nav: var(--rose); }
+.sidebar nav a:nth-child(5) { --nav: var(--violet); }
+.sidebar nav a:nth-child(6) { --nav: var(--lime); }
+.sidebar nav a:nth-child(7) { --nav: var(--mute); }
+@media (min-width: 801px) { .sidebar nav a.active { background: var(--nav); } }
+
+/* Ziele, Rad-Karten */
+.goal-bar span { background: linear-gradient(90deg, var(--violet), var(--sky)); }
+.home-bike { border-left: 3px solid var(--sky); }
+.home-bike:nth-child(3n+2) { border-left-color: var(--rose); }
+.home-bike:nth-child(3n+3) { border-left-color: var(--lime); }
+
+/* Art der Wartungsregel */
+.rule-kind { display: inline-block; font-size: .72rem; font-weight: 600; padding: .05rem .5rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.kind-service { color: var(--lime); }
+.kind-check { color: var(--sky); }
+.kind-replace { color: var(--orange); }
+.rule-top { justify-content: flex-start; }
+.rule-top .pill { margin-left: auto; }
+.rule-legend { color: var(--mute); line-height: 1.9; margin: 0 0 1rem; }
+.rule-legend em { color: var(--chalk); font-style: normal; font-weight: 600; }
+
+/* Wochenkarte: wischen */
+.week-swipe { touch-action: pan-y; }
+.week-swipe.from-left { animation: slide-in-left .28s ease-out; }
+.week-swipe.from-right { animation: slide-in-right .28s ease-out; }
+@keyframes slide-in-left { from { transform: translateX(-28px); opacity: .3; } }
+@keyframes slide-in-right { from { transform: translateX(28px); opacity: .3; } }
+.swipe-hint { display: none; text-align: center; color: var(--mute); font-size: .72rem; margin: .6rem 0 0; }
+@media (hover: none) and (pointer: coarse) { .swipe-hint { display: block; } }
+@media (prefers-reduced-motion: reduce) { .week-swipe.from-left, .week-swipe.from-right { animation: none; } }
+
+/* Ratgeber: Reifendruck ganz oben, Kleidung als Symbole */
+.pressure-bar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 0 0 1.25rem; padding: .6rem; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--sky); border-radius: var(--r-panel); box-shadow: 0 6px 18px rgba(0, 0, 0, .25); }
+.pressure-bar.empty { display: block; padding: .8rem 1rem; box-shadow: none; position: static; }
+.pressure-cell { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: .6rem; padding: .4rem .8rem; border-radius: 10px; background: var(--ink-2); }
+.pressure-cell.front { border-left: 4px solid var(--celeste); }
+.pressure-cell.rear { border-left: 4px solid var(--violet); }
+.pressure-where { color: var(--mute); font-size: .85rem; grid-column: 1 / -1; }
+.pressure-num { font-family: var(--font-display); font-size: clamp(2.2rem, 7vw, 3.4rem); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.pressure-num small { font-size: 1rem; color: var(--mute); margin-left: .3rem; font-weight: 500; }
+.pressure-psi { color: var(--mute); font-size: .85rem; justify-self: end; }
+@media (max-width: 800px) { .pressure-bar { margin: 0 -.25rem 1rem; } .pressure-psi { display: none; } }
+
+.gear-groups { display: grid; gap: .9rem; margin-top: 1rem; }
+.gear-group { animation: rise .45s cubic-bezier(.2, .7, .2, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
+.gear-group h3 { font-size: .95rem; font-weight: 500; color: var(--mute); margin-bottom: .4rem; }
+.gear-tiles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .6rem; }
+.gear-tile { --tone: var(--celeste); width: 78px; display: flex; flex-direction: column; align-items: center; gap: .3rem; text-align: center; }
+.gear-badge { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--tone) 16%, transparent); border: 1.5px solid color-mix(in srgb, var(--tone) 55%, transparent); color: var(--tone); }
+.gear-tile.optional .gear-badge { border-style: dashed; opacity: .8; }
+.gear-glyph { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.gear-label { font-size: .78rem; line-height: 1.2; color: var(--chalk); }
+.tone-top { --tone: var(--celeste); }
+.tone-legs { --tone: var(--sky); }
+.tone-hands { --tone: var(--violet); }
+.tone-feet { --tone: var(--rose); }
+.tone-head { --tone: var(--lime); }
+.tone-rain { --tone: var(--sky); }
+.tone-sun { --tone: var(--amber); }
+.tone-carry { --tone: var(--orange); }
+.tone-see { --tone: var(--amber); }
+.advice-headline { font-size: 2rem; }

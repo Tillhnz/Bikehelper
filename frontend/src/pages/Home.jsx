@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { BIKE_TYPES, api, fmtDate, fmtDuration, fmtKm, fmtNum } from "../api.js";
 import BikeIllustration from "../components/BikeIllustration.jsx";
@@ -181,6 +181,8 @@ export default function Home() {
   const [past, setPast] = useState(null); // Daten einer früheren Woche
   const [weekError, setWeekError] = useState("");
   const [lay, setLay] = useState(null);
+  const touch = useRef(null);
+  const [slide, setSlide] = useState("");
   const [extra, setExtra] = useState({});
   const [params] = useSearchParams();
   const [editing, setEditing] = useState(params.get("customize") === "1");
@@ -214,9 +216,28 @@ export default function Home() {
   const t = shown.totals;
   const isCurrent = offset === 0;
 
+  // Wischen: nach rechts eine Woche zurück, nach links eine vor (nur waagerechte Gesten, damit Scrollen frei bleibt)
+  const canBack = shown.has_earlier && (offset === 0 || !!past);
+  const canFwd = !isCurrent;
+  const swipe = {
+    onTouchStart: (e) => { const p = e.touches[0]; touch.current = { x: p.clientX, y: p.clientY }; },
+    onTouchEnd: (e) => {
+      const s0 = touch.current;
+      touch.current = null;
+      if (!s0) return;
+      const p = e.changedTouches[0];
+      const dx = p.clientX - s0.x;
+      const dy = p.clientY - s0.y;
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx > 0 && canBack) { setSlide("from-left"); setOffset(offset - 1); }
+      else if (dx < 0 && canFwd) { setSlide("from-right"); setOffset(offset + 1); }
+    },
+  };
+
   const blocks = {
     week: (
             <Panel title={weekTitle(shown)} className="home-week">
+              <div className={`week-swipe ${slide}`} key={shown.monday ?? "now"} {...swipe}>
               <div className="week-nav">
                 <button className="btn small" onClick={() => setOffset(offset - 1)} disabled={!shown.has_earlier || (offset !== 0 && !past)} aria-label="Eine Woche zurück">‹ Zurück</button>
                 {!isCurrent && <button className="link small" onClick={() => setOffset(0)}>Zu dieser Woche</button>}
@@ -233,6 +254,8 @@ export default function Home() {
                 <span>{fmtDuration(t.time_s)}</span>
                 <span>{fmtKm(t.elev_m)} m hoch</span>
                 <span>{isCurrent ? "Vorwoche" : "Woche davor"} gesamt {fmtKm(shown.last_week_km)} km</span>
+              </div>
+              <p className="swipe-hint" aria-hidden="true">‹ Zum Blättern nach links oder rechts wischen ›</p>
               </div>
             </Panel>
     ),
@@ -365,7 +388,7 @@ export default function Home() {
           <div className="home-blocks">
             {lay.layout.map((id) => {
               const node = blocks[id] ?? (DATA_BLOCKS.includes(id) ? <AnalysisPanel id={id} data={extra[id]} /> : null);
-              return node ? <div key={id} className={`home-cell ${wide.has(id) ? "home-wide" : ""}`}>{node}</div> : null;
+              return node ? <div key={id} className={`home-cell cell-${id} ${wide.has(id) ? "home-wide" : ""}`}>{node}</div> : null;
             })}
           </div>
         </>
