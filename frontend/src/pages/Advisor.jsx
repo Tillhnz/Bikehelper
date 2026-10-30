@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { BIKE_TYPES, WEATHER_TEXT, api, fmtNum } from "../api.js";
 import BikeIllustration from "../components/BikeIllustration.jsx";
 import { Segmented, Slider, StopSlider, Switch } from "../components/controls.jsx";
-import { CountUp, useTween } from "../components/motion.jsx";
+import { CountUp } from "../components/motion.jsx";
 import { Loading } from "../components/feedback.jsx";
 import { GearTiles } from "../components/gear.jsx";
 
@@ -72,45 +72,6 @@ function loadSaved() {
 
 // ---------- Anzeigen ----------
 
-const ARC = { cx: 60, cy: 60, r: 46, start: 135, sweep: 270 };
-const polar = (deg) => [ARC.cx + ARC.r * Math.cos((deg * Math.PI) / 180), ARC.cy + ARC.r * Math.sin((deg * Math.PI) / 180)];
-const ARC_PATH = (() => {
-  const [x0, y0] = polar(ARC.start);
-  const [x1, y1] = polar(ARC.start + ARC.sweep);
-  return `M${x0} ${y0} A${ARC.r} ${ARC.r} 0 1 1 ${x1} ${y1}`;
-})();
-const BAR_MIN = 0.5;
-const BAR_MAX = 8;
-
-function Dial({ label, bar, psi }) {
-  const frac = Math.min(1, Math.max(0, (bar - BAR_MIN) / (BAR_MAX - BAR_MIN)));
-  const shown = useTween(bar);
-  const [kx, ky] = polar(ARC.start);
-  const ticks = Array.from({ length: 16 }, (_, i) => i);
-  return (
-    <div className="dial">
-      <svg viewBox="0 0 120 112" role="img" aria-label={`${label}: ${fmtNum(bar)} bar`}>
-        {ticks.map((i) => {
-          const a = ARC.start + (ARC.sweep * i) / 15;
-          const [ax, ay] = [ARC.cx + 54 * Math.cos((a * Math.PI) / 180), ARC.cy + 54 * Math.sin((a * Math.PI) / 180)];
-          const [bx, by] = [ARC.cx + (i % 5 === 0 ? 50 : 52) * Math.cos((a * Math.PI) / 180), ARC.cy + (i % 5 === 0 ? 50 : 52) * Math.sin((a * Math.PI) / 180)];
-          return <line key={i} x1={ax} y1={ay} x2={bx} y2={by} className="dial-tick" />;
-        })}
-        <path d={ARC_PATH} className="dial-track" />
-        <path d={ARC_PATH} className="dial-fill" pathLength="1" style={{ strokeDashoffset: 1 - frac }} />
-        <g className="dial-knob" style={{ transform: `rotate(${ARC.sweep * frac}deg)`, transformOrigin: `${ARC.cx}px ${ARC.cy}px` }}>
-          <circle cx={kx} cy={ky} r="5.5" />
-        </g>
-      </svg>
-      <div className="dial-read">
-        <span className="dial-label">{label}</span>
-        <span className="dial-num">{fmtNum(shown, 1)}<small>bar</small></span>
-        <span className="muted small">{psi} psi</span>
-      </div>
-    </div>
-  );
-}
-
 /** Immer sichtbar ganz oben: der Reifendruck, wichtigster Wert des Ratgebers. */
 function PressureBar({ t, missing, ready }) {
   if (!t) {
@@ -144,11 +105,7 @@ function TiresResult({ t }) {
   const wet = { dry: "trocken", damp: "feucht", wet: "nass" }[t.wetness];
   return (
     <section className="panel result-card tone-blue">
-      <h2>Reifendruck</h2>
-      <div className="dials">
-        <Dial label="Vorne" bar={t.front_bar} psi={t.front_psi} />
-        <Dial label="Hinten" bar={t.rear_bar} psi={t.rear_psi} />
-      </div>
+      <h2>Hinweise zum Reifendruck</h2>
       {t.warnings.map((w) => <p key={w} className={/Hookless|niedrig|Mountain/.test(w) ? "error" : "muted small"}>{w}</p>)}
       <details className="howto">
         <summary>So wurde gerechnet</summary>
