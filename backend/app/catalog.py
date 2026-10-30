@@ -359,6 +359,23 @@ def guides_for(label: str) -> list[dict]:
 
 
 # Prüfregel -> Verschleißregel, die sich nach dem Prüfergebnis richtet
+# Standard-Prüfintervalle der Sichtprüfung (Zustand prüfen): (km, Monate). Sie gelten für Regeln, die das Teil austauschen oder
+# Lager warten, auch für bereits angelegte. Richtwerte nach Wartungsplänen von Elevation Outdoors und Mike's Bikes (Meilen
+# umgerechnet und gerundet); ein eigener Wert an der Regel hat Vorrang.
+CHECK_DEFAULTS: dict[str, tuple[float | None, int | None]] = {
+    "Kette wechseln": (1000, None),
+    "Kassette wechseln": (3000, None),
+    "Kettenblätter wechseln": (5000, None),
+    "Reifen vorn wechseln": (500, None),
+    "Reifen hinten wechseln": (500, None),
+    "Züge und Hüllen prüfen oder erneuern": (None, 6),
+    "Schaltröllchen prüfen und wechseln": (2500, None),
+    "Lenkerband erneuern": (None, 3),
+    "Steuersatz warten": (None, 6),
+    "Innenlager prüfen und warten": (None, 6),
+    "Nabenlager warten": (None, 6),
+}
+
 INSPECTIONS = {"Belagstärke prüfen": "Bremsbeläge wechseln"}
 WEAR_TO_INSPECTION = {v: k for k, v in INSPECTIONS.items()}
 INSPECTION_RESULTS = ("good", "watch", "replace")

@@ -146,6 +146,8 @@ class RuleIn(BaseModel):
     interval_months: int | None = Field(default=None, gt=0)
     wet_factor: float = Field(default=1.0, ge=1.0, le=5.0)  # 1 km bei Nässe zählt wie x km
     hint: str | None = None
+    check_interval_km: float | None = Field(default=None, ge=0)  # eigenes Prüfintervall; leer: Standard, 0: aus
+    check_interval_months: int | None = Field(default=None, ge=0)
 
 
 class WaxVariantOut(BaseModel):
@@ -158,6 +160,7 @@ class RuleOut(RuleIn):
     id: int
     variant: str | None = None  # Wachsart der letzten Wartung (nur Wachsregel)
     variants: list[WaxVariantOut] | None = None  # wählbare Wachsarten (nur Wachsregel)
+    check: dict | None = None  # Stand der Sichtprüfung dieser Regel (wirksames Intervall, fällig in …), None ohne Prüfintervall
     guides: list[dict] | None = None  # Anleitungen und Videos zur Aufgabe
     measure: dict | None = None  # Hochrechnung aus der letzten Kettenmessung (nur Verschleißregel der Kette)
     visual_check: bool = False  # Wechselregel: wird über Sichtprüfung oder „Teil gewechselt“ erledigt, nicht über „Erledigt“

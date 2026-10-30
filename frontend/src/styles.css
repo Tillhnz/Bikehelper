@@ -1368,3 +1368,11 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .tone-carry { --tone: var(--orange); }
 .tone-see { --tone: var(--amber); }
 .advice-headline { font-size: 2rem; }
+
+/* Marker der nächsten Sichtprüfung im Intervallbalken */
+.gauge { position: relative; }
+.gauge-mark { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--signal); box-shadow: 0 0 0 1.5px var(--panel); pointer-events: none; }
+.gauge-mark.due { animation: mark-pulse 1.4s ease-in-out infinite; }
+@keyframes mark-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .gauge-mark.due { animation: none; } }
+.check-line { color: var(--chalk); }

@@ -86,6 +86,8 @@ Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entste
 
 **Wie Nässe zählt:** Ein Kilometer bei Nässe zählt wie *Nässefaktor* Kilometer. Eine Fahrt gilt für die Zeit als nass, in der es regnete oder die Straße noch feucht war (mindestens 0,1 mm in der Stunde oder 0,5 mm in den zwei Stunden davor). Der Anteil nasser Fahrzeit wird auf die Strecke der Fahrt umgelegt.
 
+**Sichtprüfung:** Neben dem Tausch- oder Wartungsintervall hat jede Regel, die ein Teil tauscht oder Lager wartet, ein eigenes Prüfintervall (Kette 1.000 km, Kassette 3.000 km, Kettenblätter 5.000 km, Züge und Hüllen 6 Monate, Lenkerband 3 Monate, Steuersatz, Innenlager und Naben 6 Monate). Ein roter Strich im Balken zeigt die nächste Prüfung. Die Werte sind Richtwerte aus den Wartungsplänen von Elevation Outdoors und Mike's Bikes (Meilen umgerechnet) und lassen sich pro Regel ändern oder ausschalten. Sie gelten ohne Migration auch für bestehende Regeln, solange kein eigener Wert gesetzt ist.
+
 **Wie belastbar die Zahlen sind:** Für die Kette gibt es einen Labortest eines Schmierstoffherstellers (nass etwa 1,5-fach, sehr nass etwa 2,3-fach Verschleiß). Die Intervalle der übrigen Teile sind Richtwerte aus Werkstatt-Ratgebern und Herstellerangaben und streuen stark; die übrigen Nässefaktoren sind begründete Schätzungen. Wer es genauer weiß, ändert sie an der Regel. Die Kettenlehre schlägt jede Rechnung.
 
 Teile ohne Einbaudatum (zum Beispiel aus dem Standardsatz) zeigen „Einbaudatum fehlt“, bis du ein Datum einträgst oder eine Regel als gewartet abhakst. Erst dann kann gezählt werden. Mit „Teil getauscht“ wird das alte Teil ausgemustert und das neue übernimmt alle Regeln.

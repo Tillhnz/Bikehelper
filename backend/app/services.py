@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import wear as wear_model
-from .catalog import CATALOG, CHAIN_WEAR_LABEL, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
+from .catalog import CATALOG, CHAIN_WEAR_LABEL, CHECK_DEFAULTS, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
 from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
@@ -157,6 +157,44 @@ def visual_replace_after(comp: Component, entry: MaintenanceLog | None) -> Maint
     return max(logs, key=key, default=None)
 
 
+def check_interval(rule: MaintenanceRule) -> tuple[float | None, int | None]:
+    """Prüfintervall (km, Monate) der Sichtprüfung dieser Regel. Ein eigener Wert gilt vor dem Standard, 0 schaltet aus."""
+    if rule.check_interval_km is not None or rule.check_interval_months is not None:
+        return (rule.check_interval_km or None, rule.check_interval_months or None)
+    if not visual_applies(rule):
+        return (None, None)
+    return CHECK_DEFAULTS.get(rule.label, (None, None))
+
+
+def check_state(db: Session, comp: Component, rule: MaintenanceRule, last: date | None, today: date) -> dict | None:
+    """Wann ist die nächste Sichtprüfung dran? Zählt ab der letzten Sichtprüfung der Komponente, einer Wartung der Regel oder dem Einbau."""
+    ikm, imonths = check_interval(rule)
+    if not ikm and not imonths:
+        return None
+    seen = [l.performed_at for l in comp.logs if is_visual_check(l)]
+    if last is not None:
+        seen.append(last)
+    base = max(seen) if seen else effective_installed(comp)
+    if base is None:
+        return None
+    km = wear_between(db, comp.bike_id, base, comp.retired_at, 1.0)[0]
+    if not seen:
+        km += comp.start_km
+    months = months_between(base, today)
+    ratios = []
+    if ikm:
+        ratios.append(km / ikm)
+    if imonths:
+        ratios.append(months / imonths)
+    progress = max(ratios)
+    return {
+        "interval_km": ikm, "interval_months": imonths, "last": base.isoformat() if seen else None,
+        "km_since": round(km, 1), "months_since": round(months, 1), "progress": round(progress, 3), "due": progress >= 1,
+        "km_left": round(max(0.0, ikm - km)) if ikm else None,
+        "months_left": round(max(0.0, imonths - months), 1) if imonths else None,
+    }
+
+
 def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date | None = None) -> dict:
     """Verbrauch eines Wartungsintervalls seit der letzten Wartung (oder dem Einbau)."""
     today = today or date.today()
@@ -199,7 +237,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         return {
             "km_since": 0.0, "wet_km": 0.0, "effective_km": 0.0, "months_since": 0.0,
             "progress": 0.0, "status": "unknown", "last_done": None, "interval_km_eff": interval_km,
-            "variant": variant, "measure": None, "assessment": None,
+            "variant": variant, "measure": None, "assessment": None, "check": None,
         }
 
     km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
@@ -277,6 +315,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         "variant": variant,
         "measure": measure,
         "assessment": assessment,
+        "check": None if comp.retired_at else check_state(db, comp, rule, last, today),
     }
 
 

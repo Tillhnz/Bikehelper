@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-10-31.1",
+    "date": "2026-10-31",
+    "title": "Eigene Intervalle für die Sichtprüfung",
+    "changes": [
+      "Jede Regel, die ein Teil tauscht oder Lager wartet, hat jetzt auch ein Prüfintervall, zum Beispiel Kette alle 1.000 km, Steuersatz alle 6 Monate. Das gilt automatisch auch für bestehende Räder.",
+      "Im Intervallbalken zeigt ein roter Strich, wann die nächste Sichtprüfung dran ist. Darunter steht, in wie vielen Kilometern oder Monaten. Ist sie fällig, erscheint „Prüfen fällig“.",
+      "„Zustand prüfen“ setzt die Prüfung zurück. Mit „Prüfintervall“ an der Regel stellst du einen eigenen Wert ein oder schaltest die Erinnerung aus."
+    ]
+  },
+  {
     "id": "2026-10-30.1",
     "date": "2026-10-30",
     "title": "Mehr Farbe, wischbare Woche, schlankerer Ratgeber",

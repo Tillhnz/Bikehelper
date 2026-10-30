@@ -430,6 +430,40 @@ def test_visual_check_of_a_component_has_three_results():
         assert wear()[0]["assessment"] is None
 
 
+def test_check_interval_marks_next_visual_check():
+    with TestClient(app) as c:
+        h = _user(c, "checkint@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Rad", "type": "road", "with_defaults": False}).json()
+        uid = c.get("/api/me", headers=h).json()["id"]
+        start = date.today() - timedelta(days=30)
+        comp = c.post("/api/components", headers=h, json={
+            "bike_id": bike["id"], "category": "chain", "name": "Kette", "installed_at": start.isoformat(),
+        }).json()
+        _catalog_rules(c, h, comp)
+        with SessionLocal() as db:
+            db.add(Activity(user_id=uid, bike_id=bike["id"], name="x", distance_km=400.0,
+                            start_date=datetime.combine(start + timedelta(days=1), datetime.min.time())))
+            db.commit()
+
+        def rules():
+            rs = c.get(f"/api/components/{comp['id']}/rules", headers=h).json()
+            return next(r for r in rs if r["label"] == "Kette wechseln"), next(r for r in rs if "schmieren" in r["label"])
+
+        wear, lube = rules()
+        assert lube["check"] is None  # Schmieren hat keine Sichtprüfung
+        assert wear["check"]["interval_km"] == 1000 and wear["check"]["km_left"] == 600 and not wear["check"]["due"]
+        # Zustand prüfen setzt den Prüfzähler zurück
+        c.post(f"/api/components/{comp['id']}/inspections", headers=h, json={"performed_at": date.today().isoformat(), "result": "good"})
+        assert rules()[0]["check"]["km_left"] == 1000
+        # eigenes Intervall, 0 schaltet ab
+        r = c.put(f"/api/rules/{wear['id']}/check", headers=h, json={"check_interval_km": 300, "check_interval_months": None}).json()
+        assert r["check"]["interval_km"] == 300
+        r = c.put(f"/api/rules/{wear['id']}/check", headers=h, json={"check_interval_km": 0, "check_interval_months": 0}).json()
+        assert r["check"] is None
+        r = c.put(f"/api/rules/{wear['id']}/check", headers=h, json={}).json()
+        assert r["check"]["interval_km"] == 1000
+
+
 def test_notification_settings_roundtrip():
     with TestClient(app) as c:
         h = _user(c, "notify@example.com")

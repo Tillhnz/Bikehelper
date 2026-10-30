@@ -179,6 +179,9 @@ class MaintenanceRule(Base):
     interval_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     wet_factor: Mapped[float | None] = mapped_column(Float, nullable=True, default=1.0)  # 1 Nass-km zählt wie x km
     hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Eigenes Prüfintervall (Sichtprüfung) statt des Standards aus dem Katalog; 0 schaltet die Prüferinnerung der Regel aus
+    check_interval_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    check_interval_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     component: Mapped[Component] = relationship(back_populates="rules")
 

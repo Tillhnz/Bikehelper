@@ -165,13 +165,41 @@ const RULE_KINDS = {
   replace: { key: "replace", name: "Tauschen", title: "Verschleißteil: Das Intervall ist der Tauschzeitpunkt. Mit Zustand prüfen kannst du ihn verschieben oder vorziehen." },
 };
 
-function RuleRow({ rule, onDelete, onDone, disabled }) {
+function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax", result: "good" });
   const [hintOpen, setHintOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const unknown = rule.status === "unknown";
   const wet = rule.wet_factor > 1;
+  const [chkOpen, setChkOpen] = useState(false);
+  const [chk, setChk] = useState({ km: rule.check_interval_km ?? "", months: rule.check_interval_months ?? "" });
+  const ck = rule.check;
+  let mark = null;
+  if (ck && !unknown) {
+    if (ck.due) mark = Math.min(rule.progress, 1);
+    else {
+      const at = [];
+      if (ck.km_left != null && rule.interval_km) at.push((rule.effective_km + ck.km_left) / rule.interval_km);
+      if (ck.months_left != null && rule.interval_months) at.push((rule.months_since + ck.months_left) / rule.interval_months);
+      if (at.length) mark = Math.min(...at);
+      if (mark != null && mark > 1) mark = null; // die Prüfung käme erst nach dem Tausch
+    }
+  }
+  const checkLine = ck && (ck.due
+    ? "Sichtprüfung fällig. Tippe unten bei der Komponente auf Zustand prüfen."
+    : `Nächste Sichtprüfung in ${[ck.km_left != null && `${fmtKm(ck.km_left)} km`, ck.months_left != null && `${fmtNum(ck.months_left, 0)} ${Math.round(ck.months_left) === 1 ? "Monat" : "Monaten"}`].filter(Boolean).join(" oder ")}.`);
+  const showCheckEdit = !disabled && (ck || rule.visual_check || rule.check_interval_km != null || rule.check_interval_months != null);
+
+  async function saveCheck(e) {
+    e.preventDefault();
+    const n = (v) => (v === "" || v == null ? null : Number(v));
+    await api.put(`/rules/${rule.id}/check`, { check_interval_km: n(chk.km), check_interval_months: n(chk.months) });
+    setChkOpen(false);
+    toast("Prüfintervall gespeichert.");
+    await onChanged?.();
+  }
+
   const kind = rule.is_inspection ? RULE_KINDS.check : rule.visual_check ? RULE_KINDS.replace : RULE_KINDS.service;
 
   const variantName = rule.variants?.find((v) => v.key === rule.variant)?.name;
@@ -204,9 +232,10 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
       <div className="rule-top">
         <strong>{rule.label}</strong>
         <span className={`rule-kind kind-${kind.key}`} title={kind.title}>{kind.name}</span>
+        {ck?.due && <span className="pill pill-due">Prüfen fällig</span>}
         <StatusPill status={rule.status} />
       </div>
-      {!unknown && <Gauge progress={rule.progress} status={rule.status} />}
+      {!unknown && <Gauge progress={rule.progress} status={rule.status} mark={mark} markDue={!!ck?.due} />}
       <div className="rule-bottom">
         <span className="muted small">
           {unknown ? "Trage unten ein Einbaudatum ein oder tippe auf Gewartet." : limits}
@@ -222,6 +251,7 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
               {guideOpen ? "Anleitungen ausblenden" : "Anleitung"}
             </button>
           )}
+          {showCheckEdit && <button className="link small" onClick={() => setChkOpen(!chkOpen)}>Prüfintervall</button>}
           {!disabled && !rule.visual_check && <button className="link small" onClick={() => setOpen(!open)}>{rule.is_inspection ? "Geprüft" : "Gewartet"}</button>}
           <button className="link small" onClick={onDelete}>Regel löschen</button>
         </span>
@@ -231,6 +261,16 @@ function RuleRow({ rule, onDelete, onDone, disabled }) {
           Nässe zählt ×{fmtNum(rule.wet_factor)}: {fmtKm(rule.wet_km)} km bei Nässe, damit zählen {fmtKm(rule.effective_km)} km
           statt {fmtKm(rule.km_since)} km.
         </p>
+      )}
+      {checkLine && !unknown && <p className="muted small wet-line check-line">{checkLine}</p>}
+      {chkOpen && (
+        <form className="inline-form" onSubmit={saveCheck}>
+          <label>Sichtprüfung alle … km<input type="number" min="0" value={chk.km} onChange={(e) => setChk({ ...chk, km: e.target.value })} placeholder="Standard" /></label>
+          <label>oder alle … Monate<input type="number" min="0" value={chk.months} onChange={(e) => setChk({ ...chk, months: e.target.value })} placeholder="Standard" /></label>
+          <button className="btn primary">Speichern</button>
+          <button type="button" className="btn" onClick={() => setChkOpen(false)}>Abbrechen</button>
+          <p className="hint span-all">Leer lassen: Standardwert. 0 in beiden Feldern: keine Prüferinnerung für diese Regel.</p>
+        </form>
       )}
       {assessLine && <p className="muted small wet-line">{assessLine}</p>}
       {hintOpen && rule.hint && <p className="hint-box small">{rule.hint}</p>}
@@ -460,6 +500,7 @@ function ComponentCard({ comp, onChanged, expandSignal }) {
               disabled={retired}
               onDelete={() => removeRule(r.id)}
               onDone={(d) => ruleDone(r, d)}
+              onChanged={refresh}
             />
           ))}
         </ul>
@@ -735,7 +776,8 @@ export default function BikeDetail() {
         <p className="rule-legend small">
           <span className="rule-kind kind-service">Warten</span> schmieren oder einstellen: <em>Gewartet</em>.{" "}
           <span className="rule-kind kind-check">Prüfen</span> ansehen oder messen: <em>Geprüft</em>.{" "}
-          <span className="rule-kind kind-replace">Tauschen</span> Verschleißteil, das Intervall ist der Tauschzeitpunkt: <em>Zustand prüfen</em> oder <em>Teil getauscht</em>.
+          <span className="rule-kind kind-replace">Tauschen</span> Verschleißteil, das Intervall ist der Tauschzeitpunkt: <em>Zustand prüfen</em> oder <em>Teil getauscht</em>.{" "}
+          Der rote Strich im Balken zeigt die nächste Sichtprüfung.
         </p>
       )}
 

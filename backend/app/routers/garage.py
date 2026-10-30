@@ -1,3 +1,4 @@
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -225,6 +226,7 @@ def replace_component(
         MaintenanceRule(
             label=r.label, interval_km=r.interval_km, interval_months=r.interval_months,
             wet_factor=r.wet_factor, hint=r.hint,
+            check_interval_km=r.check_interval_km, check_interval_months=r.check_interval_months,
         )
         for r in old.rules
     ]
@@ -256,6 +258,21 @@ def create_rule(comp_id: int, data: RuleIn, user: User = Depends(current_user), 
     db.add(rule)
     db.commit()
     return _rule_out(db, comp, rule)
+
+
+class CheckIntervalIn(BaseModel):
+    check_interval_km: float | None = Field(default=None, ge=0, le=100000)
+    check_interval_months: int | None = Field(default=None, ge=0, le=240)
+
+
+@router.put("/rules/{rule_id}/check", response_model=RuleOut)
+def set_check_interval(rule_id: int, data: CheckIntervalIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Eigenes Prüfintervall der Sichtprüfung. Beide Felder leer: der Standard aus dem Katalog gilt. 0 schaltet die Prüfung dieser Regel aus."""
+    rule = _own_rule(db, user, rule_id)
+    rule.check_interval_km = data.check_interval_km
+    rule.check_interval_months = data.check_interval_months
+    db.commit()
+    return _rule_out(db, rule.component, rule)
 
 
 @router.delete("/rules/{rule_id}", status_code=204)

@@ -31,7 +31,7 @@ export function Odometer({ km, size = "lg" }) {
 }
 
 /** Verschleißanzeige wie ein Messlineal: 20 Striche, gefüllt nach Anteil des Intervalls. */
-export function Gauge({ progress = 0, status = "ok" }) {
+export function Gauge({ progress = 0, status = "ok", mark = null, markDue = false }) {
   const ticks = 20;
   const filled = Math.min(ticks, Math.round(Math.min(progress, 1) * ticks));
   return (
@@ -46,6 +46,7 @@ export function Gauge({ progress = 0, status = "ok" }) {
       {Array.from({ length: ticks }, (_, i) => (
         <span key={i} className={i < filled ? "tick on" : "tick"} style={{ "--i": i }} />
       ))}
+      {mark != null && <i className={`gauge-mark ${markDue ? "due" : ""}`} style={{ left: `${Math.min(1, Math.max(0, mark)) * 100}%` }} title="Nächste Sichtprüfung" />}
     </div>
   );
 }
