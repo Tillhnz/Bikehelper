@@ -132,6 +132,103 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
   .hero{padding-top:6.5rem}
   .mk span{left:auto;right:0;transform:none}
 }
+
+/* Film: vier Szenen, die beim Scrollen ablaufen */
+.film{background:#0b121a;color:var(--chalk);padding:0}
+.film .stage{position:relative;width:min(1120px,100% - 2rem);margin-inline:auto}
+.scene{display:grid;grid-template-columns:.85fr 1.15fr;gap:clamp(1.5rem,5vw,4rem);align-items:center;padding:5rem 0}
+.scap .no{color:var(--celeste);font-weight:600;margin-bottom:.8rem}
+.scap h2{font-size:clamp(2.2rem,4.6vw,3.6rem);color:var(--chalk);max-width:13ch}
+.scap p:last-child{color:#b9c7d3;font-size:1.1rem;max-width:40ch}
+.dots{display:none}
+.win{background:#16222f;border:1px solid #263749;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px #000;--k:0}
+.wb{display:flex;align-items:center;gap:.4rem;padding:.7rem 1rem;border-bottom:1px solid #263749;background:#121c28}
+.wb i{width:10px;height:10px;border-radius:50%;background:#2c4056}
+.wb span{margin-left:.6rem;color:var(--mute);font-size:.88rem}
+.wc{padding:1.2rem 1.3rem 1.4rem}
+.odo{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.6rem}
+.odo b{font-family:var(--display);font-size:3.4rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.odo span{color:var(--mute)}
+.rule{padding:.7rem 0;border-top:1px solid #263749}
+.rt{display:flex;gap:.55rem;align-items:center;margin-bottom:.45rem}
+.rt strong{font-weight:600}
+.film .kind{font-size:.7rem;font-weight:600;padding:.05rem .5rem;border-radius:999px;border:1px solid currentColor}
+.film .k-replace{color:#ff9a52}.film .k-service{color:#a3e063}.film .k-check{color:#5aa9ff}
+.pl{margin-left:auto;font-size:.78rem;font-weight:600;padding:.1rem .6rem;border-radius:999px;border:1px solid currentColor;color:var(--celeste);white-space:nowrap}
+.pl.soon{color:var(--amber)}.pl.due{background:var(--signal);border-color:var(--signal);color:#2a0b0b}
+.film .g{position:relative;display:grid;grid-template-columns:repeat(20,1fr);gap:3px;height:16px;align-items:end}
+.film .g i{height:60%;background:#263749;border-radius:1px;transition:background .15s}
+.film .g i:nth-child(5n){height:100%}
+.film .g i.on{background:var(--celeste)}
+.film .g.soon i.on{background:var(--amber)}.film .g.due i.on{background:var(--signal)}
+.film .g b{position:absolute;top:-3px;bottom:-3px;width:3px;margin-left:-1.5px;background:var(--signal);border-radius:2px;opacity:0;transition:opacity .3s}
+.film .g b.show{opacity:1}
+.rn{color:var(--mute);font-size:.84rem;margin-top:.35rem;font-variant-numeric:tabular-nums}
+.route-svg{width:100%;height:auto;display:block}
+.route-svg .seg{stroke-dasharray:1;stroke-dashoffset:1}
+.route-svg .lab text{fill:#cfdbe5;font:600 13px system-ui,sans-serif;opacity:0;transition:opacity .35s}
+.route-svg .lab.show text{opacity:1}
+.film .chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem}
+.film .chips span{background:#1b2a3a;border-radius:999px;padding:.2rem .8rem;font-size:.86rem;opacity:0;transform:translateY(6px);transition:.35s}
+.film .chips span.show{opacity:1;transform:none}
+.film .press{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.film .pc{background:#1b2a3a;border-radius:12px;padding:.6rem .9rem;border-left:4px solid var(--celeste)}
+.film .pc.r{border-color:var(--violet)}
+.film .pc span{display:block;color:var(--mute);font-size:.85rem}
+.film .pc strong{font-family:var(--display);font-size:2.8rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.film .pc small{font-size:1rem;margin-left:.3rem;color:var(--mute)}
+.headline{font-family:var(--display);font-size:2.2rem;color:var(--celeste);margin:.9rem 0 .2rem;line-height:1.05}
+.thermo{position:relative;margin:2.8rem .5rem 1rem}
+.tb{height:10px;border-radius:999px;background:linear-gradient(90deg,#4f8cff 0%,#6fd3c3 42%,#f2b84b 74%,#ff8a5c 100%)}
+.tm{position:absolute;top:-6px;left:10%;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:var(--chalk);border:3px solid #16222f;box-shadow:0 0 0 2px var(--chalk)}
+.tm span{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--display);font-size:1.25rem;font-weight:600}
+.film .tiles{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}
+.film .tile{width:72px;text-align:center;font-size:.78rem;line-height:1.2;opacity:0;transform:translateY(10px) scale(.85);transition:.4s cubic-bezier(.2,.8,.2,1)}
+.film .tile.show{opacity:1;transform:none}
+.drop{display:flex;gap:.5rem;flex-wrap:wrap;min-height:2.6rem;padding:.8rem;border:2px dashed #34506b;border-radius:12px;overflow:hidden}
+.file{font-size:.84rem;background:#1b2a3a;border-radius:8px;padding:.25rem .7rem;transform:translate(calc((1 - var(--f,0))*120%),calc((1 - var(--f,0))*-90%)) scale(calc(.8 + .2*var(--f,0)));opacity:var(--f,0)}
+.count{display:flex;align-items:baseline;gap:.6rem;margin:1rem 0 .4rem}
+.count b{font-family:var(--display);font-size:3rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.count span{color:var(--mute)}
+.rides{list-style:none;margin:0;padding:0}
+.rides li{display:grid;grid-template-columns:1fr auto auto;gap:.8rem;align-items:center;padding:.55rem 0;border-top:1px solid #263749;opacity:0;transform:translateX(-12px);transition:.4s}
+.rides li.show{opacity:1;transform:none}
+.rides em{font-style:normal;color:var(--mute);font-variant-numeric:tabular-nums}
+.bk{font-style:normal;font-size:.76rem;font-weight:600;padding:.1rem .6rem;border-radius:999px;background:#12303a;color:var(--celeste)}
+.bk.g2{background:#33260f;color:var(--amber)}
+
+/* nur mit Skript: Szenen werden angeheftet und laufen beim Scrollen ab */
+.film.live{height:520vh}
+.film.live .stage{position:sticky;top:0;height:100vh;height:100svh;width:min(1120px,100% - 2rem)}
+.film.live .scene{position:absolute;inset:0;padding:0;opacity:0;visibility:hidden;transform:translateY(24px);transition:opacity .5s,transform .5s,visibility 0s .5s}
+.film.live .scene.on{opacity:1;visibility:visible;transform:none;transition:opacity .5s .1s,transform .5s .1s}
+.film.live .dots{display:flex;gap:.5rem;position:absolute;left:0;right:0;bottom:1.4rem;justify-content:center;margin:0;padding:0;list-style:none}
+.dots li{width:26px;height:4px;border-radius:2px;background:#263749;transition:background .3s,width .3s}
+.dots li.on{background:var(--celeste);width:44px}
+@media (max-width:820px){
+  .scene{grid-template-columns:1fr;gap:1.2rem;padding:3.5rem 0}
+  .film.live .scene{align-content:center;padding:0}
+  .scap h2{font-size:2rem;max-width:none}
+  .scap p:last-child{font-size:1rem}
+  .wc{padding:.9rem 1rem 1rem}
+  .odo b{font-size:2.6rem}
+  .film .pc strong{font-size:2.2rem}
+  .headline{font-size:1.7rem}
+  .thermo{margin:2.6rem .5rem .8rem}
+  .film .tile{width:62px;font-size:.72rem}
+  .film .tile span{width:46px;height:46px;border-radius:13px}
+  .film .tile svg{width:24px;height:24px}
+}
+@media (max-width:820px) and (max-height:700px){.scap p:last-child{display:none}}
+
+/* Auftritt beim Scrollen, nur mit Skript */
+.js .rv{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--d,0)*90ms)}
+.js .rv.in{opacity:1;transform:none}
+.js .shot .g i.on{transform:scaleY(.15);transform-origin:bottom;transition:transform .5s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--k)*30ms + .2s)}
+.js .shot.in .g i.on{transform:none}
+.js .shot .g b{opacity:0;transition:opacity .4s 1s}.js .shot.in .g b{opacity:1}
+@media (prefers-reduced-motion:reduce){.js .rv,.js .shot .g i.on{opacity:1;transform:none;transition:none}.film.live .scene{transition:none}}
+
 @media (prefers-reduced-motion:reduce){.t.on,.mk{animation:none}html{scroll-behavior:auto}}
 </style>
 </head>
@@ -159,6 +256,78 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
     </div>
   </div>
 </div>
+
+
+<section class="film" id="film" aria-label="Die wichtigsten Funktionen in vier Szenen">
+  <div class="stage">
+    <div class="scene sc1">
+      <div class="scap"><p class="no">1 von 4 · Wartung</p><h2>Kilometer zählen von selbst.</h2><p>Jede Fahrt zählt auf die Teile deines Rads. Nasse Kilometer zählen mehr. Der rote Strich zeigt, wann du das nächste Mal hinschauen solltest.</p></div>
+      <div class="win" role="img" aria-label="Animation: Wartungsbalken füllen sich, die Kette wird bald fällig, die Bremsbeläge sind fällig">
+        <div class="wb"><i></i><i></i><i></i><span>Garage · Rennrad</span></div>
+        <div class="wc">
+          <div class="odo"><b data-odo>2.180</b><span>km gesamt</span></div>
+          <div class="rule" data-g="0.86" data-max="3000" data-unit="km" data-mark="94"><div class="rt"><strong>Kette wechseln</strong><em class="kind k-replace">Tauschen</em><span class="pl" data-pill>in Ordnung</span></div><div class="g"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div><div class="rn" data-note></div></div>
+          <div class="rule" data-g="0.33" data-max="12" data-unit="Monaten" data-mark="55"><div class="rt"><strong>Steuersatz warten</strong><em class="kind k-service">Warten</em><span class="pl" data-pill>in Ordnung</span></div><div class="g"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div><div class="rn" data-note></div></div>
+          <div class="rule" data-g="1" data-max="500" data-unit="km"><div class="rt"><strong>Belagstärke prüfen</strong><em class="kind k-check">Prüfen</em><span class="pl" data-pill>in Ordnung</span></div><div class="g"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="rn" data-note></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene sc2">
+      <div class="scap"><p class="no">2 von 4 · Wetter</p><h2>Wetter entlang der Strecke.</h2><p>Jede Fahrt wird in Abschnitte geteilt. Für jeden holt BikeHelper die Stunde, in der du dort warst, und rechnet den Gegenwind aus deiner Fahrtrichtung.</p></div>
+      <div class="win" role="img" aria-label="Animation: eine Strecke wird gezeichnet, Abschnitte zeigen Temperatur und Wind">
+        <div class="wb"><i></i><i></i><i></i><span>Fahrt · Sonntagsrunde</span></div>
+        <div class="wc">
+          <svg viewBox="0 0 440 230" class="route-svg" aria-hidden="true">
+            <path class="rt0" d="M30 180 C90 160 110 70 190 90 S300 180 360 100 410 50 410 50" fill="none" stroke="#263749" stroke-width="10" stroke-linecap="round"/>
+            <path class="seg" data-a="0" data-b=".4" d="M30 180 C90 160 110 70 190 90" fill="none" stroke="#6fd3c3" stroke-width="10" stroke-linecap="round" pathLength="1"/>
+            <path class="seg" data-a=".4" data-b=".78" d="M190 90 C250 105 300 180 360 100" fill="none" stroke="#f2b84b" stroke-width="10" stroke-linecap="round" pathLength="1"/>
+            <path class="seg" data-a=".78" data-b="1" d="M360 100 C380 80 410 50 410 50" fill="none" stroke="#ff7ab0" stroke-width="10" stroke-linecap="round" pathLength="1"/>
+            <g class="lab" data-at=".38"><text x="38" y="214">9 °C · Rückenwind</text></g>
+            <g class="lab" data-at=".74"><text x="150" y="50">11 °C · seitlich</text></g>
+            <g class="lab" data-at=".97"><text x="236" y="222">13 °C · Gegenwind 14 km/h</text></g>
+          </svg>
+          <div class="chips"><span data-at=".45">5 Abschnitte</span><span data-at=".7">Regen ab km 38</span><span data-at=".92">Nässe zählt für die Wartung</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene sc3">
+      <div class="scap"><p class="no">3 von 4 · Ratgeber</p><h2>Druck und Kleidung für heute.</h2><p>Der Reifendruck steht ganz oben, getrennt für vorn und hinten. Darunter siehst du als Symbole, was zum Wetter der Tour passt.</p></div>
+      <div class="win" role="img" aria-label="Animation: Reifendruck 5,5 und 5,9 bar, die Temperatur steigt, Kleidungssymbole erscheinen">
+        <div class="wb"><i></i><i></i><i></i><span>Ratgeber</span></div>
+        <div class="wc">
+          <div class="press"><div class="pc"><span>Vorne</span><strong><b data-p="5.5">0,0</b><small>bar</small></strong></div><div class="pc r"><span>Hinten</span><strong><b data-p="5.9">0,0</b><small>bar</small></strong></div></div>
+          <div class="headline" data-head>Winterausrüstung</div>
+          <div class="thermo"><div class="tb"></div><div class="tm" data-tm><span data-temp>0 °C</span></div></div>
+          <div class="tiles">
+            <div class="tile" style="--c:#6fd3c3"><span><svg viewBox="0 0 24 24"><path d="M8 4 L2.5 11 L4.5 13 L8 9.5 V20 H16 V9.5 L19.5 13 L21.5 11 L16 4 Q12 7.5 8 4 Z"/></svg></span>Trikot lang</div>
+            <div class="tile" style="--c:#5aa9ff"><span><svg viewBox="0 0 24 24"><path d="M8 3 H16 L16.5 21 H7.5 Z M7.9 8 H16.1"/></svg></span>Beinlinge</div>
+            <div class="tile" style="--c:#a78bfa"><span><svg viewBox="0 0 24 24"><path d="M8 21 V13 L5.5 10 Q5 9 6 8.5 Q7 8 8 9.5 L9 11 V5 Q9 3.8 10.2 3.8 Q11.4 3.8 11.4 5 V9 V4 Q11.4 2.8 12.6 2.8 Q13.8 2.8 13.8 4 V9 V5 Q13.8 3.8 15 3.8 Q16.2 3.8 16.2 5 V12 L17.5 10.5 Q18.5 9.5 19.3 10.3 L17 17 V21 Z"/></svg></span>Handschuhe</div>
+            <div class="tile" style="--c:#ff7ab0"><span><svg viewBox="0 0 24 24"><path d="M9 3 H15 V12 L19.5 16 Q20.5 19.5 17 20 H8.5 Q8 20 8 19 Z M9 7 H15"/></svg></span>Socken</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene sc4">
+      <div class="scap"><p class="no">4 von 4 · Fahrten</p><h2>Dateien rein, Fahrten raus.</h2><p>Der Strava-Export oder einzelne GPX-, FIT- und TCX-Dateien genügen. BikeHelper berechnet alles selbst und ordnet jede Fahrt dem richtigen Rad zu.</p></div>
+      <div class="win" role="img" aria-label="Animation: Dateien fliegen herein, die Fahrten erscheinen und werden Rädern zugeordnet">
+        <div class="wb"><i></i><i></i><i></i><span>Fahrten</span></div>
+        <div class="wc">
+          <div class="drop"><span class="file" style="--n:0">strava-export.zip</span><span class="file" style="--n:1">morgens.gpx</span><span class="file" style="--n:2">feierabend.fit</span></div>
+          <div class="count"><b data-rides>0</b><span>Fahrten importiert</span></div>
+          <ul class="rides">
+            <li data-at=".5"><span>Sonntagsrunde</span><em>62 km</em><i class="bk">Rennrad</i></li>
+            <li data-at=".66"><span>Feierabend</span><em>24 km</em><i class="bk g2">Gravel</i></li>
+            <li data-at=".82"><span>Berge</span><em>118 km</em><i class="bk">Rennrad</i></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <ol class="dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+  </div>
+</section>
 
 <section>
   <div class="wrap row">
@@ -276,6 +445,83 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
   <span><a href="https://github.com/Tillhnz/Bikehelper">GitHub</a> · <a href="impressum.html">Impressum</a></span>
 </div></footer>
 
+
+<script>
+(function(){
+  var d=document,root=d.documentElement;
+  root.classList.add("js");
+  var reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $=function(q,r){return Array.prototype.slice.call((r||d).querySelectorAll(q))};
+  var clamp=function(v,a,b){return Math.min(b,Math.max(a,v))};
+  var ease=function(t){return 1-Math.pow(1-t,3)};
+  var de=function(n,dg){return n.toLocaleString("de-DE",{minimumFractionDigits:dg||0,maximumFractionDigits:dg||0})};
+
+  /* Auftritt beim Scrollen */
+  var rv=$(".row .copy,.row .shot,.more div,.facts div,.own .code");
+  rv.forEach(function(e,i){e.classList.add("rv");e.style.setProperty("--d",String(i%3))});
+  $(".shot .g").forEach(function(g){$("i",g).forEach(function(t,i){t.style.setProperty("--k",String(i))})});
+  var show=function(e){e.classList.add("in")};
+  if(reduce||!("IntersectionObserver" in window)){rv.concat($(".shot")).forEach(show)}
+  else{
+    var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){show(x.target);io.unobserve(x.target)}})},{threshold:.18,rootMargin:"0px 0px -6% 0px"});
+    rv.concat($(".shot")).forEach(function(e){io.observe(e)});
+  }
+
+  /* Film */
+  var film=d.getElementById("film");
+  if(!film)return;
+  var scenes=$(".scene",film),dots=$(".dots li",film);
+  var paint=function(i,s){
+    var sc=scenes[i];
+    if(i===0){
+      $("[data-odo]",sc)[0].textContent=de(Math.round(2180*ease(s)));
+      $(".rule",sc).forEach(function(r){
+        var to=parseFloat(r.dataset.g),max=parseFloat(r.dataset.max),f=to*ease(s);
+        var g=$(".g",r)[0],ts=$("i",g),n=Math.round(f*ts.length);
+        ts.forEach(function(t,k){t.classList.toggle("on",k<n)});
+        g.classList.toggle("soon",f>=.8&&f<1);g.classList.toggle("due",f>=.999);
+        var p=$("[data-pill]",r)[0];p.className="pl"+(f>=.999?" due":f>=.8?" soon":"");
+        p.textContent=f>=.999?"fällig":f>=.8?"bald":"in Ordnung";
+        $("[data-note]",r)[0].textContent=de(Math.round(max*f))+" von "+de(max)+" "+r.dataset.unit;
+        var b=$("b",g)[0];if(b){b.style.left=r.dataset.mark+"%";b.classList.toggle("show",s>.7)}
+      });
+    }else if(i===1){
+      $(".seg",sc).forEach(function(p){var a=parseFloat(p.dataset.a),b=parseFloat(p.dataset.b);p.style.strokeDashoffset=String(1-clamp((s-a)/(b-a),0,1))});
+      $(".lab",sc).forEach(function(l){l.classList.toggle("show",s>=parseFloat(l.dataset.at))});
+      $(".chips span",sc).forEach(function(c){c.classList.toggle("show",s>=parseFloat(c.dataset.at))});
+    }else if(i===2){
+      $("[data-p]",sc).forEach(function(b){b.textContent=de(parseFloat(b.dataset.p)*ease(clamp(s/.6,0,1)),1)});
+      var t=Math.round(-6+19*ease(s));
+      $("[data-temp]",sc)[0].textContent=t+" °C";
+      $("[data-tm]",sc)[0].style.left=(((t+4)/34)*100)+"%";
+      $("[data-head]",sc)[0].textContent=t>=12?"Lang / Beinlinge":t>=8?"Lang / lang":t>=4?"Lang / lang, winterfest":"Winterausrüstung";
+      $(".tile",sc).forEach(function(e,k){e.classList.toggle("show",s>.4+k*.13)});
+    }else{
+      $(".file",sc).forEach(function(f,k){f.style.setProperty("--f",String(ease(clamp((s-k*.14)/.34,0,1))))});
+      $("[data-rides]",sc)[0].textContent=de(Math.round(1284*ease(clamp((s-.15)/.7,0,1))));
+      $(".rides li",sc).forEach(function(l){l.classList.toggle("show",s>=parseFloat(l.dataset.at))});
+    }
+  };
+  if(reduce||!("IntersectionObserver" in window)){
+    scenes.forEach(function(_,i){paint(i,1)});
+    return;
+  }
+  film.classList.add("live");
+  var cur=-1,tick=false;
+  var update=function(){
+    tick=false;
+    var r=film.getBoundingClientRect(),total=film.offsetHeight-innerHeight;
+    var p=clamp(-r.top/total,0,.9999),f=p*scenes.length,idx=Math.floor(f);
+    scenes.forEach(function(sc,i){
+      var s=i<idx?1:i>idx?0:clamp((f-i)/.72,0,1);
+      paint(i,s);
+    });
+    if(idx!==cur){cur=idx;scenes.forEach(function(sc,i){sc.classList.toggle("on",i===idx)});dots.forEach(function(x,i){x.classList.toggle("on",i===idx)})}
+  };
+  var req=function(){if(!tick){tick=true;requestAnimationFrame(update)}};
+  addEventListener("scroll",req,{passive:true});addEventListener("resize",req);update();
+})();
+</script>
 <script>
 (function(){
   var b=document.getElementById("copy"),c=document.getElementById("cmd");
