@@ -134,20 +134,40 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 }
 
 
-.flow{display:grid;justify-items:center;gap:0}
-.flow .src{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
-.flow .src span{background:var(--paper-2);border-radius:999px;padding:.25rem .9rem;font-size:.92rem;font-weight:500}
-.flow .arr{position:relative;width:2px;height:46px;background:repeating-linear-gradient(var(--teal) 0 6px,transparent 6px 11px);margin:.3rem 0}
-.flow .arr small{position:absolute;left:12px;top:50%;transform:translateY(-50%);white-space:nowrap;color:var(--text-mute)}
-.flow .hub{font-family:var(--display);font-size:1.7rem;font-weight:600;border:2px solid var(--teal);border-radius:14px;padding:.35rem 1.6rem}
-.flow .hub.me{background:var(--teal);color:#fff}
-@media (prefers-color-scheme:dark){.flow .hub.me{color:#06241f}}
-.flow .sug{margin-top:1rem;width:100%;background:var(--paper-2);border-radius:12px;padding:.8rem 1rem;display:grid;gap:.15rem;position:relative}
-.flow .sug span{color:var(--text-mute);font-size:.9rem}
-.flow .sug small{color:var(--text-mute)}
-.flow .sug i{position:absolute;right:1rem;top:.8rem;font-style:normal;font-size:.82rem;font-weight:600;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .8rem}
-@media (prefers-color-scheme:dark){.flow .sug i{color:#06241f}}
-.flow>small{margin-top:.8rem;justify-self:start}
+.flow{display:grid;gap:1rem}
+.flow svg{width:100%;height:auto;display:block;overflow:visible}
+.flow .lines use{stroke:var(--text-mute);opacity:.55;fill:none}
+.flow .lines{stroke-dasharray:4 6}
+.flow .chip rect{fill:var(--paper-2)}
+.flow .chip text,.flow .hub1 text,.flow .hub2 text{font:600 17px system-ui,sans-serif;text-anchor:middle;fill:var(--text)}
+.flow .hub1 text,.flow .hub2 text{font-size:18px;font-weight:700}
+.flow .hub1 rect{fill:var(--card);stroke:var(--teal);stroke-width:2.5}
+.flow .hub2 rect{fill:var(--teal)}
+.flow .hub2 text{fill:#fff}
+@media (prefers-color-scheme:dark){.flow .hub2 text{fill:#06241f}}
+.flow .every{font:500 13px system-ui,sans-serif;fill:var(--text-mute);text-anchor:middle}
+.flow .pulses circle{fill:#e8a31a;stroke:var(--card);stroke-width:2}.flow .pulses .big{fill:var(--teal)}
+.flow .ring{fill:none;stroke:var(--teal);stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center}
+.flow.play *{animation-play-state:var(--run,paused)}
+.flow.play .ring{animation:ringpulse 2.4s ease-out infinite;animation-delay:.9s}
+@keyframes ringpulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.35,1.5)}}
+.flow .sug{position:relative;background:var(--paper-2);border-radius:12px;min-height:5.4rem}
+.flow .st{display:grid;gap:.15rem;padding:.8rem 1rem}
+.flow .st span,.flow .st small{color:var(--text-mute);font-size:.9rem}
+.flow .st b{font-size:1.05rem}
+.flow .st i{position:absolute;right:1rem;top:.8rem;font-style:normal;font-size:.82rem;font-weight:600;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .8rem}
+@media (prefers-color-scheme:dark){.flow .st i{color:#06241f}}
+.flow .s1{display:none}
+.flow.play .st{position:absolute;inset:0}
+.flow.play .s1{display:grid;animation:s1 9s infinite}
+.flow.play .s2{animation:s2 9s infinite}
+.flow.play .s1 i{animation:tap 9s infinite;transform-origin:center}
+@keyframes s1{0%{opacity:0;transform:translateY(10px)}6%,52%{opacity:1;transform:none}58%,100%{opacity:0}}
+@keyframes s2{0%,56%{opacity:0;transform:translateY(8px)}64%,92%{opacity:1;transform:none}100%{opacity:0}}
+@keyframes tap{0%,47%{transform:scale(1)}50%{transform:scale(.88)}53%,100%{transform:scale(1)}}
+.flow .ex{color:var(--text-mute)}
+@media (max-width:820px){.flow .chip text{font-size:19px}.flow .hub1 text,.flow .hub2 text{font-size:21px}.flow .every{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.flow.play .ring,.flow.play .s1,.flow.play .s2,.flow.play .s1 i{animation:none}}
 
 /* Film: vier Szenen, die beim Scrollen ablaufen */
 .film{background:#0b121a;color:var(--chalk);padding:0}
@@ -389,17 +409,41 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
         <li>Fahrten, die bei intervals.icu aus Strava stammen, gibt intervals.icu nicht heraus. Dafür gibt es den Strava-Export.</li>
       </ul>
     </div>
-    <div class="shot flow" style="--accent:var(--celeste)" role="img" aria-label="Ablauf: Garmin, Wahoo und Hammerhead senden zu intervals.icu, BikeHelper holt die Fahrten alle 30 Minuten und schlägt ein Rad vor">
-      <div class="src"><span>Garmin</span><span>Wahoo</span><span>Hammerhead</span><span>Zwift</span></div>
-      <div class="arr"></div>
-      <div class="hub">intervals.icu</div>
-      <div class="arr"><small>alle 30 Minuten</small></div>
-      <div class="hub me">BikeHelper</div>
-      <div class="sug"><span>Neue Fahrt „Feierabend“, 41 km</span><b>Vorschlag: Rennrad</b><small>Leistungsmesser und Tempo passen zu diesem Rad.</small><i>Übernehmen</i></div>
-      <small>Beispieldaten</small>
+    <div class="shot flow" style="--accent:var(--celeste)" role="img" aria-label="Animation: Fahrten von Garmin, Wahoo, Hammerhead und Zwift laufen zu intervals.icu, BikeHelper holt sie alle 30 Minuten ab und schlägt ein Rad vor">
+      <svg viewBox="0 0 560 230" aria-hidden="true">
+        <defs>
+          <path id="p1" d="M118 27 C160 27 165 108 190 108"/>
+          <path id="p2" d="M118 79 C160 79 165 108 190 108"/>
+          <path id="p3" d="M118 131 C160 131 165 108 190 108"/>
+          <path id="p4" d="M118 183 C160 183 165 108 190 108"/>
+          <path id="ph" d="M330 108 H430"/>
+        </defs>
+        <g class="lines" fill="none" stroke-width="2">
+          <use href="#p1"/><use href="#p2"/><use href="#p3"/><use href="#p4"/><use href="#ph"/>
+        </g>
+        <g class="chip"><rect x="0" y="10" width="118" height="34" rx="17"/><text x="59" y="33">Garmin</text></g>
+        <g class="chip"><rect x="0" y="62" width="118" height="34" rx="17"/><text x="59" y="85">Wahoo</text></g>
+        <g class="chip"><rect x="0" y="114" width="118" height="34" rx="17"/><text x="59" y="137">Hammerhead</text></g>
+        <g class="chip"><rect x="0" y="166" width="118" height="34" rx="17"/><text x="59" y="189">Zwift</text></g>
+        <rect class="ring" x="190" y="78" width="140" height="60" rx="16"/>
+        <g class="hub1"><rect x="190" y="78" width="140" height="60" rx="16"/><text x="260" y="114">intervals.icu</text></g>
+        <g class="hub2"><rect x="430" y="78" width="130" height="60" rx="16"/><text x="495" y="114">BikeHelper</text></g>
+        <text class="every" x="380" y="96">alle 30 Min.</text>
+        <g class="pulses">
+          <circle r="5"><animateMotion path="M118 27 C160 27 165 108 190 108" dur="2.4s" begin="0s" repeatCount="indefinite"></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="2.4s" begin="0s" repeatCount="indefinite"/></circle>
+          <circle r="5"><animateMotion path="M118 79 C160 79 165 108 190 108" dur="2.4s" begin=".6s" repeatCount="indefinite"></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="2.4s" begin=".6s" repeatCount="indefinite"/></circle>
+          <circle r="5"><animateMotion path="M118 131 C160 131 165 108 190 108" dur="2.4s" begin="1.2s" repeatCount="indefinite"></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="2.4s" begin="1.2s" repeatCount="indefinite"/></circle>
+          <circle r="5"><animateMotion path="M118 183 C160 183 165 108 190 108" dur="2.4s" begin="1.8s" repeatCount="indefinite"></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.85;1" dur="2.4s" begin="1.8s" repeatCount="indefinite"/></circle>
+          <circle r="6" class="big"><animateMotion path="M330 108 H430" dur="1.4s" begin="0s" repeatCount="indefinite"></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="1.4s" begin="0s" repeatCount="indefinite"/></circle>
+        </g>
+      </svg>
+      <div class="sug">
+        <div class="st s1"><span>Neue Fahrt „Feierabend“, 41 km</span><b>Vorschlag: Rennrad</b><small>Leistungsmesser und Tempo passen zu diesem Rad.</small><i>Übernehmen</i></div>
+        <div class="st s2"><span>Neue Fahrt „Feierabend“, 41 km</span><b>Zugeordnet: Rennrad ✓</b><small>Wetter und Wartungsstände sind aktualisiert.</small></div>
+      </div>
+      <small class="ex">Beispieldaten</small>
     </div>
-  </div>
-</section>
+  </section>
 
 <section>
   <div class="wrap row">
@@ -506,6 +550,19 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
     var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){show(x.target);io.unobserve(x.target)}})},{threshold:.18,rootMargin:"0px 0px -6% 0px"});
     rv.concat($(".shot")).forEach(function(e){io.observe(e)});
   }
+
+
+  /* intervals.icu-Ablauf: läuft nur, solange er sichtbar ist */
+  $(".flow").forEach(function(box){
+    var svg=box.querySelector("svg");
+    if(svg&&svg.pauseAnimations)svg.pauseAnimations();
+    if(reduce||!("IntersectionObserver" in window))return;
+    box.classList.add("play");
+    new IntersectionObserver(function(es){es.forEach(function(x){
+      if(!svg||!svg.unpauseAnimations)return;
+      if(x.isIntersecting){svg.unpauseAnimations();box.style.setProperty("--run","running")}else{svg.pauseAnimations();box.style.setProperty("--run","paused")}
+    })},{threshold:.25}).observe(box);
+  });
 
   /* Film */
   var film=d.getElementById("film");
