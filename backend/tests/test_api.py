@@ -464,6 +464,27 @@ def test_check_interval_marks_next_visual_check():
         assert r["check"]["interval_km"] == 1000
 
 
+def test_rotors_are_added_once_to_existing_bikes():
+    from app import services
+    from app.models import AppSetting, Component
+    with TestClient(app) as c:
+        h = _user(c, "rotors@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Alt", "type": "road", "with_defaults": False}).json()
+        c.post("/api/components", headers=h, json={"bike_id": bike["id"], "category": "brake_pads", "name": "Beläge"})
+        with SessionLocal() as db:
+            db.delete(db.get(AppSetting, services.ROTOR_MIGRATION_KEY))  # der Start hat sie schon einmal laufen lassen
+            db.commit()
+            assert services.migrate_add_rotors(db) == 2
+            cats = {x.category for x in db.query(Component).filter(Component.bike_id == bike["id"])}
+            assert {"rotor_front", "rotor_rear"} <= cats
+            # gelöscht bleibt gelöscht: die Migration läuft nicht noch einmal
+            for x in db.query(Component).filter(Component.bike_id == bike["id"], Component.category.like("rotor_%")):
+                db.delete(x)
+            db.commit()
+            assert services.migrate_add_rotors(db) == 0
+            assert not db.query(Component).filter(Component.bike_id == bike["id"], Component.category.like("rotor_%")).count()
+
+
 def test_notification_settings_roundtrip():
     with TestClient(app) as c:
         h = _user(c, "notify@example.com")

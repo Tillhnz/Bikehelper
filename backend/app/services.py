@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from . import wear as wear_model
 from .catalog import CATALOG, CHAIN_WEAR_LABEL, CHECK_DEFAULTS, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
-from .models import Activity, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
+from .models import Activity, AppSetting, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
 
 SOON_THRESHOLD = 0.8
 
@@ -402,6 +402,32 @@ def migrate_legacy_lube(db: Session) -> int:
         apply_chain_lube(db, bike)
     db.commit()
     return len(bikes)
+
+
+ROTOR_MIGRATION_KEY = "migration_rotors_v1"
+
+
+def migrate_add_rotors(db: Session) -> int:
+    """Einmalig: Räder mit Bremsbelägen bekommen die neuen Komponenten Bremsscheibe vorn und hinten.
+
+    Wer keine Scheibenbremsen fährt, löscht sie wieder. Weil die Migration nur einmal läuft (Merker in app_settings),
+    kommen gelöschte Komponenten nicht zurück. Vorhandene Komponenten werden nicht verändert.
+    """
+    if db.get(AppSetting, ROTOR_MIGRATION_KEY) is not None:
+        return 0
+    added = 0
+    for bike in db.scalars(select(Bike)).all():
+        if bike.type not in ("road", "gravel", "mtb") or bike.retired:
+            continue
+        active = [c for c in bike.components if not c.retired_at]
+        if not any(c.category == "brake_pads" for c in active):
+            continue
+        if any(c.category in ("rotor_front", "rotor_rear") for c in bike.components):
+            continue
+        added += len(create_default_components(db, bike.user_id, bike, ["rotor_front", "rotor_rear"]))
+    db.add(AppSetting(key=ROTOR_MIGRATION_KEY, value="done"))
+    db.commit()
+    return added
 
 
 # ---------- Reifensätze ----------
