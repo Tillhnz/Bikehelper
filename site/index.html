@@ -133,6 +133,22 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
   .mk span{left:auto;right:0;transform:none}
 }
 
+
+.flow{display:grid;justify-items:center;gap:0}
+.flow .src{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+.flow .src span{background:var(--paper-2);border-radius:999px;padding:.25rem .9rem;font-size:.92rem;font-weight:500}
+.flow .arr{position:relative;width:2px;height:46px;background:repeating-linear-gradient(var(--teal) 0 6px,transparent 6px 11px);margin:.3rem 0}
+.flow .arr small{position:absolute;left:12px;top:50%;transform:translateY(-50%);white-space:nowrap;color:var(--text-mute)}
+.flow .hub{font-family:var(--display);font-size:1.7rem;font-weight:600;border:2px solid var(--teal);border-radius:14px;padding:.35rem 1.6rem}
+.flow .hub.me{background:var(--teal);color:#fff}
+@media (prefers-color-scheme:dark){.flow .hub.me{color:#06241f}}
+.flow .sug{margin-top:1rem;width:100%;background:var(--paper-2);border-radius:12px;padding:.8rem 1rem;display:grid;gap:.15rem;position:relative}
+.flow .sug span{color:var(--text-mute);font-size:.9rem}
+.flow .sug small{color:var(--text-mute)}
+.flow .sug i{position:absolute;right:1rem;top:.8rem;font-style:normal;font-size:.82rem;font-weight:600;background:var(--teal);color:#fff;border-radius:999px;padding:.15rem .8rem}
+@media (prefers-color-scheme:dark){.flow .sug i{color:#06241f}}
+.flow>small{margin-top:.8rem;justify-self:start}
+
 /* Film: vier Szenen, die beim Scrollen ablaufen */
 .film{background:#0b121a;color:var(--chalk);padding:0}
 .film .stage{position:relative;width:min(1120px,100% - 2rem);margin-inline:auto}
@@ -244,7 +260,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 <div class="hero">
   <div class="wrap">
     <h1>Weiß, wann dein Rad <em>dran ist.</em></h1>
-    <p class="lead">Wartung nach Kilometern, Monaten und Regenfahrten. Fahrten aus Dateien statt Strava-Abo. Reifendruck und Kleidung für die nächste Tour. Alles auf deinem eigenen Server.</p>
+    <p class="lead">Wartung nach Kilometern, Monaten und Regenfahrten. Fahrten kommen automatisch von intervals.icu, aus Garmin, Wahoo und Hammerhead, ohne Strava-Abo. Reifendruck und Kleidung für die nächste Tour. Alles auf deinem eigenen Server.</p>
     <div class="cta">
       <a class="btn primary" href="#selbst-hosten">In fünf Minuten installieren</a>
       <a class="btn" href="https://github.com/Tillhnz/Bikehelper">Code auf GitHub</a>
@@ -311,7 +327,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
     </div>
 
     <div class="scene sc4">
-      <div class="scap"><p class="no">4 von 4 · Fahrten</p><h2>Dateien rein, Fahrten raus.</h2><p>Der Strava-Export oder einzelne GPX-, FIT- und TCX-Dateien genügen. BikeHelper berechnet alles selbst und ordnet jede Fahrt dem richtigen Rad zu.</p></div>
+      <div class="scap"><p class="no">4 von 4 · Fahrten</p><h2>Dateien rein, Fahrten raus.</h2><p>Neue Fahrten holt BikeHelper automatisch von intervals.icu. Oder du lädst den Strava-Export und einzelne GPX-, FIT- und TCX-Dateien hoch. Jede Fahrt wird dem richtigen Rad zugeordnet.</p></div>
       <div class="win" role="img" aria-label="Animation: Dateien fliegen herein, die Fahrten erscheinen und werden Rädern zugeordnet">
         <div class="wb"><i></i><i></i><i></i><span>Fahrten</span></div>
         <div class="wc">
@@ -364,6 +380,30 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 <section class="band">
   <div class="wrap row flip">
     <div class="copy">
+      <h2>Fahrten kommen von allein.</h2>
+      <p class="kicker">Die Strava-Schnittstelle kostet seit 2026 ein Abo. BikeHelper holt deine Fahrten deshalb über intervals.icu. Dort laufen Garmin, Wahoo, Hammerhead, Zwift, Polar und Suunto zusammen, und das auch ohne Strava.</p>
+      <ul class="checks">
+        <li>Einmal den Schlüssel in den Einstellungen einfügen, danach prüft BikeHelper alle 30 Minuten auf neue Fahrten.</li>
+        <li>Die Originaldatei (FIT, GPX, TCX) wird geholt. Kilometer, Höhenmeter und Strecke berechnet BikeHelper selbst.</li>
+        <li>Das Rad wird zugeordnet, nach dem Namen oder als Vorschlag mit Begründung. Du bestätigst mit einem Tipp.</li>
+        <li>Fahrten, die bei intervals.icu aus Strava stammen, gibt intervals.icu nicht heraus. Dafür gibt es den Strava-Export.</li>
+      </ul>
+    </div>
+    <div class="shot flow" style="--accent:var(--celeste)" role="img" aria-label="Ablauf: Garmin, Wahoo und Hammerhead senden zu intervals.icu, BikeHelper holt die Fahrten alle 30 Minuten und schlägt ein Rad vor">
+      <div class="src"><span>Garmin</span><span>Wahoo</span><span>Hammerhead</span><span>Zwift</span></div>
+      <div class="arr"></div>
+      <div class="hub">intervals.icu</div>
+      <div class="arr"><small>alle 30 Minuten</small></div>
+      <div class="hub me">BikeHelper</div>
+      <div class="sug"><span>Neue Fahrt „Feierabend“, 41 km</span><b>Vorschlag: Rennrad</b><small>Leistungsmesser und Tempo passen zu diesem Rad.</small><i>Übernehmen</i></div>
+      <small>Beispieldaten</small>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap row">
+    <div class="copy">
       <h2>Ratgeber für die nächste Tour.</h2>
       <p class="kicker">Rad, Zeit und Ort wählen. Der Reifendruck steht ganz oben und bleibt sichtbar, darunter ziehst du an, was zum Wetter der Strecke passt.</p>
       <ul class="checks" style="--accent:var(--violet)">
@@ -388,8 +428,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
   </div>
 </section>
 
-<section>
-  <div class="wrap row">
+<section class="band">
+  <div class="wrap row flip">
     <div class="copy">
       <h2>Wetter entlang der Strecke.</h2>
       <p class="kicker">Nicht nur der Startpunkt zählt. BikeHelper teilt jede Fahrt in Abschnitte, fragt die Stunde ab, in der du dort warst, und rechnet den Gegenwind aus deiner Fahrtrichtung.</p>
@@ -411,11 +451,11 @@ footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
   </div>
 </section>
 
-<section class="band">
+<section>
   <div class="wrap">
     <h2>Und sonst.</h2>
     <div class="more">
-      <div><h3>Fahrten ohne Abo</h3><p>Strava-Export als ZIP oder einzelne GPX-, FIT- und TCX-Dateien. Die Räder werden automatisch zugeordnet.</p></div>
+      <div><h3>Strava-Export und Dateien</h3><p>Die ganze Historie als ZIP auf einmal oder einzelne GPX-, FIT- und TCX-Dateien. Doppelte Fahrten erkennt BikeHelper.</p></div>
       <div><h3>Gruppen</h3><p>Rangliste, Ziel und Duell mit Freunden, auch zwischen verschiedenen BikeHelper-Servern. Geteilt werden nur Tageswerte.</p></div>
       <div><h3>Mechaniker</h3><p>Dein Schrauber darf Wartungen eintragen, ohne deine Fahrten zu sehen.</p></div>
       <div><h3>Reifensätze</h3><p>Sommer- und Winterreifen mit eigenem Kilometerstand und Prüfintervall.</p></div>
