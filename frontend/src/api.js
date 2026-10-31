@@ -107,6 +107,8 @@ export const CATEGORIES = {
   tire_front: "Reifen vorn",
   tire_rear: "Reifen hinten",
   brake_pads: "Bremsbeläge",
+  rotor_front: "Bremsscheibe vorn",
+  rotor_rear: "Bremsscheibe hinten",
   bar_tape: "Lenkerband",
   cables: "Brems- und Schaltzüge",
   sealant: "Dichtmilch",

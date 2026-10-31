@@ -143,6 +143,18 @@ CATALOG: dict[str, ComponentTemplate] = {
                  "Bei Nässe verschleißen vor allem organische Beläge schneller.",
         ),
     )),
+    "rotor_front": ComponentTemplate("rotor_front", "Bremsscheibe vorn", (
+        RuleTemplate(
+            "Bremsscheibe vorn wechseln", interval_km=6000, wet_factor=1.5,
+            hint="Nur für Scheibenbremsen, sonst Komponente löschen. Mit dem Messschieber die Dicke an der dünnsten Stelle der Bremsfläche messen: Die Mindestdicke steht meist auf der Scheibe (häufig 1,5 mm). Davor wechseln, wenn sie verzogen, eingelaufen, rissig oder blau angelaufen ist. Vorn bremst du deutlich mehr als hinten, deshalb nutzt sich die vordere Scheibe schneller ab.",
+        ),
+    )),
+    "rotor_rear": ComponentTemplate("rotor_rear", "Bremsscheibe hinten", (
+        RuleTemplate(
+            "Bremsscheibe hinten wechseln", interval_km=9000, wet_factor=1.5,
+            hint="Nur für Scheibenbremsen, sonst Komponente löschen. Mit dem Messschieber die Dicke messen: Die Mindestdicke steht meist auf der Scheibe (häufig 1,5 mm). Hinten hält die Scheibe meist länger als vorn. Wechseln bei Verzug, Rissen, tiefen Rillen oder Blauverfärbung durch Überhitzung.",
+        ),
+    )),
     "brake_fluid": ComponentTemplate("brake_fluid", "Bremsflüssigkeit", (
         RuleTemplate(
             "Bremse entlüften, Flüssigkeit wechseln", interval_months=12,
@@ -217,15 +229,15 @@ CATALOG: dict[str, ComponentTemplate] = {
 
 BIKE_TEMPLATES: dict[str, tuple[str, ...]] = {
     "road": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "bar_tape", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "gravel": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "mtb": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "other": ("chain", "cassette", "pulleys", "brake_pads", "cables", "pedals"),
@@ -364,6 +376,8 @@ def guides_for(label: str) -> list[dict]:
 # umgerechnet und gerundet); ein eigener Wert an der Regel hat Vorrang.
 CHECK_DEFAULTS: dict[str, tuple[float | None, int | None]] = {
     "Kette wechseln": (1000, None),
+    "Bremsscheibe vorn wechseln": (1500, None),
+    "Bremsscheibe hinten wechseln": (1500, None),
     "Kassette wechseln": (3000, None),
     "Kettenblätter wechseln": (5000, None),
     "Reifen vorn wechseln": (500, None),
@@ -500,6 +514,28 @@ CHECKS: dict[str, Check] = {
             "Verzogene, tief eingelaufene oder zu dünne Scheibe, bei Felgenbremsen eine abgefahrene Verschleißmarke.",
         ),
         act="Beläge je Bremse paarweise wechseln und danach einbremsen. Verölte Beläge und Scheiben reinigen oder tauschen. Bei metallischem Schleifen sofort nicht mehr fahren, sonst wird die Scheibe zerstört.",
+    ),
+    "rotor_front": Check(
+        tools="Messschieber, Taschenlampe, Lappen, Bremsenreiniger",
+        how=(
+            "Rad drehen und von hinten auf die Scheibe sehen: Läuft sie gerade, oder schleift sie bei jeder Umdrehung an derselben Stelle?",
+            "Mit dem Messschieber die Dicke der Bremsfläche an mehreren Stellen messen, besonders an der dünnsten (Mitte der Bremsspur). Die Mindestdicke steht meist auf der Scheibe.",
+            "Die Bremsfläche ansehen und mit dem Fingernagel über den Rand fahren: Ein deutlicher Absatz bedeutet starken Verschleiß.",
+            "Auf Verfärbung achten: Blaue oder braune Stellen deuten auf Überhitzung hin. Dazu Risse und Ölflecken.",
+            "Die Befestigung prüfen: Schrauben bzw. Center-Lock-Verschlussring sitzen fest, die Scheibe wackelt nicht.",
+        ),
+        good=(
+            "Dicke deutlich über der Mindestdicke, glatte, gleichmäßige Bremsfläche.",
+            "Scheibe läuft gerade und schleift nicht.",
+            "Keine Risse, keine Blauverfärbung, keine Ölflecken.",
+        ),
+        bad=(
+            "Dicke an oder unter der Mindestdicke, tiefe Rillen oder ein Absatz am Rand.",
+            "Verzogene Scheibe, die bei jeder Umdrehung schleift oder pulsiert.",
+            "Risse, Blauverfärbung oder verölte, glänzende Bremsfläche.",
+            "Lockere Schrauben oder Scheibe, die wackelt.",
+        ),
+        act="Unter der Mindestdicke oder bei Rissen sofort wechseln, nicht mehr fahren. Eine leicht verzogene Scheibe lässt sich oft ausrichten, sonst tauschen. Verölte Scheiben mit Bremsenreiniger säubern und neue Beläge einbremsen. Schrauben mit dem Drehmoment des Herstellers anziehen.",
     ),
     "brake_fluid": Check(
         tools="Lappen, Taschenlampe",
@@ -711,3 +747,4 @@ CHECKS: dict[str, Check] = {
         act="Bei Spiel die Lager nachstellen, bei Rauheit reinigen, fetten oder erneuern. Rutscht der Freilauf durch, nicht mehr belasten und warten lassen.",
     ),
 }
+CHECKS["rotor_rear"] = CHECKS["rotor_front"]  # beide Scheiben werden gleich geprüft

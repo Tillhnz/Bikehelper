@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-11-01.1",
+    "date": "2026-11-01",
+    "title": "Bremsscheiben vorn und hinten",
+    "changes": [
+      "Neue Komponenten „Bremsscheibe vorn“ und „Bremsscheibe hinten“ mit Tauschintervall (vorn 6.000 km, hinten 9.000 km), Sichtprüfung alle 1.500 km und Prüfanleitung mit Mindestdicke.",
+      "Neue Räder mit Rennrad-, Gravel- oder MTB-Vorlage bekommen sie automatisch. Bei bestehenden Rädern ergänzt „Standardkomponenten ergänzen“ in der Garage sie, ohne etwas zu verändern. Wer Felgenbremsen fährt, löscht sie einfach."
+    ]
+  },
+  {
     "id": "2026-10-31.1",
     "date": "2026-10-31",
     "title": "Eigene Intervalle für die Sichtprüfung",

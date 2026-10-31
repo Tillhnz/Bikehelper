@@ -78,6 +78,7 @@ Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entste
 | Kettenblätter | wechseln | 20.000 km | 1,5 |
 | Reifen vorn / hinten | wechseln | 6.000 / 4.000 km | – |
 | Bremsbeläge | prüfen / wechseln | 500 / 1.500 km | 2,0 |
+| Bremsscheibe vorn / hinten | wechseln | 6.000 / 9.000 km | 1,5 |
 | Bremsflüssigkeit | wechseln | 12 Monate | – |
 | Züge | erneuern | 5.000 km oder 12 Monate | 1,3 |
 | Lenkerband | erneuern | 12 Monate | – |
