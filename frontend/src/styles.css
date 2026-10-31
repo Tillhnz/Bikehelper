@@ -1376,3 +1376,14 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 @keyframes mark-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .gauge-mark.due { animation: none; } }
 .check-line { color: var(--chalk); }
+
+/* Ratgeber auf dem Handy: die Ergebnisspalte darf nicht breiter werden als der Bildschirm (Wetterleiste scrollt in sich) */
+.advisor-results { grid-template-columns: minmax(0, 1fr); }
+.advisor-results > * { min-width: 0; }
+@media (max-width: 800px) {
+  .pressure-bar { margin: 0 0 1rem; gap: .5rem; padding: .45rem; }
+  .pressure-cell { padding: .3rem .6rem; }
+  .pressure-num { font-size: 2.3rem; }
+  .gear-tile { width: 70px; }
+  .gear-badge { width: 52px; height: 52px; }
+}
