@@ -1403,8 +1403,25 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .work-place h3{margin:0 0 .3rem;font-size:1rem}
 .rides tr.paired > td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 .rides tr.pair-first > td{border-bottom-color:transparent}
-.rides tr.stand-row td{padding:.35rem .8rem;font-size:.82rem;color:var(--mute);background:color-mix(in srgb,var(--amber) 9%,transparent)}
-.rides tr.stand-row strong{color:var(--chalk)}
-.stand-icon{color:var(--amber)}
-.pair-note{display:block;margin-top:.25rem}
-@media (max-width:800px){.rides tr.stand-row td{display:block}}
+.rides tr.stand-row td{padding:.3rem .9rem .45rem;background:color-mix(in srgb,var(--amber) 8%,transparent)}
+.chips{display:inline-flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-top:.25rem}
+.chips:first-child{margin-top:0}
+.chip{display:inline-block;padding:.05rem .55rem;border-radius:999px;border:1px solid var(--line);font-size:.74rem;line-height:1.6;white-space:nowrap;color:var(--chalk)}
+.chip-strong{border-color:var(--amber);color:var(--amber)}
+.chip-wet{border-color:color-mix(in srgb,var(--celeste) 55%,transparent);background:color-mix(in srgb,var(--celeste) 12%,transparent)}
+.chip-mute{color:var(--mute)}
+@media (max-width:800px){
+  .rides tr{position:relative}
+  .rides .cell-pick{position:absolute;top:.75rem;right:.9rem;order:0}
+  .rides .cell-date{padding-right:2rem}
+  .rides tr.pair-first{margin-bottom:0;border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;padding-bottom:.45rem}
+  .rides tr.stand-row{display:block;margin:0;border-radius:0;border-top:0;border-bottom:0;padding:.1rem 1rem .5rem;background:color-mix(in srgb,var(--amber) 8%,var(--panel))}
+  .rides tr.stand-row td{display:block;padding:0;background:none}
+  .rides tr.pair-last{border-top:0;border-top-left-radius:0;border-top-right-radius:0;padding-top:.45rem}
+  .rides tr.paired{border-left:3px solid var(--amber)}
+  .rides tr.paired > td:first-child{box-shadow:none}
+  .rides .cell-wide:last-child{grid-column:1 / -1}
+}
+.stand-list{list-style:none;margin:.4rem 0 0;padding:0}
+.stand-list li{display:flex;flex-wrap:wrap;gap:.2rem .7rem;align-items:center;padding:.3rem 0;border-top:1px solid var(--line);font-size:.85rem}
+.stand-list .chips{margin-top:0}

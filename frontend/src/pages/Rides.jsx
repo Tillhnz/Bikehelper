@@ -360,19 +360,24 @@ function TagCell({ a, known, onChange }) {
   );
 }
 
-function StandText({ p }) {
-  const h = String(p.hours).replace(".", ",");
-  if (!p.outdoor) {
-    return <>Rad stand {h} h am Arbeitsplatz ({p.from}–{p.to} Uhr){p.storage === "dry" ? ", trocken untergestellt, zählt nicht" : ". Stell in den Einstellungen ein, ob es im Freien steht."}</>;
-  }
-  if (p.wet_km == null) return <>Rad stand {h} h im Freien ({p.from}–{p.to} Uhr), das Wetter wird noch abgerufen.</>;
-  const km = String(Math.round(p.wet_km * 10) / 10).replace(".", ",");
+const num1 = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+
+function StandChips({ p, label }) {
   return (
-    <>
-      Rad stand {h} h im Freien ({p.from}–{p.to} Uhr)
-      {p.wet_h != null ? <>, davon <strong>{String(Math.round(p.wet_h * 10) / 10).replace(".", ",")} h bei Regen oder Nässe</strong></> : ", ohne Wetterdaten"}
-      {" "}· zählt beim Verschleiß wie {km} km Regen
-    </>
+    <span className="chips">
+      {label && <span className="chip chip-strong">{label}</span>}
+      <span className="chip" title="Zeit zwischen Ankunft und Rückfahrt">Stand {num1(p.hours)} h · {p.from}–{p.to}</span>
+      {!p.outdoor ? (
+        <span className="chip chip-mute">{p.storage === "dry" ? "trocken, zählt nicht" : "Ort in Einstellungen wählen"}</span>
+      ) : p.wet_km == null ? (
+        <span className="chip chip-mute">Wetter folgt</span>
+      ) : (
+        <>
+          <span className="chip chip-wet" title="Stunden Regen oder nasse Straße während der Standzeit">{p.wet_h != null ? `${num1(p.wet_h)} h nass` : "ohne Wetterdaten"}</span>
+          <span className="chip chip-wet" title="So viel Verschleiß durch Nässe zählt die Standzeit">≈ {num1(p.wet_km)} km Regen</span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -612,7 +617,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                   <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
                   <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}<TagCell a={a} known={knownTags} onChange={setTags} />
                     {a.pair && !(a.pair.role === "back" ? items[i + 1]?.id === a.pair.other_id : items[i - 1]?.id === a.pair.other_id) && (
-                      <span className="pair-note small muted">{a.pair.role === "out" ? "Hinweg" : "Rückweg"}: <StandText p={a.pair} /></span>
+                      <StandChips p={a.pair} label={a.pair.role === "out" ? "Hinweg" : "Rückweg"} />
                     )}</td>
                   <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap" data-label="Zeit">{fmtDuration(a.moving_time_s)}</td>
@@ -638,7 +643,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                   <td className="cell-wide"><button className="link small danger" onClick={() => remove(a)}>Löschen</button></td>
                 </tr>
                 {a.pair?.role === "back" && items[i + 1]?.id === a.pair.other_id && (
-                  <tr className="stand-row paired"><td colSpan={9}><span className="stand-icon" aria-hidden="true">⇅</span> <strong>Arbeitsweg:</strong> <StandText p={a.pair} /></td></tr>
+                  <tr className="stand-row paired"><td colSpan={9}><StandChips p={a.pair} label="⇅ Arbeitsweg" /></td></tr>
                 )}
                 </Fragment>
               ))}

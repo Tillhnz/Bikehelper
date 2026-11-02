@@ -694,12 +694,24 @@ function WashPanel({ bike, onChanged }) {
   return (
     <section className="panel wash-panel">
       <h2>Nässe ohne Fahrt</h2>
-      {exp && (exp.stands > 0 || exp.washes > 0) && (
-        <p className="small">
-          {exp.stands > 0 && exp.storage === "outdoor" && <>Am Arbeitsplatz stand das Rad {exp.stands}-mal im Freien, zusammen {String(exp.stand_h).replace(".", ",")} h, davon {String(exp.stand_wet_h).replace(".", ",")} h bei Regen oder Nässe. Das zählt wie {fmtKm(exp.stand_wet_km)} km Regen. </>}
-          {exp.washes > 0 && <>{exp.washes}-mal nass geputzt, zählt wie {fmtKm(exp.wash_wet_km)} km Regen. </>}
-          Wie stark es einzelne Teile trifft, steht bei deren Wartungsregel.
-        </p>
+      {exp && ((exp.stands > 0 && exp.storage === "outdoor") || exp.washes > 0) && (
+        <div className="chips" style={{ marginBottom: ".6rem" }}>
+          {exp.stands > 0 && exp.storage === "outdoor" && (
+            <>
+              <span className="chip chip-strong">Arbeitsplatz im Freien</span>
+              <span className="chip">{exp.stands}× · {String(exp.stand_h).replace(".", ",")} h</span>
+              <span className="chip chip-wet">{String(exp.stand_wet_h).replace(".", ",")} h nass</span>
+              <span className="chip chip-wet">≈ {fmtKm(exp.stand_wet_km)} km Regen</span>
+            </>
+          )}
+          {exp.washes > 0 && (
+            <>
+              <span className="chip chip-strong">Nass geputzt</span>
+              <span className="chip">{exp.washes}×</span>
+              <span className="chip chip-wet">≈ {fmtKm(exp.wash_wet_km)} km Regen</span>
+            </>
+          )}
+        </div>
       )}
       <h3>Rad nass geputzt</h3>
       <p className="muted small">

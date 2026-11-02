@@ -82,21 +82,22 @@ function WorkplaceSettings() {
             Erkannt am {fmtDate(p.detected_on)}, nach dem dritten Tag mit demselben Hin- und Rückweg. Seitdem {p.days} Tage zwischen {fmtDate(p.first)} und {fmtDate(p.last)}.
             Das Rad stand dort im Schnitt {String(p.avg_stand_h).replace(".", ",")} Stunden.
           </p>
-          <table className="rides small">
-            <thead><tr><th>Tag</th><th>Stand von – bis</th><th className="num">Dauer</th><th className="num">Belastung</th></tr></thead>
-            <tbody>
-              {p.stands.map((x) => (
-                <tr key={x.activity_id}>
-                  <td data-label="Tag"><Link className="ride-link" to={`/rides/${x.activity_id}`}>{fmtDate(x.day)}</Link></td>
-                  <td data-label="Stand">{x.from} – {x.to} Uhr</td>
-                  <td className="num" data-label="Dauer">{String(x.hours).replace(".", ",")} h</td>
-                  <td className="num" data-label="Belastung">
-                    {st.storage !== "outdoor" ? "nicht gezählt (trocken)" : x.wet_km == null ? "wird berechnet" : `${x.wet_h != null ? `${String(Math.round(x.wet_h * 10) / 10).replace(".", ",")} h Regen · ` : ""}${String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} nasse km${x.weather === "none" ? " (ohne Wetter)" : ""}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="stand-list">
+            {p.stands.map((x) => (
+              <li key={x.activity_id}>
+                <Link className="ride-link" to={`/rides/${x.activity_id}`}>{fmtDate(x.day)}</Link>
+                <span className="chips">
+                  <span className="chip">{x.from}–{x.to} · {String(x.hours).replace(".", ",")} h</span>
+                  {st.storage !== "outdoor" ? <span className="chip chip-mute">trocken, zählt nicht</span> : x.wet_km == null ? <span className="chip chip-mute">wird berechnet</span> : (
+                    <>
+                      <span className="chip chip-wet">{x.wet_h != null ? `${String(Math.round(x.wet_h * 10) / 10).replace(".", ",")} h nass` : "ohne Wetter"}</span>
+                      <span className="chip chip-wet">≈ {String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} km Regen</span>
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       ))}
       {error && <p className="error" role="alert">{error}</p>}
