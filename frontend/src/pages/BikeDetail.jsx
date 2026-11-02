@@ -660,6 +660,58 @@ function BikeEdit({ bike, onSaved, onCancel }) {
   );
 }
 
+function WashPanel({ bike, onChanged }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [washes, setWashes] = useState([]);
+  const [dried, setDried] = useState(true);
+  const [day, setDay] = useState(today);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => api.get(`/bikes/${bike.id}/washes`).then(setWashes).catch(() => {}), [bike.id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function add(e) {
+    e.preventDefault();
+    setBusy(true); setError("");
+    try {
+      await api.post(`/bikes/${bike.id}/washes`, { chain_dried: dried, day });
+      toast("Eingetragen. Die Nässe zählt jetzt beim Verschleiß mit.");
+      await load(); onChanged();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+  async function remove(w) {
+    await api.del(`/washes/${w.id}`);
+    await load(); onChanged();
+  }
+
+  return (
+    <section className="panel wash-panel">
+      <h2>Rad nass geputzt</h2>
+      <p className="muted small">
+        Wasser an Kette, Lagern und Bremsen belastet das Rad wie Fahrten im Regen. Mit abgetrockneter und frisch geölter Kette ist es deutlich weniger.
+        Die Belastung fließt in alle Teile ein, die auf Nässe reagieren.
+      </p>
+      <form className="inline-form" onSubmit={add}>
+        <label>Datum<input type="date" max={today} value={day} onChange={(e) => setDay(e.target.value)} required /></label>
+        <label className="check"><input type="checkbox" checked={dried} onChange={(e) => setDried(e.target.checked)} /> Kette danach abgetrocknet und geölt</label>
+        <button className="btn primary" disabled={busy}>Eintragen</button>
+      </form>
+      {error && <p className="error" role="alert">{error}</p>}
+      {washes.length > 0 && (
+        <ul className="plain-list small">
+          {washes.slice(0, 5).map((w) => (
+            <li key={w.id}>
+              {fmtDate(w.at)} · {w.chain_dried ? "Kette getrocknet" : "Kette nicht getrocknet"} · zählt wie {Math.round(w.wet_km)} km Regen{" "}
+              <button className="link small danger" onClick={() => remove(w)}>Löschen</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function BikeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -754,6 +806,8 @@ export default function BikeDetail() {
       )}
 
       <TireSets bike={bike} onChanged={load} expandSignal={expandSignal} />
+
+      {!bike.shared_from && <WashPanel bike={bike} onChanged={load} />}
 
       <header className="page-head">
         <h2>Komponenten <span className="muted small">{active.length}{dueCount > 0 ? `, ${dueCount} fällig` : ""}</span></h2>

@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-11-02.1",
+    "date": "2026-11-02",
+    "title": "Rad automatisch zuordnen, Tags, Arbeitsweg und Nass-Putzen",
+    "changes": [
+      "Fahrten ohne Rad bekommen ihr Rad jetzt direkt vom Server (nach Radname, ähnlichen Fahrten und Merkmalen der Aufzeichnung). In der Fahrtenliste steht „Automatisch zugeordnet“ mit der Begründung. Änderst du das Rad selbst, oder lässt es bewusst leer, fasst der Server die Fahrt nicht mehr an. Automatische Zuordnungen dienen nicht als Lernbeispiel.",
+      "Tags: Fahrten lassen sich taggen und danach filtern. Hast du ein Tag bei mindestens drei ähnlichen Fahrten gesetzt (gleicher Start und Ziel, ähnliche Länge und Tageszeit), vergibt der Server es bei weiteren selbst. Automatische Tags sind gestrichelt und lassen sich mit dem × entfernen, dann kommen sie dort nicht wieder.",
+      "Arbeitswege werden erkannt (derselbe Hin- und Rückweg an mindestens drei Tagen) und als „Pendeln“ getaggt. Unter Einstellungen legst du fest, ob das Rad am Arbeitsplatz trocken oder im Freien steht. Im Freien zählen Regenstunden zwischen Hin- und Rückweg beim Verschleiß mit.",
+      "Auf der Seite eines Rades kannst du „nass geputzt“ eintragen, mit oder ohne anschließend getrocknete und geölte Kette. Die Nässe fließt in den Verschleiß der nässeempfindlichen Teile ein."
+    ]
+  },
+  {
     "id": "2026-11-01.1",
     "date": "2026-11-01",
     "title": "Bremsscheiben vorn und hinten",

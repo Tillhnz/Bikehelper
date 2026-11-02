@@ -1,6 +1,7 @@
-"""Radvorschläge für Fahrten ohne Rad, abgeleitet aus bereits zugeordneten Fahrten.
+"""Radzuordnung für Fahrten ohne Rad, abgeleitet aus bereits zugeordneten Fahrten.
 
-Die Vorschläge sind Schätzungen und werden nie automatisch übernommen. Hinweise in dieser Reihenfolge:
+Die Zuordnung ist eine Schätzung. `auto_assign` übernimmt sie direkt (mit Begründung und Kennzeichnung „automatisch“); Fahrten, die du selbst
+zugeordnet oder bewusst ohne Rad gelassen hast, fasst der Server nie an, und automatisch zugeordnete Fahrten dienen nicht als Lernbeispiel. Hinweise in dieser Reihenfolge:
 0. Es gibt nur ein Rad: Das wird vorgeschlagen.
 1. Gleicher Radname (Strava-Export, intervals.icu): Gehören fast alle Fahrten mit diesem Namen zu einem Rad, ist das der Vorschlag.
 2. Ähnliche Fahrten: gleicher Startort (etwa 400 m), ähnliche Länge (±35 %) und Tageszeit (±2,5 h).
@@ -19,7 +20,7 @@ import time
 from collections import Counter
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from .database import SessionLocal
 from .models import Activity, Bike
@@ -185,7 +186,7 @@ def suggest_bikes(db: Session, user_id: int, targets: list[Activity]) -> dict[in
 
     cols = (Activity.bike_id, Activity.gear_name, Activity.start_lat, Activity.start_lng, Activity.distance_km, Activity.start_date,
             Activity.moving_time_s, Activity.avg_power, Activity.avg_cadence, Activity.source, Activity.terrain)
-    assigned = [r for r in db.execute(select(*cols).where(Activity.user_id == user_id, Activity.bike_id.is_not(None))) if r.bike_id in bikes]
+    assigned = [r for r in db.execute(select(*cols).where(Activity.user_id == user_id, Activity.bike_id.is_not(None), Activity.bike_auto.is_not(True))) if r.bike_id in bikes]
     if not assigned:
         return {}
     by_gear: dict[str, Counter] = {}
@@ -227,6 +228,47 @@ def suggest_bikes(db: Session, user_id: int, targets: list[Activity]) -> dict[in
     return out
 
 
+# ---------- Automatische Zuordnung ----------
+
+AUTO_BATCH = 500
+
+
+def auto_assign(db: Session, user_id: int) -> int:
+    """Ordnet Fahrten ohne Rad dem wahrscheinlichsten Rad zu. Gibt die Zahl zugeordneter Fahrten zurück.
+
+    Übersprungen werden Fahrten, die du selbst gesetzt oder bewusst geleert hast (bike_locked) und Fahrten ohne klaren Hinweis.
+    """
+    targets = db.scalars(
+        select(Activity).options(defer(Activity.polyline), defer(Activity.details), defer(Activity.tiles))
+        .where(Activity.user_id == user_id, Activity.bike_id.is_(None), Activity.bike_locked.is_not(True))
+        .order_by(Activity.start_date.desc()).limit(AUTO_BATCH)
+    ).all()
+    if not targets:
+        return 0
+    found = suggest_bikes(db, user_id, targets)
+    for a in targets:
+        s = found.get(a.id)
+        if s:
+            a.bike_id, a.bike_auto, a.bike_reason = s["bike_id"], True, (s["reason"] or "")[:300]
+    db.commit()
+    return len(found)
+
+
+def run_auto_assign(user_id: int) -> None:
+    """Für Aufrufe nach einem Import: eigene Sitzung, Fehler stören den Import nicht."""
+    try:
+        with SessionLocal() as db:
+            auto_assign(db, user_id)
+    except Exception:
+        log.exception("Automatische Radzuordnung fehlgeschlagen")
+    from . import habits  # Arbeitswege, Standzeiten und Tags bauen auf der Radzuordnung auf
+    habits.run(user_id)
+
+
+def trigger(user_id: int) -> None:
+    threading.Thread(target=run_auto_assign, args=(user_id,), daemon=True, name="suggest-auto").start()
+
+
 # ---------- Merkmale für bestehende Fahrten nachtragen ----------
 
 def backfill_features(limit: int = 200) -> int:
@@ -258,5 +300,19 @@ def start_backfill() -> None:
                 time.sleep(0.2)
         except Exception:
             log.exception("Merkmale für Radvorschläge konnten nicht nachgetragen werden")
+        rounds = 0
+        while True:  # danach alle 10 Minuten: neue Fahrten ohne Rad zuordnen (auch nach dem Anlegen eines Rads)
+            rounds += 1
+            if rounds % 6 == 1:  # Gewohnheiten (Arbeitswege, Standzeit, Tags) stündlich
+                from . import habits
+                habits.run_all()
+            try:
+                with SessionLocal() as db:
+                    ids = db.scalars(select(Activity.user_id).where(Activity.bike_id.is_(None), Activity.bike_locked.is_not(True)).distinct()).all()
+                    for uid in ids:
+                        auto_assign(db, uid)
+            except Exception:
+                log.exception("Automatische Radzuordnung fehlgeschlagen")
+            time.sleep(600)
 
     threading.Thread(target=work, daemon=True, name="suggest-backfill").start()

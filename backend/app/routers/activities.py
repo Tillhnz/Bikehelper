@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session, defer
 from ..config import settings
 from ..database import get_db
 from ..importers import service
-from ..models import Activity, Bike, User
+from ..models import Activity, ActivityTag, Bike, User
 from ..schemas import ActivityDetail, ActivityOut, ActivityPage, ActivityUpdate, AssignIn, GearOut
 from ..security import current_user
+from .. import suggest
 from ..stats.overview import get_tz
 from ..weather import service as weather_service
 from .garage import _own_bike
+from .habits import tags_for
 
 router = APIRouter(prefix="/api", tags=["activities"])
 
@@ -29,6 +31,7 @@ def _out(a: Activity, has_track: bool) -> ActivityOut:
         bike_id=a.bike_id, gear_name=a.gear_name, source=a.source, has_track=has_track,
         temp_c=a.temp_c, precip_mm=a.precip_mm, wind_kmh=a.wind_kmh, wind_dir=a.wind_dir, headwind_kmh=a.headwind_kmh, weather_pts=a.weather_pts, wet_minutes=a.wet_minutes,
         weather_code=a.weather_code, weather_status=a.weather_status,
+        bike_auto=bool(a.bike_auto), bike_reason=a.bike_reason if a.bike_auto else None,
     )
 
 
@@ -68,6 +71,7 @@ def upload_activities(
         summary.add_error(name, "Die Datei ist zu groß.")
     if summary.imported:
         weather_service.trigger(user.id)
+        suggest.trigger(user.id)
     return summary.as_dict()
 
 
@@ -111,7 +115,7 @@ def import_status(job_id: str, user: User = Depends(current_user)):
 # ---------- Fahrten ansehen und zuordnen ----------
 
 def _conditions(user: User, unassigned: bool = False, bike_id: int | None = None, q: str | None = None,
-                day: date | None = None, source: str | None = None) -> list:
+                day: date | None = None, source: str | None = None, tag: str | None = None) -> list:
     """Filter der Fahrtenliste; immer nur die eigenen Fahrten."""
     cond = [Activity.user_id == user.id]
     if unassigned:
@@ -124,6 +128,9 @@ def _conditions(user: User, unassigned: bool = False, bike_id: int | None = None
         cond += [Activity.start_date >= start, Activity.start_date < start + timedelta(days=1)]
     if q and q.strip():
         cond.append(Activity.name.ilike(f"%{q.strip()}%"))
+    if tag:
+        cond.append(Activity.id.in_(select(ActivityTag.activity_id).where(ActivityTag.user_id == user.id, ActivityTag.tag == tag,
+                                                                          ActivityTag.state != "rejected")))
     if source:  # "unknown" = ältere Fahrten ohne gespeicherte Herkunft
         cond.append(Activity.source.is_(None) if source == "unknown" else Activity.source == source)
     return cond
@@ -138,10 +145,11 @@ def list_activities(
     q: str | None = None,
     day: date | None = None,
     source: str | None = Query(None, max_length=20),
+    tag: str | None = Query(None, max_length=60),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    cond = _conditions(user, unassigned, bike_id, q, day, source)
+    cond = _conditions(user, unassigned, bike_id, q, day, source, tag)
     total = db.scalar(select(func.count()).select_from(Activity).where(*cond)) or 0
     rows = db.execute(
         select(Activity, Activity.polyline.is_not(None).label("has_track"))
@@ -151,7 +159,11 @@ def list_activities(
         .limit(limit)
         .offset(offset)
     ).all()
-    return ActivityPage(total=total, items=[_out(a, bool(t)) for a, t in rows])
+    tags = tags_for(db, [a.id for a, _ in rows])
+    items = [_out(a, bool(t)) for a, t in rows]
+    for it in items:
+        it.tags = tags.get(it.id, [])
+    return ActivityPage(total=total, items=items)
 
 
 @router.get("/activities/suggestions")
@@ -201,14 +213,14 @@ def assign_activities(data: AssignIn, user: User = Depends(current_user), db: Se
         stmt = stmt.where(Activity.id.in_(data.activity_ids))
     elif data.match is not None:  # alle Fahrten, die zu Suche und Filter der Liste passen
         m = data.match
-        stmt = stmt.where(*_conditions(user, m.unassigned, None, m.q, m.day, m.source))
+        stmt = stmt.where(*_conditions(user, m.unassigned, None, m.q, m.day, m.source, m.tag))
     elif data.gear_name is not None:
         stmt = stmt.where(Activity.gear_name == data.gear_name)
     else:
         raise HTTPException(422, "Bitte activity_ids, match oder gear_name angeben.")
     if data.only_unassigned:
         stmt = stmt.where(Activity.bike_id.is_(None))
-    result = db.execute(stmt.values(bike_id=data.bike_id))
+    result = db.execute(stmt.values(bike_id=data.bike_id, bike_auto=False, bike_locked=True, bike_reason=None))
     db.commit()
     return {"updated": result.rowcount}
 
@@ -222,6 +234,7 @@ def update_activity(
         if data.bike_id is not None:
             _own_bike(db, user, data.bike_id)
         a.bike_id = data.bike_id
+        a.bike_auto, a.bike_locked, a.bike_reason = False, True, None  # eigene Entscheidung: der Server ändert sie nicht mehr
     if data.name:
         a.name = data.name
     db.commit()
@@ -230,7 +243,9 @@ def update_activity(
 
 @router.delete("/activities/{activity_id}", status_code=204)
 def delete_activity(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    db.delete(_own_activity(db, user, activity_id))
+    a = _own_activity(db, user, activity_id)
+    db.execute(delete(ActivityTag).where(ActivityTag.activity_id == a.id))
+    db.delete(a)
     db.commit()
 
 
@@ -243,6 +258,7 @@ def delete_all_activities(
     """Löscht alle Fahrten des Nutzers (Räder, Komponenten und Wartungen bleiben erhalten)."""
     if not confirm:
         raise HTTPException(422, "Zum Löschen aller Fahrten muss confirm=true angegeben werden.")
+    db.execute(delete(ActivityTag).where(ActivityTag.user_id == user.id))
     result = db.execute(delete(Activity).where(Activity.user_id == user.id))
     db.commit()
     return {"deleted": result.rowcount}
@@ -252,7 +268,9 @@ def delete_all_activities(
 def activity_detail(activity_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Einzelauswertung einer Fahrt mit Strecke und Verlaufsdaten."""
     a = _own_activity(db, user, activity_id)
-    base = _out(a, bool(a.polyline)).model_dump()
+    out = _out(a, bool(a.polyline))
+    out.tags = tags_for(db, [a.id]).get(a.id, [])
+    base = out.model_dump()
     try:
         details = json.loads(a.details) if a.details else None
     except ValueError:

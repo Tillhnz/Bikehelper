@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from . import wear as wear_model
 from .catalog import CATALOG, CHAIN_WEAR_LABEL, CHECK_DEFAULTS, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
-from .models import Activity, AppSetting, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet
+from .models import Activity, AppSetting, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet, WashEvent
 
 SOON_THRESHOLD = 0.8
 
@@ -46,19 +46,26 @@ def wear_between(
     """Gibt (km, nasse km, wirksame km) im Zeitraum zurück.
 
     Wirksame km = km + nasse km * (wet_factor - 1): Ein Kilometer bei Nässe zählt wie wet_factor Kilometer.
+    Nasse km sind Fahrstrecke bei Regen/nasser Straße, dazu Nässe beim Abstellen im Freien und Nass-Putzen (zählen nicht als gefahrene km).
     """
     if bike_id is None:
         return 0.0, 0.0, 0.0
-    q = select(Activity.distance_km, Activity.moving_time_s, Activity.wet_minutes).where(Activity.bike_id == bike_id)
+    q = select(Activity.distance_km, Activity.moving_time_s, Activity.wet_minutes, Activity.stand_wet_km).where(Activity.bike_id == bike_id)
     if start:
         q = q.where(Activity.start_date >= _since(start))
     if end:
         q = q.where(Activity.start_date < _until(end))
     km = wet = 0.0
-    for dist, moving, wet_min in db.execute(q):
+    for dist, moving, wet_min, stand in db.execute(q):
         dist = dist or 0.0
         km += dist
-        wet += dist * wet_fraction(moving, wet_min)
+        wet += dist * wet_fraction(moving, wet_min) + (stand or 0.0)  # Nässe beim Abstellen im Freien
+    w = select(func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)  # nass geputzt
+    if start:
+        w = w.where(WashEvent.at >= _since(start))
+    if end:
+        w = w.where(WashEvent.at < _until(end))
+    wet += float(db.scalar(w) or 0.0)
     factor = wet_factor if wet_factor and wet_factor > 1 else 1.0
     return km, wet, km + wet * (factor - 1)
 

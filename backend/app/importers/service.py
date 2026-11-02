@@ -353,3 +353,6 @@ def _run_zip_import(job: Job, zip_path: str, create_bikes: bool) -> None:
             from ..weather import service as weather_service
 
             weather_service.trigger(job.user_id)
+            from .. import suggest
+
+            suggest.trigger(job.user_id)

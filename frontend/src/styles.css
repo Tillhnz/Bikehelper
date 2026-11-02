@@ -1083,6 +1083,7 @@ a.week-day.has-rides:hover .week-fill,a.week-day.has-rides:focus-visible .week-f
 @media (max-width:800px){.rides .source-tag{margin-left:0;margin-top:.2rem}}
 .suggest{display:block;margin-top:.3rem;font-size:.82rem;color:var(--mute)}
 .suggest strong{color:inherit}
+.suggest.auto{color:var(--celeste)}
 
 /* Gruppen */
 .group-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-bottom:1.25rem}
@@ -1387,3 +1388,14 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
   .gear-tile { width: 70px; }
   .gear-badge { width: 52px; height: 52px; }
 }
+
+.tags{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-top:.3rem}
+.tag{display:inline-flex;align-items:center;gap:.25rem;padding:.05rem .2rem .05rem .6rem;border-radius:999px;font-size:.74rem;line-height:1.6;background:color-mix(in srgb,var(--celeste) 14%,transparent);color:var(--chalk)}
+.tag.auto{background:transparent;border:1px dashed var(--celeste)}
+.tag button{border:0;background:none;color:var(--mute);cursor:pointer;padding:0 .35rem;font-size:.9rem;line-height:1}
+.tag button:hover{color:var(--chalk)}
+.tag-plus{border:0;background:none;color:var(--mute);cursor:pointer;font-size:.74rem;padding:.05rem .3rem}
+.tag-plus:hover{color:var(--celeste)}
+.tag-add input{width:8.5rem;font-size:.78rem;padding:.1rem .4rem}
+.plain-list{list-style:none;padding:0;margin:.6rem 0 0}
+.plain-list li{padding:.25rem 0;border-top:1px solid var(--line)}

@@ -53,6 +53,7 @@ class User(Base):
     tour_pending: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True = Rundgang für neue Konten steht noch aus
     whatsnew_seen: Mapped[str | None] = mapped_column(String(32), nullable=True)  # zuletzt gezeigter Neuigkeiten-Hinweis
     wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
+    work_storage: Mapped[str | None] = mapped_column(String(10), nullable=True)  # Rad am Arbeitsplatz: "dry" (drinnen/trocken) | "outdoor" (im Freien); leer = nicht erfasst
 
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
     token_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -241,6 +242,18 @@ class Activity(Base):
     avg_cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
     terrain: Mapped[str | None] = mapped_column(String(10), nullable=True)  # road | gravel | mtb | ebike | "" (unbekannt)
     max_hr: Mapped[float | None] = mapped_column(Float, nullable=True)  # höchster Puls der Fahrt; NULL = noch nicht gelesen, 0 = kein Puls
+    # Automatische Radzuordnung: bike_auto = vom Server gewählt (zählt nicht als Lernbeispiel), bike_locked = du hast die Zuordnung
+    # selbst gesetzt oder bewusst geleert, der Server fasst sie nicht mehr an.
+    bike_auto: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    bike_locked: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    bike_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Zielpunkt der Fahrt (aus der Strecke; 999 = keine Strecke) für Pendel- und Tag-Erkennung
+    end_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    end_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Rad stand nach dieser Fahrt im Freien (z. B. am Arbeitsplatz): Stunden und daraus abgeleitete „nasse Kilometer“
+    stand_h: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stand_wet_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stand_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | none (kein Wetter) | skip; leer = noch offen
 
 
 class RuleNotice(Base):
@@ -515,3 +528,26 @@ class GroupGoal(Base):
     end: Mapped[date] = mapped_column(Date)  # einschließlich
     title: Mapped[str | None] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class WashEvent(Base):
+    """Das Rad wurde nass geputzt. Wasser an Kette, Lagern und Bremsen zählt als zusätzliche Nässe-Belastung."""
+    __tablename__ = "wash_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bike_id: Mapped[int] = mapped_column(ForeignKey("bikes.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    chain_dried: Mapped[bool] = mapped_column(Boolean, default=True)  # Kette danach abgetrocknet (und nachgeölt)
+    wet_km: Mapped[float] = mapped_column(Float, default=0)  # zum Zeitpunkt des Eintrags berechnete Belastung in nassen Kilometern
+
+
+class ActivityTag(Base):
+    """Ein Tag an einer Fahrt. state: manual (von dir), auto (vom Server vergeben), rejected (von dir entfernt, wird nicht erneut vergeben)."""
+    __tablename__ = "activity_tags"
+
+    activity_id: Mapped[int] = mapped_column(ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True)
+    tag: Mapped[str] = mapped_column(String(30), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    state: Mapped[str] = mapped_column(String(10), default="manual")
+    reason: Mapped[str | None] = mapped_column(String(300), nullable=True)

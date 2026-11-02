@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from . import audit, federation, notify, suggest
 from .database import Base, SessionLocal, ensure_columns, engine
-from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router, federation as federation_router
+from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router, federation as federation_router, habits as habits_router
 from . import server_settings
 from .services import migrate_add_rotors, migrate_legacy_lube
 from .geo import service as geo_service
@@ -142,6 +142,7 @@ app.include_router(tires.router)
 app.include_router(tire_catalog_router.router)
 app.include_router(inventory.router)
 app.include_router(activities.router)
+app.include_router(habits_router.router)
 app.include_router(weather_router.router)
 app.include_router(stats_router.router)
 app.include_router(mapconfig.router)

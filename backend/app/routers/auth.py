@@ -33,6 +33,7 @@ def _user_out(u: User, admin: bool = False) -> UserOut:
         home_layout=home_blocks.parse_layout(u.home_layout),
         tour=bool(u.tour_pending),
         whatsnew=changelog.unseen(u.whatsnew_seen) or None,
+        work_storage=u.work_storage,
     )
 
 

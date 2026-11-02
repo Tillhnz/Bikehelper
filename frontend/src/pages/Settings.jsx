@@ -39,6 +39,43 @@ function ProfileSettings({ user, onChange }) {
   );
 }
 
+function WorkplaceSettings() {
+  const [st, setSt] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => { api.get("/settings/workplace").then(setSt).catch((e) => setError(e.message)); }, []);
+
+  async function choose(storage) {
+    setError("");
+    try { setSt(await api.put("/settings/workplace", { storage })); } catch (err) { setError(err.message); }
+  }
+
+  if (!st) return <section className="panel"><h2>Rad am Arbeitsplatz</h2>{error ? <p className="error" role="alert">{error}</p> : <Loading />}</section>;
+
+  return (
+    <section className="panel">
+      <h2>Rad am Arbeitsplatz</h2>
+      <p className="muted">
+        BikeHelper erkennt Arbeitswege selbst: Fährst du an mehreren Tagen morgens hin und nachmittags oder abends zurück, steht das Rad dazwischen am Ziel.
+        Steht es dort im Freien, belastet Regen in dieser Zeit Kette, Lager und Bremsen. Das zählt beim Verschleiß mit.
+      </p>
+      <div className="seg" role="radiogroup" aria-label="Wo steht dein Rad bei der Arbeit?">
+        {[["dry", "Drinnen oder trocken"], ["outdoor", "Im Freien"]].map(([v, label]) => (
+          <button key={v} type="button" role="radio" aria-checked={st.storage === v} className={`btn small${st.storage === v ? " primary" : ""}`} onClick={() => choose(st.storage === v ? null : v)}>{label}</button>
+        ))}
+      </div>
+      <p className="muted small">
+        {st.commute_rides > 0
+          ? `${st.commute_rides} Fahrten sind als Arbeitsweg getaggt.`
+          : "Noch kein Arbeitsweg erkannt. Dafür braucht es denselben Hin- und Rückweg an mindestens drei Tagen."}
+        {st.storage === "outdoor" && st.stands > 0 && ` ${st.stands} Standzeiten im Freien bewertet, im Schnitt ${String(st.avg_stand_h).replace(".", ",")} Stunden.`}
+        {!st.storage && " Ohne Auswahl wird die Standzeit nicht berücksichtigt."}
+      </p>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function NotifySettings() {
   const [st, setSt] = useState(null);
   const [email, setEmail] = useState(false);
@@ -475,6 +512,7 @@ export default function Settings({ user, onChange }) {
       <MechanicSettings user={user} onChange={onChange} />
       <TourSettings user={user} onChange={onChange} />
 
+      <WorkplaceSettings />
       <NotifySettings />
 
       <InstallSettings />

@@ -321,6 +321,45 @@ function WeatherPanel({ refreshKey }) {
 
 const PAGE = 50;
 
+function TagCell({ a, known, onChange }) {
+  const [adding, setAdding] = useState(false);
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+
+  async function add(e) {
+    e.preventDefault();
+    const tag = text.trim();
+    if (!tag) { setAdding(false); return; }
+    try {
+      onChange(a.id, await api.post(`/activities/${a.id}/tags`, { tag }));
+      setText(""); setAdding(false); setError("");
+    } catch (err) { setError(err.message); }
+  }
+  async function remove(tag) {
+    try { onChange(a.id, await api.del(`/activities/${a.id}/tags/${encodeURIComponent(tag)}`)); } catch (err) { setError(err.message); }
+  }
+
+  return (
+    <span className="tags">
+      {(a.tags || []).map((t) => (
+        <span key={t.tag} className={`tag${t.auto ? " auto" : ""}`} title={t.auto ? `Automatisch vergeben: ${t.reason || ""}` : "Von dir vergeben"}>
+          {t.tag}{t.auto && <span className="sr-only"> (automatisch)</span>}
+          <button type="button" aria-label={`Tag ${t.tag} entfernen`} onClick={() => remove(t.tag)}>×</button>
+        </span>
+      ))}
+      {adding ? (
+        <form className="tag-add" onSubmit={add}>
+          <input autoFocus list="known-tags" maxLength={30} value={text} onChange={(e) => setText(e.target.value)} onBlur={add} aria-label="Neues Tag" placeholder="z. B. Pendeln" />
+          <datalist id="known-tags">{known.map((k) => <option key={k} value={k} />)}</datalist>
+        </form>
+      ) : (
+        <button type="button" className="tag-plus" onClick={() => setAdding(true)} aria-label={`Tag zu ${a.name} hinzufügen`}>+ Tag</button>
+      )}
+      {error && <span className="error small" role="alert"> {error}</span>}
+    </span>
+  );
+}
+
 function ActivityList({ bikes, refreshKey, onChanged }) {
   const [params, setParams] = useSearchParams();
   const day = /^\d{4}-\d{2}-\d{2}$/.test(params.get("day") || "") ? params.get("day") : "";
@@ -330,6 +369,8 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [unassigned, setUnassigned] = useState(false);
   const [source, setSource] = useState("");
   const [sources, setSources] = useState([]);
+  const [tag, setTag] = useState("");
+  const [knownTags, setKnownTags] = useState([]);
   const [suggestions, setSuggestions] = useState({}); // Radvorschläge für Fahrten ohne Rad, nach Fahrt-ID
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -340,7 +381,9 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
   const [assigning, setAssigning] = useState(false);
 
   // Bei neuem Filter oder neuer Suche beginnt die Auswahl von vorn
-  useEffect(() => { setPicked(new Set()); setAllMatching(false); }, [unassigned, debouncedQ, day, source]);
+  useEffect(() => { setPicked(new Set()); setAllMatching(false); }, [unassigned, debouncedQ, day, source, tag]);
+
+  useEffect(() => { api.get("/tags").then((r) => setKnownTags(r.map((x) => x.tag))).catch(() => {}); }, [refreshKey, items.length]);
 
   useEffect(() => { api.get("/activities/sources").then(setSources).catch(() => {}); }, [refreshKey]);
 
@@ -358,6 +401,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
       if (source) params.set("source", source);
       if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
       if (day) params.set("day", day);
+      if (tag) params.set("tag", tag);
       const page = await api.get(`/activities?${params}`);
       setTotal(page.total);
       setItems((prev) => (offset === 0 ? page.items : [...prev, ...page.items]));
@@ -366,7 +410,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     } finally {
       setLoading(false);
     }
-  }, [unassigned, debouncedQ, day, source]);
+  }, [unassigned, debouncedQ, day, source, tag]);
 
   useEffect(() => { load(0); }, [load, refreshKey]);
 
@@ -395,9 +439,11 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     }
   }
 
+  const setTags = (id, tags) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, tags } : x)));
+
   async function changeBike(a, value) {
     const bikeId = value ? Number(value) : null;
-    setItems((prev) => prev.map((x) => (x.id === a.id ? { ...x, bike_id: bikeId } : x)));
+    setItems((prev) => prev.map((x) => (x.id === a.id ? { ...x, bike_id: bikeId, bike_auto: false, bike_reason: null } : x)));
     try {
       await api.put(`/activities/${a.id}`, { bike_id: bikeId });
       loadSuggestions();
@@ -436,7 +482,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
     setError("");
     try {
       const body = allMatching
-        ? { bike_id: bikeId, only_unassigned: false, match: { unassigned, q: debouncedQ.trim() || null, day: day || null, source: source || null } }
+        ? { bike_id: bikeId, only_unassigned: false, match: { unassigned, q: debouncedQ.trim() || null, day: day || null, source: source || null, tag: tag || null } }
         : { bike_id: bikeId, only_unassigned: false, activity_ids: [...picked] };
       const res = await api.post("/activities/assign", body);
       toast(`${res.updated} ${res.updated === 1 ? "Fahrt" : "Fahrten"} zugeordnet.`);
@@ -471,6 +517,12 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
             <select aria-label="Nach Herkunft filtern" value={source} onChange={(e) => setSource(e.target.value)}>
               <option value="">Alle Quellen</option>
               {sources.map((s) => <option key={s.source} value={s.source}>{s.source === "unknown" ? "Ohne Angabe" : sourceLabel(s.source)} ({s.count})</option>)}
+            </select>
+          )}
+          {knownTags.length > 0 && (
+            <select aria-label="Nach Tag filtern" value={tag} onChange={(e) => setTag(e.target.value)}>
+              <option value="">Alle Tags</option>
+              {knownTags.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           )}
           <label className="check">
@@ -513,8 +565,8 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
 
       {!loading && items.length === 0 ? (
         <EmptyState
-          title={unassigned || debouncedQ || day || source ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
-          text={unassigned || debouncedQ || day || source ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
+          title={unassigned || debouncedQ || day || source || tag ? "Keine passenden Fahrten" : "Noch keine Fahrten"}
+          text={unassigned || debouncedQ || day || source || tag ? "Ändere den Filter oder die Suche." : "Importiere oben deinen Strava-Export oder lade Fahrtdateien hoch."}
         />
       ) : (
         <>
@@ -541,7 +593,7 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                 <tr key={a.id} className={picked.has(a.id) || allMatching ? "picked" : ""}>
                   <td className="cell-pick"><input type="checkbox" aria-label={`${a.name} auswählen`} checked={picked.has(a.id) || allMatching} onChange={() => togglePick(a.id)} /></td>
                   <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
-                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}</td>
+                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}<TagCell a={a} known={knownTags} onChange={setTags} /></td>
                   <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap" data-label="Zeit">{fmtDuration(a.moving_time_s)}</td>
                   <td className="num nowrap" data-label="Höhenmeter">{Math.round(a.elevation_m)} m</td>
@@ -551,6 +603,11 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                       <option value="">Kein Rad</option>
                       {bikes.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
+                    {a.bike_auto && (
+                      <span className="suggest auto" title={a.bike_reason || ""}>
+                        Automatisch zugeordnet{a.bike_reason ? `: ${a.bike_reason}` : ""}
+                      </span>
+                    )}
                     {!a.bike_id && suggestions[a.id] && (
                       <span className="suggest" title={suggestions[a.id].reason}>
                         Vorschlag: <strong>{suggestions[a.id].bike_name}</strong>{" "}

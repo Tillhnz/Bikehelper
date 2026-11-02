@@ -62,6 +62,7 @@ class UserOut(BaseModel):
     home_layout: list[str] | None = None  # None = Standardanordnung
     tour: bool = False  # Rundgang durch die App zeigen (neues Konto oder von Hand gestartet)
     whatsnew: list[dict] | None = None  # noch nicht gezeigte Versionshinweise, neueste zuerst
+    work_storage: str | None = None  # Rad am Arbeitsplatz: dry | outdoor
 
 
 class StravaSettingsIn(BaseModel):
@@ -232,6 +233,9 @@ class ActivityOut(BaseModel):
     wet_minutes: float | None = None
     weather_code: int | None = None
     weather_status: str | None = None
+    bike_auto: bool = False
+    bike_reason: str | None = None
+    tags: list[dict] = []  # [{tag, auto, reason}]
 
 
 class ActivityDetail(ActivityOut):
@@ -257,6 +261,7 @@ class AssignMatch(BaseModel):
     unassigned: bool = False
     q: str | None = Field(default=None, max_length=200)
     day: date | None = None
+    tag: str | None = Field(default=None, max_length=60)
     source: str | None = Field(default=None, max_length=20)
 
 
