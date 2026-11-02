@@ -245,6 +245,8 @@ class ActivityDetail(ActivityOut):
     details: dict | None = None  # fehlt bei Fahrten, die vor dieser Funktion importiert wurden
     start_lat: float | None = None
     start_lng: float | None = None
+    stand_h: float | None = None  # Standzeit im Freien nach dieser Fahrt (Arbeitsplatz)
+    stand_wet_km: float | None = None
 
 
 class ActivityPage(BaseModel):

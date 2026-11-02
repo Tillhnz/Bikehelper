@@ -144,7 +144,7 @@ def _workplace(db: Session, user: User) -> dict:
     commutes = db.scalar(
         select(func.count()).select_from(ActivityTag).where(ActivityTag.user_id == user.id, ActivityTag.tag == habits.COMMUTE_TAG,
                                                               ActivityTag.state != "rejected")) or 0
-    return {"storage": user.work_storage, "commute_rides": commutes, "stands": pairs[0], "avg_stand_h": round(float(pairs[1]), 1),
+    return {**habits.overview(db, user), "storage": user.work_storage, "commute_rides": commutes, "stands": pairs[0], "avg_stand_h": round(float(pairs[1]), 1),
             "wet_km": round(float(pairs[2]), 1)}
 
 

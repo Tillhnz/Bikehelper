@@ -56,6 +56,9 @@ def test_commute_needs_a_pattern_and_finds_pairs():
             pairs, places = habits.commute_pairs(habits._load_rides(db, uid, timezone.utc))
             assert len(pairs) == 3 and len(places) == 1
             assert all((b.start - a.end).total_seconds() / 3600 > 8 for a, b in pairs)
+            ov = habits.overview(db, db.get(User, uid))["places"]
+            assert len(ov) == 1 and ov[0]["days"] == 3 and ov[0]["detected_on"] == "2026-05-06" and len(ov[0]["stands"]) == 3
+            assert ov[0]["stands"][0]["from"] == "08:00" and ov[0]["stands"][0]["to"] == "16:30"
 
 
 def test_standing_outdoors_adds_wet_km_only_if_configured():

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, clearToken, download, fmtDateTime, setToken } from "../api.js";
+import { api, clearToken, download, fmtDate, fmtDateTime, setToken } from "../api.js";
 import { Loading, confirmDialog, toast } from "../components/feedback.jsx";
 import { getTheme, setTheme } from "../theme.js";
 
@@ -71,6 +71,34 @@ function WorkplaceSettings() {
         {st.storage === "outdoor" && st.stands > 0 && ` ${st.stands} Standzeiten im Freien bewertet, im Schnitt ${String(st.avg_stand_h).replace(".", ",")} Stunden.`}
         {!st.storage && " Ohne Auswahl wird die Standzeit nicht berücksichtigt."}
       </p>
+      {(st.places || []).map((p, i) => (
+        <div key={i} className="work-place">
+          <h3>Arbeitsort{st.places.length > 1 ? ` ${i + 1}` : ""}</h3>
+          <p className="small">
+            <a className="link" href={`https://www.openstreetmap.org/?mlat=${p.work_lat}&mlon=${p.work_lng}#map=17/${p.work_lat}/${p.work_lng}`} target="_blank" rel="noopener noreferrer">
+              Auf der Karte ansehen ({p.work_lat.toFixed(4).replace(".", ",")} / {p.work_lng.toFixed(4).replace(".", ",")})
+            </a>
+            <br />
+            Erkannt am {fmtDate(p.detected_on)}, nach dem dritten Tag mit demselben Hin- und Rückweg. Seitdem {p.days} Tage zwischen {fmtDate(p.first)} und {fmtDate(p.last)}.
+            Das Rad stand dort im Schnitt {String(p.avg_stand_h).replace(".", ",")} Stunden.
+          </p>
+          <table className="rides small">
+            <thead><tr><th>Tag</th><th>Stand von – bis</th><th className="num">Dauer</th><th className="num">Belastung</th></tr></thead>
+            <tbody>
+              {p.stands.map((x) => (
+                <tr key={x.activity_id}>
+                  <td data-label="Tag"><Link className="ride-link" to={`/rides/${x.activity_id}`}>{fmtDate(x.day)}</Link></td>
+                  <td data-label="Stand">{x.from} – {x.to} Uhr</td>
+                  <td className="num" data-label="Dauer">{String(x.hours).replace(".", ",")} h</td>
+                  <td className="num" data-label="Belastung">
+                    {st.storage !== "outdoor" ? "nicht gezählt (trocken)" : x.wet_km == null ? "wird berechnet" : `${String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} nasse km${x.weather === "none" ? " (ohne Wetter)" : ""}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
       {error && <p className="error" role="alert">{error}</p>}
     </section>
   );

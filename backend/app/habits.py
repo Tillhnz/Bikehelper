@@ -105,6 +105,11 @@ def _load_rides(db: Session, user_id: int, tz) -> list[Ride]:
 
 def commute_pairs(rides: list[Ride]) -> tuple[list[tuple[Ride, Ride]], list[tuple[float, float, float, float]]]:
     """Gibt (Paare Hinweg/Rückweg, Orte als (Heim-lat, Heim-lng, Arbeits-lat, Arbeits-lng)) zurück; nur bestätigte Muster."""
+    confirmed = _confirmed_places(rides)
+    return [pair for p in confirmed for pair in p["pairs"]], [(p["h"][0], p["h"][1], p["w"][0], p["w"][1]) for p in confirmed]
+
+
+def _confirmed_places(rides: list[Ride]) -> list[dict]:
     by_day: dict[tuple, list[Ride]] = {}
     for r in rides:
         by_day.setdefault((r.local_start.date(), r.bike_id), []).append(r)
@@ -130,8 +135,37 @@ def commute_pairs(rides: list[Ride]) -> tuple[list[tuple[Ride, Ride]], list[tupl
                 break
         else:
             places.append({"h": (a.slat, a.slng), "w": (a.elat, a.elng), "pairs": [(a, b)]})
-    confirmed = [p for p in places if len({a.local_start.date() for a, _ in p["pairs"]}) >= COMMUTE_MIN_DAYS]
-    return [pair for p in confirmed for pair in p["pairs"]], [(p["h"][0], p["h"][1], p["w"][0], p["w"][1]) for p in confirmed]
+    return [p for p in places if len({a.local_start.date() for a, _ in p["pairs"]}) >= COMMUTE_MIN_DAYS]
+
+
+def overview(db: Session, user: User) -> dict:
+    """Für die Anzeige: erkannte Arbeitsorte (wo, seit wann, an wie vielen Tagen) und die letzten Standzeiten (wann, wie lange)."""
+    tz = get_tz(settings.timezone)
+    rides = _load_rides(db, user.id, tz)
+    stand = {r.id: r for r in db.execute(select(Activity.id, Activity.stand_h, Activity.stand_wet_km, Activity.stand_status)
+                                         .where(Activity.user_id == user.id, Activity.stand_status.is_not(None)))}
+    places = []
+    for p in _confirmed_places(rides):
+        days = sorted({a.local_start.date() for a, _ in p["pairs"]})
+        pairs = sorted(p["pairs"], key=lambda ab: ab[0].start, reverse=True)
+        hours = [(b.start - a.end).total_seconds() / 3600 for a, b in pairs]
+        stands = []
+        for a, b in pairs[:8]:
+            st = stand.get(a.id)
+            stands.append({
+                "activity_id": a.id, "day": a.local_start.date().isoformat(),
+                "from": local(a.end, tz).strftime("%H:%M"), "to": local(b.start, tz).strftime("%H:%M"),
+                "hours": round((b.start - a.end).total_seconds() / 3600, 1),
+                "wet_km": None if st is None else st.stand_wet_km, "weather": None if st is None else st.stand_status,
+            })
+        places.append({
+            "work_lat": round(sum(a.elat for a, _ in p["pairs"]) / len(p["pairs"]), 5),
+            "work_lng": round(sum(a.elng for a, _ in p["pairs"]) / len(p["pairs"]), 5),
+            "days": len(days), "detected_on": days[COMMUTE_MIN_DAYS - 1].isoformat(),  # der Tag, an dem das Muster feststand
+            "first": days[0].isoformat(), "last": days[-1].isoformat(), "avg_stand_h": round(sum(hours) / len(hours), 1),
+            "stands": stands,
+        })
+    return {"places": places}
 
 
 # ---------- Standzeit im Freien ----------

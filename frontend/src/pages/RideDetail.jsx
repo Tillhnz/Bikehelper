@@ -136,6 +136,12 @@ export default function RideDetail() {
             {a.bike_name ? <> · <Link className="link" to={`/bikes/${a.bike_id}`}>{a.bike_name}</Link></> : a.gear_name ? ` · ${a.gear_name}` : ""}
             {sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}
           </p>
+          {a.stand_h != null && (
+            <p className="muted small">
+              Danach stand das Rad {String(a.stand_h).replace(".", ",")} Stunden im Freien (Arbeitsplatz)
+              {a.stand_wet_km != null ? `, zählt wie ${String(Math.round(a.stand_wet_km * 10) / 10).replace(".", ",")} km Regen` : ""}.
+            </p>
+          )}
         </div>
         <div className="actions" style={{ marginTop: 0 }}>
           {!editing && <button className="btn small" onClick={() => setEditing(true)}>Umbenennen</button>}

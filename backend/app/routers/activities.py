@@ -283,4 +283,6 @@ def activity_detail(activity_id: int, user: User = Depends(current_user), db: Se
         details=details,
         start_lat=a.start_lat,
         start_lng=a.start_lng,
+        stand_h=a.stand_h,
+        stand_wet_km=a.stand_wet_km,
     )
