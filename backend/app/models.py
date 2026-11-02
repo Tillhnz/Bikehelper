@@ -254,6 +254,10 @@ class Activity(Base):
     stand_h: Mapped[float | None] = mapped_column(Float, nullable=True)
     stand_wet_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     stand_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | none (kein Wetter) | skip; leer = noch offen
+    stand_wet_h: Mapped[float | None] = mapped_column(Float, nullable=True)  # Stunden Regen/Nässe während der Standzeit (NULL = ohne Wetterdaten)
+    # Hin- und Rückweg gehören zusammen: pair_id = die andere Fahrt, pair_role = "out" (Hinweg) oder "back" (Rückweg)
+    pair_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pair_role: Mapped[str | None] = mapped_column(String(4), nullable=True)
 
 
 class RuleNotice(Base):

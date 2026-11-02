@@ -70,6 +70,19 @@ def wear_between(
     return km, wet, km + wet * (factor - 1)
 
 
+def wet_sources(db: Session, bike_id: int | None, start: date | None, end: date | None) -> tuple[float, float]:
+    """Nasse Kilometer ohne Fahrt im Zeitraum: (Standzeit im Freien, nass geputzt). Sie sind schon in wear_between enthalten."""
+    if bike_id is None:
+        return 0.0, 0.0
+    a = select(func.coalesce(func.sum(Activity.stand_wet_km), 0.0)).where(Activity.bike_id == bike_id)
+    w = select(func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)
+    if start:
+        a, w = a.where(Activity.start_date >= _since(start)), w.where(WashEvent.at >= _since(start))
+    if end:
+        a, w = a.where(Activity.start_date < _until(end)), w.where(WashEvent.at < _until(end))
+    return float(db.scalar(a) or 0.0), float(db.scalar(w) or 0.0)
+
+
 def bike_total_km(db: Session, bike: Bike) -> float:
     return bike.start_km + km_between(db, bike.id, None)
 
@@ -248,6 +261,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         }
 
     km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
+    stand_km, wash_km = wet_sources(db, comp.bike_id, since, comp.retired_at)
     if last is None:  # noch nie gewartet: Kilometer, die ein gebrauchtes Teil schon hatte, zählen mit
         km += comp.start_km
         effective += comp.start_km
@@ -313,6 +327,8 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     return {
         "km_since": round(km, 1),
         "wet_km": round(wet_km, 1),
+        "stand_wet_km": round(stand_km, 1),
+        "wash_wet_km": round(wash_km, 1),
         "effective_km": round(effective, 1),
         "months_since": round(months_since, 1),
         "progress": round(progress, 3),

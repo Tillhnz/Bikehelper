@@ -65,6 +65,21 @@ def delete_wash(wash_id: int, user: User = Depends(current_user), db: Session = 
     db.commit()
 
 
+@router.get("/bikes/{bike_id}/exposure")
+def bike_exposure(bike_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Nässe ohne Fahrt: Standzeiten im Freien und Nass-Putzen (Summe über das ganze Rad)."""
+    _own_bike(db, user, bike_id)
+    n, h, wet_h, wet_km = db.execute(
+        select(func.count(), func.coalesce(func.sum(Activity.stand_h), 0.0), func.coalesce(func.sum(Activity.stand_wet_h), 0.0),
+               func.coalesce(func.sum(Activity.stand_wet_km), 0.0))
+        .where(Activity.bike_id == bike_id, Activity.stand_status.is_not(None))
+    ).one()
+    wash_n, wash_km = db.execute(
+        select(func.count(), func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)).one()
+    return {"storage": user.work_storage, "stands": n, "stand_h": round(float(h), 1), "stand_wet_h": round(float(wet_h), 1),
+            "stand_wet_km": round(float(wet_km), 1), "washes": wash_n, "wash_wet_km": round(float(wash_km), 1)}
+
+
 # ---------- Tags ----------
 
 class TagIn(BaseModel):

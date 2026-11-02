@@ -91,7 +91,7 @@ function WorkplaceSettings() {
                   <td data-label="Stand">{x.from} – {x.to} Uhr</td>
                   <td className="num" data-label="Dauer">{String(x.hours).replace(".", ",")} h</td>
                   <td className="num" data-label="Belastung">
-                    {st.storage !== "outdoor" ? "nicht gezählt (trocken)" : x.wet_km == null ? "wird berechnet" : `${String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} nasse km${x.weather === "none" ? " (ohne Wetter)" : ""}`}
+                    {st.storage !== "outdoor" ? "nicht gezählt (trocken)" : x.wet_km == null ? "wird berechnet" : `${x.wet_h != null ? `${String(Math.round(x.wet_h * 10) / 10).replace(".", ",")} h Regen · ` : ""}${String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} nasse km${x.weather === "none" ? " (ohne Wetter)" : ""}`}
                   </td>
                 </tr>
               ))}

@@ -169,6 +169,8 @@ class RuleOut(RuleIn):
     assessment: dict | None = None  # Prüfergebnis, das Intervall dieser Regel beeinflusst (Prüf- und Wechselregel)
     km_since: float
     wet_km: float
+    stand_wet_km: float = 0  # davon Nässe durch Stehen im Freien (Arbeitsplatz)
+    wash_wet_km: float = 0  # davon Nässe durch Nass-Putzen
     effective_km: float  # gefahrene km inklusive Nässe-Zuschlag
     months_since: float
     progress: float  # 0..1+ (Anteil des Intervalls, der verbraucht ist)
@@ -236,6 +238,7 @@ class ActivityOut(BaseModel):
     bike_auto: bool = False
     bike_reason: str | None = None
     tags: list[dict] = []  # [{tag, auto, reason}]
+    pair: dict | None = None  # Arbeitsweg: {role, other_id, from, to, hours, outdoor, wet_h, wet_km, weather}
 
 
 class ActivityDetail(ActivityOut):

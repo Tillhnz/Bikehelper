@@ -260,6 +260,8 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
         <p className="muted small wet-line">
           Nässe zählt ×{fmtNum(rule.wet_factor)}: {fmtKm(rule.wet_km)} km bei Nässe, damit zählen {fmtKm(rule.effective_km)} km
           statt {fmtKm(rule.km_since)} km.
+          {rule.stand_wet_km > 0 && <> Davon {fmtKm(rule.stand_wet_km)} km durch Stehen im Freien (Arbeitsplatz).</>}
+          {rule.wash_wet_km > 0 && <> Davon {fmtKm(rule.wash_wet_km)} km durch Nass-Putzen.</>}
         </p>
       )}
       {checkLine && !unknown && <p className="muted small wet-line check-line">{checkLine}</p>}
@@ -663,12 +665,16 @@ function BikeEdit({ bike, onSaved, onCancel }) {
 function WashPanel({ bike, onChanged }) {
   const today = new Date().toISOString().slice(0, 10);
   const [washes, setWashes] = useState([]);
+  const [exp, setExp] = useState(null);
   const [dried, setDried] = useState(true);
   const [day, setDay] = useState(today);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(() => api.get(`/bikes/${bike.id}/washes`).then(setWashes).catch(() => {}), [bike.id]);
+  const load = useCallback(() => {
+    api.get(`/bikes/${bike.id}/exposure`).then(setExp).catch(() => {});
+    return api.get(`/bikes/${bike.id}/washes`).then(setWashes).catch(() => {});
+  }, [bike.id]);
   useEffect(() => { load(); }, [load]);
 
   async function add(e) {
@@ -687,7 +693,15 @@ function WashPanel({ bike, onChanged }) {
 
   return (
     <section className="panel wash-panel">
-      <h2>Rad nass geputzt</h2>
+      <h2>Nässe ohne Fahrt</h2>
+      {exp && (exp.stands > 0 || exp.washes > 0) && (
+        <p className="small">
+          {exp.stands > 0 && exp.storage === "outdoor" && <>Am Arbeitsplatz stand das Rad {exp.stands}-mal im Freien, zusammen {String(exp.stand_h).replace(".", ",")} h, davon {String(exp.stand_wet_h).replace(".", ",")} h bei Regen oder Nässe. Das zählt wie {fmtKm(exp.stand_wet_km)} km Regen. </>}
+          {exp.washes > 0 && <>{exp.washes}-mal nass geputzt, zählt wie {fmtKm(exp.wash_wet_km)} km Regen. </>}
+          Wie stark es einzelne Teile trifft, steht bei deren Wartungsregel.
+        </p>
+      )}
+      <h3>Rad nass geputzt</h3>
       <p className="muted small">
         Wasser an Kette, Lagern und Bremsen belastet das Rad wie Fahrten im Regen. Mit abgetrockneter und frisch geölter Kette ist es deutlich weniger.
         Die Belastung fließt in alle Teile ein, die auf Nässe reagieren.

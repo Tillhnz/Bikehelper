@@ -35,6 +35,36 @@ def _out(a: Activity, has_track: bool) -> ActivityOut:
     )
 
 
+def pairs_for(db: Session, user: User, acts: list[Activity]) -> dict[int, dict]:
+    """Arbeitsweg-Infos je Fahrt-ID: Hin- und Rückweg, Standzeit dazwischen und deren Nässe."""
+    linked = [a for a in acts if a.pair_id and a.pair_role]
+    if not linked:
+        return {}
+    others = {r.id: r for r in db.execute(
+        select(Activity.id, Activity.name, Activity.start_date, Activity.moving_time_s, Activity.stand_h, Activity.stand_wet_km,
+               Activity.stand_wet_h, Activity.stand_status)
+        .where(Activity.user_id == user.id, Activity.id.in_([a.pair_id for a in linked])))}
+    tz = get_tz(settings.timezone)
+    out: dict[int, dict] = {}
+    for a in linked:
+        o = others.get(a.pair_id)
+        if o is None:
+            continue
+        out_ride, back_ride = (a, o) if a.pair_role == "out" else (o, a)
+        end = out_ride.start_date + timedelta(seconds=out_ride.moving_time_s or 0)
+        hours = (back_ride.start_date - end).total_seconds() / 3600
+        st = out_ride  # die Bewertung der Standzeit hängt am Hinweg
+        outdoor = user.work_storage == "outdoor" and st.stand_status is not None
+        loc = lambda d: d.replace(tzinfo=timezone.utc).astimezone(tz).strftime("%H:%M")  # noqa: E731
+        out[a.id] = {
+            "role": a.pair_role, "other_id": o.id, "other_name": o.name, "from": loc(end), "to": loc(back_ride.start_date),
+            "hours": round(hours, 1), "storage": user.work_storage, "outdoor": outdoor,
+            "wet_h": st.stand_wet_h if outdoor else None, "wet_km": st.stand_wet_km if outdoor else None,
+            "weather": st.stand_status if outdoor else None,
+        }
+    return out
+
+
 def _own_activity(db: Session, user: User, activity_id: int) -> Activity:
     a = db.get(Activity, activity_id)
     if not a or a.user_id != user.id:
@@ -160,9 +190,11 @@ def list_activities(
         .offset(offset)
     ).all()
     tags = tags_for(db, [a.id for a, _ in rows])
+    pairs = pairs_for(db, user, [a for a, _ in rows])
     items = [_out(a, bool(t)) for a, t in rows]
     for it in items:
         it.tags = tags.get(it.id, [])
+        it.pair = pairs.get(it.id)
     return ActivityPage(total=total, items=items)
 
 
@@ -270,6 +302,7 @@ def activity_detail(activity_id: int, user: User = Depends(current_user), db: Se
     a = _own_activity(db, user, activity_id)
     out = _out(a, bool(a.polyline))
     out.tags = tags_for(db, [a.id]).get(a.id, [])
+    out.pair = pairs_for(db, user, [a]).get(a.id)
     base = out.model_dump()
     try:
         details = json.loads(a.details) if a.details else None

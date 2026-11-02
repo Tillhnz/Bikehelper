@@ -1401,3 +1401,10 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 .plain-list li{padding:.25rem 0;border-top:1px solid var(--line)}
 .work-place{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--line)}
 .work-place h3{margin:0 0 .3rem;font-size:1rem}
+.rides tr.paired > td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+.rides tr.pair-first > td{border-bottom-color:transparent}
+.rides tr.stand-row td{padding:.35rem .8rem;font-size:.82rem;color:var(--mute);background:color-mix(in srgb,var(--amber) 9%,transparent)}
+.rides tr.stand-row strong{color:var(--chalk)}
+.stand-icon{color:var(--amber)}
+.pair-note{display:block;margin-top:.25rem}
+@media (max-width:800px){.rides tr.stand-row td{display:block}}

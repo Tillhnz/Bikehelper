@@ -142,7 +142,7 @@ def overview(db: Session, user: User) -> dict:
     """Für die Anzeige: erkannte Arbeitsorte (wo, seit wann, an wie vielen Tagen) und die letzten Standzeiten (wann, wie lange)."""
     tz = get_tz(settings.timezone)
     rides = _load_rides(db, user.id, tz)
-    stand = {r.id: r for r in db.execute(select(Activity.id, Activity.stand_h, Activity.stand_wet_km, Activity.stand_status)
+    stand = {r.id: r for r in db.execute(select(Activity.id, Activity.stand_h, Activity.stand_wet_km, Activity.stand_status, Activity.stand_wet_h)
                                          .where(Activity.user_id == user.id, Activity.stand_status.is_not(None)))}
     places = []
     for p in _confirmed_places(rides):
@@ -157,6 +157,7 @@ def overview(db: Session, user: User) -> dict:
                 "from": local(a.end, tz).strftime("%H:%M"), "to": local(b.start, tz).strftime("%H:%M"),
                 "hours": round((b.start - a.end).total_seconds() / 3600, 1),
                 "wet_km": None if st is None else st.stand_wet_km, "weather": None if st is None else st.stand_status,
+                "wet_h": None if st is None else st.stand_wet_h,
             })
         places.append({
             "work_lat": round(sum(a.elat for a, _ in p["pairs"]) / len(p["pairs"]), 5),
@@ -203,7 +204,9 @@ def apply_stands(db: Session, user: User, pairs: list[tuple[Ride, Ride]], fetch=
     """Bewertet die Standzeit zwischen Hin- und Rückweg (nur bei Einstellung „im Freien“). Gibt die Zahl neu bewerteter Fahrten zurück."""
     if user.work_storage != "outdoor":
         return 0
-    open_ids = set(db.scalars(select(Activity.id).where(Activity.user_id == user.id, Activity.stand_status.is_(None))))
+    open_ids = set(db.scalars(select(Activity.id).where(
+        Activity.user_id == user.id,
+        (Activity.stand_status.is_(None)) | ((Activity.stand_status == "ok") & Activity.stand_wet_h.is_(None)))))  # ältere Einträge ohne Regenstunden nachrechnen
     todo = [(a, b) for a, b in pairs if a.id in open_ids and a.bike_id is not None]
     items = [weather_core.Item(a.id, a.elat, a.elng, a.end, int((b.start - a.end).total_seconds())) for a, b in todo]
     weather = _stand_weather(items, fetch)
@@ -215,15 +218,29 @@ def apply_stands(db: Session, user: User, pairs: list[tuple[Ride, Ride]], fetch=
         wet_h = weather[a.id]
         has_weather = wet_h is not None and wet_h >= 0
         db.execute(update(Activity).where(Activity.id == a.id).values(
-            stand_h=hours, stand_wet_km=stand_credit(hours, wet_h if has_weather else None), stand_status="ok" if has_weather else "none"))
+            stand_h=hours, stand_wet_km=stand_credit(hours, wet_h if has_weather else None), stand_status="ok" if has_weather else "none",
+            stand_wet_h=round(wet_h, 2) if has_weather else None))
         done += 1
     db.commit()
     return done
 
 
+def link_pairs(db: Session, pairs: list[tuple[Ride, Ride]]) -> None:
+    """Merkt sich, welche Fahrten Hin- und Rückweg sind, damit die Fahrtenliste sie bündeln kann."""
+    if not pairs:
+        return
+    have = {r.id: (r.pair_id, r.pair_role) for r in db.execute(
+        select(Activity.id, Activity.pair_id, Activity.pair_role).where(Activity.id.in_([r.id for p in pairs for r in p])))}
+    for a, b in pairs:
+        for me, other, role in ((a, b, "out"), (b, a, "back")):
+            if have.get(me.id) != (other.id, role):
+                db.execute(update(Activity).where(Activity.id == me.id).values(pair_id=other.id, pair_role=role))
+    db.commit()
+
+
 def clear_stands(db: Session, user_id: int) -> None:
     db.execute(update(Activity).where(Activity.user_id == user_id, Activity.stand_status.is_not(None))
-               .values(stand_h=None, stand_wet_km=None, stand_status=None))
+               .values(stand_h=None, stand_wet_km=None, stand_status=None, stand_wet_h=None))
     db.commit()
 
 
@@ -317,6 +334,7 @@ def _run_for_user(db: Session, user: User, fetch) -> dict:
     rides = _load_rides(db, user.id, tz)
     pairs, places = commute_pairs(rides)
     tagged = tag_commutes(db, user.id, rides, pairs, places) if pairs else 0
+    link_pairs(db, pairs)
     stands = apply_stands(db, user, pairs, fetch)
     learned = learn_tags(db, user.id, rides) if rides else 0
     return {"commute_pairs": len(pairs), "commute_tags": tagged, "stands": stands, "learned": learned}

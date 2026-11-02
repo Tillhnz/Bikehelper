@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { WEATHER_TEXT, api, sourceLabel, fmtDate, fmtDateTime, fmtDuration, fmtKm1, fmtNum, upload } from "../api.js";
 import { EmptyState } from "../components/ui.jsx";
@@ -360,6 +360,22 @@ function TagCell({ a, known, onChange }) {
   );
 }
 
+function StandText({ p }) {
+  const h = String(p.hours).replace(".", ",");
+  if (!p.outdoor) {
+    return <>Rad stand {h} h am Arbeitsplatz ({p.from}–{p.to} Uhr){p.storage === "dry" ? ", trocken untergestellt, zählt nicht" : ". Stell in den Einstellungen ein, ob es im Freien steht."}</>;
+  }
+  if (p.wet_km == null) return <>Rad stand {h} h im Freien ({p.from}–{p.to} Uhr), das Wetter wird noch abgerufen.</>;
+  const km = String(Math.round(p.wet_km * 10) / 10).replace(".", ",");
+  return (
+    <>
+      Rad stand {h} h im Freien ({p.from}–{p.to} Uhr)
+      {p.wet_h != null ? <>, davon <strong>{String(Math.round(p.wet_h * 10) / 10).replace(".", ",")} h bei Regen oder Nässe</strong></> : ", ohne Wetterdaten"}
+      {" "}· zählt beim Verschleiß wie {km} km Regen
+    </>
+  );
+}
+
 function ActivityList({ bikes, refreshKey, onChanged }) {
   const [params, setParams] = useSearchParams();
   const day = /^\d{4}-\d{2}-\d{2}$/.test(params.get("day") || "") ? params.get("day") : "";
@@ -589,11 +605,15 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
               </tr>
             </thead>
             <tbody>
-              {items.map((a) => (
-                <tr key={a.id} className={picked.has(a.id) || allMatching ? "picked" : ""}>
+              {items.map((a, i) => (
+                <Fragment key={a.id}>
+                <tr className={`${picked.has(a.id) || allMatching ? "picked" : ""}${a.pair ? " paired" : ""}${a.pair?.role === "back" && items[i + 1]?.id === a.pair.other_id ? " pair-first" : ""}${a.pair?.role === "out" && items[i - 1]?.id === a.pair.other_id ? " pair-last" : ""}`}>
                   <td className="cell-pick"><input type="checkbox" aria-label={`${a.name} auswählen`} checked={picked.has(a.id) || allMatching} onChange={() => togglePick(a.id)} /></td>
                   <td className="nowrap cell-date">{fmtDateTime(a.start_date)}</td>
-                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}<TagCell a={a} known={knownTags} onChange={setTags} /></td>
+                  <td className="cell-name"><Link className="ride-link" to={`/rides/${a.id}`}>{a.name}</Link>{sourceLabel(a.source) && <span className="source-tag" title="Woher diese Fahrt stammt">{sourceLabel(a.source)}</span>}<TagCell a={a} known={knownTags} onChange={setTags} />
+                    {a.pair && !(a.pair.role === "back" ? items[i + 1]?.id === a.pair.other_id : items[i - 1]?.id === a.pair.other_id) && (
+                      <span className="pair-note small muted">{a.pair.role === "out" ? "Hinweg" : "Rückweg"}: <StandText p={a.pair} /></span>
+                    )}</td>
                   <td className="num nowrap" data-label="Strecke">{fmtKm1(a.distance_km)} km</td>
                   <td className="num nowrap" data-label="Zeit">{fmtDuration(a.moving_time_s)}</td>
                   <td className="num nowrap" data-label="Höhenmeter">{Math.round(a.elevation_m)} m</td>
@@ -617,6 +637,10 @@ function ActivityList({ bikes, refreshKey, onChanged }) {
                   </td>
                   <td className="cell-wide"><button className="link small danger" onClick={() => remove(a)}>Löschen</button></td>
                 </tr>
+                {a.pair?.role === "back" && items[i + 1]?.id === a.pair.other_id && (
+                  <tr className="stand-row paired"><td colSpan={9}><span className="stand-icon" aria-hidden="true">⇅</span> <strong>Arbeitsweg:</strong> <StandText p={a.pair} /></td></tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

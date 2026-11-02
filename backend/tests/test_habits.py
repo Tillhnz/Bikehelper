@@ -106,6 +106,8 @@ def test_commute_rides_get_the_pendeln_tag_automatically():
             habits.run_for_user(db, db.get(User, uid))
         items = c.get("/api/activities?tag=Pendeln", headers=h).json()["items"]
         assert len(items) == 6 and all(t["auto"] for i in items for t in i["tags"])
+        assert {i["pair"]["role"] for i in items} == {"out", "back"} and all(i["pair"]["hours"] == 8.5 for i in items)
+        assert all(i["pair"]["from"] and i["pair"]["outdoor"] is False for i in items)  # Arbeitsplatz nicht als „im Freien“ gewählt
 
 
 def test_manual_tags_are_learned_and_rejection_sticks():
