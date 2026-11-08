@@ -167,7 +167,7 @@ setup_env() {
 
 start_stack() {
   info "Baue und starte BikeHelper (der erste Start dauert einige Minuten) …"
-  (cd "$APP_DIR" && "${DOCKER[@]}" compose up -d --build)
+  (cd "$APP_DIR" && "${DOCKER[@]}" compose build --pull && "${DOCKER[@]}" compose up -d)
 }
 
 wait_healthy() {
