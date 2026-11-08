@@ -300,6 +300,11 @@ _G_PADS = (
     Guide("Hydraulische Scheibenbremse ausrichten", _PT + "hydraulic-disc-brake-alignment", PT),
     Guide("Bremsbeläge bei Felgenbremsen wechseln", _PT + "brake-pad-replacement-rim-brakes", PT),
 )
+_G_ROTOR = (
+    Guide("Bremsscheibe aus- und einbauen", _PT + "disc-brake-rotor-removal-installation", PT, True),
+    Guide("Verbogene Bremsscheibe richten", _PT + "disc-brake-rotor-truing", PT),
+    _G_PADS[0],
+)
 _G_TUBELESS = (
     Guide("Tubeless-Reifen montieren und reparieren", _PT + "tubeless-tire-mounting-and-repair", PT, True),
     Guide("Auf Tubeless umrüsten", _PT + "tubeless-tire-conversion", PT),
@@ -327,6 +332,8 @@ GUIDES: dict[str, tuple[Guide, ...]] = {
     ) + _G_TUBELESS[:1],
     "Belagstärke prüfen": _G_PADS[:2],
     "Bremsbeläge wechseln": _G_PADS,
+    "Bremsscheibe vorn wechseln": _G_ROTOR,
+    "Bremsscheibe hinten wechseln": _G_ROTOR,
     "Bremse entlüften, Flüssigkeit wechseln": (
         Guide("Shimano-Bremsen entlüften (Mineralöl)", _PT + "shimano-hydraulic-brake-service-and-adjustment", PT),
         Guide("SRAM-Bremsen entlüften (DOT)", _PT + "brake-bleeding-for-sram-hydraulic-brakes-using-the-bkd-1", PT, True),

@@ -474,9 +474,9 @@ def test_rotors_are_added_once_to_existing_bikes():
         with SessionLocal() as db:
             db.delete(db.get(AppSetting, services.ROTOR_MIGRATION_KEY))  # der Start hat sie schon einmal laufen lassen
             db.commit()
-            assert services.migrate_add_rotors(db) == 2
-            cats = {x.category for x in db.query(Component).filter(Component.bike_id == bike["id"])}
-            assert {"rotor_front", "rotor_rear"} <= cats
+            assert services.migrate_add_rotors(db) >= 2  # andere Räder aus früheren Tests bekommen ebenfalls Scheiben
+            cats = [x.category for x in db.query(Component).filter(Component.bike_id == bike["id"])]
+            assert cats.count("rotor_front") == 1 and cats.count("rotor_rear") == 1
             # gelöscht bleibt gelöscht: die Migration läuft nicht noch einmal
             for x in db.query(Component).filter(Component.bike_id == bike["id"], Component.category.like("rotor_%")):
                 db.delete(x)

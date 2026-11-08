@@ -57,6 +57,15 @@ def test_upload_assign_and_strava_zip():
 
         # Fahrt ohne Rad, danach gesammelt zuordnen
         assert _upload(c, h, "b.gpx", make_gpx(start=BASE + DAY))["assigned"] == 0
+        # Bei nur einem Rad ordnet die App die Fahrt selbst zu (als Vorschlag markiert); von Hand lösen
+        for _ in range(50):  # die Zuordnung läuft im Hintergrund
+            auto = [a for a in c.get("/api/activities", headers=h).json()["items"] if a["bike_auto"]]
+            if auto:
+                break
+            time.sleep(0.1)
+        assert len(auto) == 1 and auto[0]["bike_id"] == bike["id"] and "nur ein Rad" in auto[0]["bike_reason"]
+        assert c.post("/api/activities/assign", headers=h,
+                      json={"bike_id": None, "activity_ids": [auto[0]["id"]], "only_unassigned": False}).json()["updated"] == 1
         page = c.get("/api/activities?unassigned=true", headers=h).json()
         assert page["total"] == 1
         res = c.post("/api/activities/assign", headers=h,
