@@ -72,7 +72,11 @@ def test_commute_needs_a_pattern_and_finds_pairs():
             assert ov[0]["stands"][0]["from"] == "10:00" and ov[0]["stands"][0]["to"] == "18:30"  # Sommerzeit: UTC+2
 
 
-def test_standing_outdoors_adds_wet_km_only_if_configured():
+def test_standing_outdoors_adds_wet_km_only_if_configured(monkeypatch):
+    # Das Ändern der Einstellung startet sonst eine Auswertung im Hintergrund mit echtem Wetter (im Netz der CI
+    # wäre die schneller und der Test sähe 0 neue Bewertungen)
+    started = []
+    monkeypatch.setattr(habits, "trigger", lambda uid: started.append(uid))
     settings.weather_enabled = True
     try:
         series = {datetime(2026, 5, 3) + timedelta(hours=i): Hour(temp=10, precip=1.0, wind=5, wdir=0) for i in range(24 * 5)}
@@ -91,6 +95,7 @@ def test_standing_outdoors_adds_wet_km_only_if_configured():
                 assert res["commute_pairs"] == 3 and res["stands"] == 0  # Arbeitsplatz nicht als „im Freien“ eingestellt
                 assert wear_between(db, bike_id, None, None, 2.0)[1] == 0.0
             assert c.put("/api/settings/workplace", headers=h, json={"storage": "outdoor"}).json()["storage"] == "outdoor"
+            assert started == [uid]  # die Neubewertung wird angestoßen
             with SessionLocal() as db:
                 res = habits.run_for_user(db, db.get(User, uid), fetch=lambda client, w: series)
                 assert res["stands"] == 3
