@@ -30,6 +30,7 @@ FIELDS: dict[str, tuple[str, str, bool]] = {
     "smtp_starttls": ("bool", "email", False),
     "ntfy_server": ("url", "notify", False),
     "reminders_enabled": ("bool", "features", False),
+    "update_notify": ("bool", "features", False),
     "weather_enabled": ("bool", "features", False),
     "geo_enabled": ("bool", "features", False),
     "intervals_enabled": ("bool", "features", False),

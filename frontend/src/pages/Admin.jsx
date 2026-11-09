@@ -296,6 +296,7 @@ const EMAIL = [
 ];
 const NOTIFY = [
   { key: "reminders_enabled", type: "bool", label: "Wartungserinnerungen senden" },
+  { key: "update_notify", type: "bool", label: "Neue BikeHelper-Versionen melden", hint: "Prüft alle 6 Stunden auf GitHub und schickt Administratoren mit ntfy-Thema (Einstellungen → Erinnerungen) eine Push-Nachricht, Sicherheitsupdates gekennzeichnet." },
   { key: "ntfy_server", type: "text", label: "ntfy-Server für Push-Nachrichten", wide: true, placeholder: "https://ntfy.sh" },
 ];
 const FEATURES = [

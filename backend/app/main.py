@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 
-from . import audit, federation, notify, suggest
+from . import audit, federation, notify, suggest, updatewatch
 from .database import Base, SessionLocal, ensure_columns, engine
 from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router, federation as federation_router, habits as habits_router
 from . import server_settings
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     audit.event("System", "server.start", "BikeHelper gestartet")
     weather_service.start_background()
     notify.start_background()
+    updatewatch.start_background()
     geo_service.start_background()
     intervals_service.start_background()
     suggest.start_backfill()

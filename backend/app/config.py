@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     ntfy_server: str = "https://ntfy.sh"
     reminders_enabled: bool = True
+    update_notify: bool = True  # neue BikeHelper-Versionen an Administratoren pushen (ntfy)
     # Orte und Länder: Städte werden einmalig bei OpenStreetMap (Nominatim) nachgeschlagen und gespeichert
     geo_enabled: bool = True
     nominatim_url: str = "https://nominatim.openstreetmap.org"

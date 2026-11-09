@@ -905,3 +905,23 @@ def test_event_log_records_logins_and_coarse_actions_without_content():
         c.delete(f"/api/inventory/{c.get('/api/inventory', headers=h).json()['items'][0]['id']}", headers=h)
         newer = c.get("/api/admin/audit", headers=admin, params={"after": newest}).json()
         assert any("Lager: gelöscht" in (r["detail"] or "") for r in newer)
+
+
+def test_update_watch_pushes_new_version_once():
+    from app import updatewatch
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.models import AppSetting, User
+    with TestClient(app):
+        with SessionLocal() as db:
+            admin = db.query(User).filter(User.role == "admin").first()
+            assert admin is not None
+            admin.ntfy_topic = "bike-admin-test"
+            db.query(AppSetting).filter(AppSetting.key == updatewatch.KEY).delete()
+            db.commit()
+        sent = []
+        status = lambda: {"behind": 1, "changes": ["2026-11-09  Bump fastapi from 0.162.0 to 0.162.1 in /backend (#20)"]}  # noqa: E731
+        settings.update_notify = True
+        assert updatewatch.run_once(status, lambda topic, title, body: sent.append((topic, title)))
+        assert not updatewatch.run_once(status, lambda topic, title, body: sent.append((topic, title)))  # nur einmal
+        assert sent == [("bike-admin-test", "Sicherheitsupdate für BikeHelper verfügbar")]
