@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-09.1",
+    "date": "2026-11-09",
+    "title": "Quellen beim Neuladen aktualisieren",
+    "changes": [
+      "Beim Öffnen oder Neuladen der Seite ruft BikeHelper die verbundenen Quellen (intervals.icu) sofort neu ab, holt fehlendes Wetter nach und ordnet neue Fahrten zu. Kommen neue Fahrten dazu, baut sich die Seite von selbst neu auf. Mehrfaches Neuladen innerhalb von 30 Sekunden löst nur einen Abruf aus."
+    ]
+  },
+  {
     "id": "2026-11-02.1",
     "date": "2026-11-02",
     "title": "Rad automatisch zuordnen, Tags, Arbeitsweg und Nass-Putzen",

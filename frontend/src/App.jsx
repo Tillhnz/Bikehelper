@@ -5,7 +5,7 @@ import { resetMapConfig } from "./geo.js";
 import WhatsNew from "./components/WhatsNew.jsx";
 import Tour from "./components/Tour.jsx";
 import Shell from "./components/Shell.jsx";
-import { ErrorBoundary, FeedbackHost } from "./components/feedback.jsx";
+import { ErrorBoundary, FeedbackHost, toast } from "./components/feedback.jsx";
 import { resetUploads, resumeActive } from "./uploads.js";
 import Admin from "./pages/Admin.jsx";
 import Login from "./pages/Login.jsx";
@@ -41,10 +41,30 @@ export default function App() {
     navigate("/login");
   }, [navigate]);
 
+  // Beim Öffnen oder Neuladen die Quellen neu abrufen. Kommen neue Fahrten dazu, wird die aktuelle Seite neu aufgebaut.
+  const [dataVersion, setDataVersion] = useState(0);
+  const refreshSources = useCallback(async () => {
+    try {
+      const r = await api.post("/refresh", {});
+      if (!r.started && !r.running) return;
+      for (let i = 0; i < 40; i++) {  // höchstens etwa zwei Minuten warten
+        await new Promise((ok) => setTimeout(ok, 3000));
+        const st = await api.get("/settings/intervals");
+        if (st.running) continue;
+        if (st.imported > r.imported) {
+          toast(`${st.imported - r.imported} neue ${st.imported - r.imported === 1 ? "Fahrt" : "Fahrten"} von intervals.icu`);
+          setDataVersion((v) => v + 1);
+        }
+        return;
+      }
+    } catch { /* Abruf ist Zugabe: Fehler stören die Seite nicht */ }
+  }, []);
+
   const loadUser = useCallback(async () => {
     try {
       setUser(await api.get("/me"));
       resumeActive();
+      refreshSources();
       const pending = pendingGroupToken.get();
       if (pending) navigate(`/groups/join/${pending}`);
     } catch {
@@ -52,7 +72,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, refreshSources]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -85,7 +105,7 @@ export default function App() {
     <WhatsNew user={user} onClose={() => setUser((u) => ({ ...u, whatsnew: null }))} />
     <UiModeContext.Provider value={user.ui_mode ?? "expert"}>
     <Shell user={user} onLogout={logout}>
-      <ErrorBoundary>
+      <ErrorBoundary key={dataVersion}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/garage" element={<Garage user={user} />} />

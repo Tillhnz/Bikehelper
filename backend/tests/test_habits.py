@@ -189,3 +189,11 @@ def test_bike_is_assigned_automatically_but_not_against_your_choice():
             assert suggest.auto_assign(db, uid) == 0
         a = {i["id"]: i for i in c.get("/api/activities", headers=h).json()["items"]}
         assert a[second]["bike_id"] is None and a[first]["bike_auto"] is True
+
+
+def test_refresh_endpoint_is_throttled():
+    with TestClient(app) as c:
+        h = _register(c, "neuladen@example.com")
+        first = c.post("/api/refresh", headers=h)
+        assert first.status_code == 202 and first.json()["throttled"] is False and first.json()["started"] is False  # intervals.icu nicht verbunden
+        assert c.post("/api/refresh", headers=h).json()["throttled"] is True

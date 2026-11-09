@@ -1,4 +1,5 @@
 import re
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -84,6 +85,29 @@ def intervals_sync(data: SyncIn | None = None, user: User = Depends(current_user
         user.icu_synced_until = None
         db.commit()
     return {"started": service.run_in_background(user.id)}
+
+
+_last_refresh: dict[int, float] = {}
+REFRESH_MIN_GAP_S = 30  # mehrfaches Neuladen in kurzer Zeit löst nur einen Abruf aus
+
+
+@router.post("/refresh", status_code=202)
+def refresh_sources(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Wird beim Öffnen oder Neuladen der Seite aufgerufen: ruft die verbundenen Quellen neu ab (intervals.icu), holt fehlendes
+    Wetter nach und ordnet neue Fahrten zu. Alles läuft im Hintergrund."""
+    from .. import suggest
+    from ..weather import service as weather_service
+
+    now = time.monotonic()
+    if now - _last_refresh.get(user.id, -1e9) < REFRESH_MIN_GAP_S:
+        return {"started": False, "running": service.is_running(user.id), "imported": _out(db, user)["imported"], "throttled": True}
+    _last_refresh[user.id] = now
+    started = False
+    if settings.intervals_enabled and service.is_connected(user):
+        started = service.run_in_background(user.id)
+    weather_service.trigger(user.id)
+    suggest.trigger(user.id)
+    return {"started": started, "running": service.is_running(user.id), "imported": _out(db, user)["imported"], "throttled": False}
 
 
 @router.delete("/intervals/connection", status_code=204)
