@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { api } from "../api.js";
 import Search from "./Search.jsx";
+import UpdateToast from "./UpdateToast.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import UploadBanner from "./UploadBanner.jsx";
 
@@ -71,6 +72,7 @@ export default function Shell({ user, onLogout, children }) {
       <main className="main" id="inhalt" tabIndex={-1}>
         <UploadBanner />
         <div className="page" key={pathname}>{children}</div>
+        {user.role === "admin" && <UpdateToast />}
       </main>
     </div>
   );
