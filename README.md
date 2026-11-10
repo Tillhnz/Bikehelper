@@ -194,6 +194,10 @@ Der mitgelieferte Katalog (`backend/app/data/tires.csv`) ist bewusst klein: Er e
 - **Arbeitswege:** Ein Hinweg am Vormittag und ein Rückweg danach (3 bis 14 Stunden später, gleiches Rad, Ziel und Start passen zusammen) gelten als Arbeitsweg, sobald sich dasselbe Ortspaar an drei Tagen zeigt. Die Fahrten bekommen das Tag „Pendeln“. Unter *Einstellungen → Rad am Arbeitsplatz* wählst du „Drinnen oder trocken“ oder „Im Freien“. Im Freien wird die Standzeit mit dem Wetter am Arbeitsplatz (Open-Meteo) bewertet: eine Regenstunde zählt wie 6 Kilometer Fahrt im Regen, dazu 0,25 km je Stunde im Freien als Grundlast, höchstens 40 km je Standzeit. Diese „nassen Kilometer“ wirken nur dort, wo eine Regel einen Nässe-Faktor hat; die gefahrenen Kilometer bleiben unverändert.
 - **Nass geputzt:** Auf der Seite des Rades trägst du ein, dass du es mit Wasser geputzt hast. Mit abgetrockneter und frisch geölter Kette zählt das wie 10 km Fahrt im Regen, sonst wie 30 km.
 
+## Nebel und feuchte Luft
+
+Eine Stunde ohne Regen gilt als *feucht*, wenn die Luftfeuchte mindestens 90 % beträgt, die Temperatur höchstens 1,5 Grad über dem Taupunkt liegt oder der Wettercode Nebel meldet (Open-Meteo). Die Fahrzeit in solchen Stunden steht als `damp_minutes` an der Fahrt. Beim Verschleiß zählt sie mit 35 % einer Regenfahrt, bei der Wachsregel mit 60 %, und nur bei Regeln mit Nässefaktor. Die Werte stehen in `services.py` (`DAMP_WEIGHT`, `DAMP_WEIGHT_WAX`). Nutzer können es unter *Einstellungen → Nebel und feuchte Luft* abschalten. Bei älteren Fahrten holt der Wetterlauf die Feuchte nach.
+
 ## Reifen: Lebensdauer und Sichtprüfung
 
 Jeder Reifensatz zeigt, wie viele Kilometer er gefahren ist und (wenn du eine erwartete Lebensdauer einträgst) wie viele noch übrig sind. Dazu kommt ein Prüfintervall für die Sichtprüfung (Standard 1.000 km). Mit „Geprüft“ beginnt der Zähler neu. Ab 80 % wird ein Satz „bald fällig“, ab 100 % „fällig“, und der montierte Satz erscheint dann unter „Das steht an“. Erinnerungen per E-Mail oder ntfy gibt es dafür noch nicht.

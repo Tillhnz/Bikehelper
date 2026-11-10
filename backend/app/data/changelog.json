@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-10.1",
+    "date": "2026-11-10",
+    "title": "Nebel und feuchte Luft zählen beim Verschleiß mit",
+    "changes": [
+      "Auch ohne Regen sind Straße und Kette bei Nebel, Tau und sehr feuchter Luft klamm. Solche Fahrten werden jetzt erkannt (Luftfeuchte ab 90 %, Temperatur dicht am Taupunkt oder Nebel laut Wetterdaten) und zählen beim Verschleiß teilweise wie Regenfahrten: etwa ein Drittel, bei gewachsten Ketten etwas mehr. In der Fahrtenliste steht „min feucht“. Unter Einstellungen lässt sich das abschalten. Bei älteren Fahrten holt der Server die Feuchte beim nächsten Wetterlauf nach."
+    ]
+  },
+  {
     "id": "2026-11-09.1",
     "date": "2026-11-09",
     "title": "Quellen beim Neuladen aktualisieren",

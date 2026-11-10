@@ -39,6 +39,29 @@ function ProfileSettings({ user, onChange }) {
   );
 }
 
+function DampSettings() {
+  const [on, setOn] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { api.get("/settings/damp").then((r) => setOn(r.enabled)).catch((e) => setError(e.message)); }, []);
+  async function toggle(v) {
+    setError("");
+    try { setOn((await api.put("/settings/damp", { enabled: v })).enabled); } catch (err) { setError(err.message); }
+  }
+  return (
+    <section className="panel">
+      <h2>Nebel und feuchte Luft</h2>
+      <p className="muted">
+        Auch ohne Regen sind Straße und Kette bei Nebel, Tau und sehr feuchter Luft (ab etwa 90 %) klamm. Solche Fahrten zählen beim Verschleiß
+        teilweise wie Regenfahrten: etwa ein Drittel, bei gewachsten Ketten etwas mehr. Das wirkt nur bei Teilen mit Nässefaktor.
+      </p>
+      <label className="check">
+        <input type="checkbox" checked={on !== false} disabled={on === null} onChange={(e) => toggle(e.target.checked)} /> Nebel und feuchte Luft mitzählen
+      </label>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function WorkplaceSettings() {
   const [st, setSt] = useState(null);
   const [error, setError] = useState("");
@@ -542,6 +565,7 @@ export default function Settings({ user, onChange }) {
       <TourSettings user={user} onChange={onChange} />
 
       <WorkplaceSettings />
+      <DampSettings />
       <NotifySettings />
 
       <InstallSettings />

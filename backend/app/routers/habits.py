@@ -178,3 +178,21 @@ def set_workplace(data: WorkplaceIn, user: User = Depends(current_user), db: Ses
         if data.storage == "outdoor":
             habits.trigger(user.id)
     return _workplace(db, user)
+
+
+# ---------- Feuchte Luft und Nebel ----------
+
+class DampIn(BaseModel):
+    enabled: bool
+
+
+@router.get("/settings/damp")
+def get_damp(user: User = Depends(current_user)):
+    return {"enabled": user.damp_wear is not False}
+
+
+@router.put("/settings/damp")
+def set_damp(data: DampIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.damp_wear = data.enabled
+    db.commit()
+    return {"enabled": data.enabled}

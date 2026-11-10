@@ -255,6 +255,7 @@ export default function RideDetail() {
                 <Stat value={fmtNum(Math.abs(a.headwind_kmh), 0)} unit="km/h" label={Math.abs(a.headwind_kmh) < 1 ? "Wind in Fahrtrichtung" : a.headwind_kmh > 0 ? "Gegenwind im Mittel" : "Rückenwind im Mittel"} />
               )}
               <Stat value={a.wet_minutes != null ? fmtNum(a.wet_minutes, 0) : null} unit="min" label="auf nasser Straße" />
+              {a.damp_minutes > 0 && <Stat value={fmtNum(a.damp_minutes, 0)} unit="min" label="bei Nebel oder feuchter Luft" />}
             </div>
             <p className="muted small" style={{ marginTop: "0.75rem" }}>
               {wetText

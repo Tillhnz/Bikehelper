@@ -27,7 +27,7 @@ log = logging.getLogger("bikehelper.weather")
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-HOURLY = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code"
+HOURLY = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code,relative_humidity_2m,dew_point_2m"
 PAUSE_BETWEEN_REQUESTS_S = 0.6
 SCHEDULE_INTERVAL_S = 6 * 3600
 
@@ -80,17 +80,18 @@ def _items_for(aid: int, lat: float, lng: float, start: datetime, dur: int, enco
 def _candidates(db: Session, user_id: int | None) -> list[core.Item]:
     q = select(
         Activity.id, Activity.start_lat, Activity.start_lng, Activity.start_date,
-        Activity.moving_time_s, Activity.weather_status, Activity.weather_pts, Activity.polyline,
+        Activity.moving_time_s, Activity.weather_status, Activity.weather_pts, Activity.polyline, Activity.damp_minutes,
     ).where(Activity.start_lat.is_not(None), Activity.start_lng.is_not(None))
     if user_id is not None:
         q = q.where(Activity.user_id == user_id)
     today = _today()
     items: list[core.Item] = []
-    for aid, lat, lng, start, dur, status, pts, encoded in db.execute(q):
+    for aid, lat, lng, start, dur, status, pts, encoded, damp in db.execute(q):
         age_days = (today - start.date()).days
         # offen, vorläufig und inzwischen im Archiv verfügbar, oder bisher nur mit dem Wetter am Startpunkt
         upgrade = status in ("ok", "prelim") and pts is None and bool(encoded)
-        if status is None or (status == "prelim" and age_days >= core.ARCHIVE_DELAY_DAYS) or upgrade:
+        no_damp = status in ("ok", "prelim") and damp is None  # Fahrten von früher: Feuchte nachholen
+        if status is None or (status == "prelim" and age_days >= core.ARCHIVE_DELAY_DAYS) or upgrade or no_damp:
             items.extend(_items_for(aid, lat, lng, start, dur or 0, encoded))
     return items
 
@@ -126,7 +127,7 @@ def enrich(user_id: int | None = None, fetch=fetch_window, pause: float = PAUSE_
                 }
                 if s is not None:
                     values.update(
-                        temp_c=s.temp_c, precip_mm=s.precip_mm, wind_kmh=s.wind_kmh, wet_minutes=s.wet_minutes,
+                        temp_c=s.temp_c, precip_mm=s.precip_mm, wind_kmh=s.wind_kmh, wet_minutes=s.wet_minutes, damp_minutes=s.damp_minutes,
                         weather_code=s.weather_code, wind_dir=s.wind_dir, headwind_kmh=s.headwind_kmh,
                     )
                 db.execute(update(Activity).where(Activity.id == aid).values(**values))

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from . import wear as wear_model
 from .catalog import CATALOG, CHAIN_WEAR_LABEL, CHECK_DEFAULTS, INSPECTIONS, WEAR_TO_INSPECTION, LEGACY_CATEGORIES, LUBE_LABELS, WAX_LUBE_LABEL, categories_for, chain_rules, wax_interval_km
 from .timeutil import local_to_utc
-from .models import Activity, AppSetting, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet, WashEvent
+from .models import Activity, AppSetting, User, Bike, Component, MaintenanceLog, MaintenanceRule, TireMount, TireSet, WashEvent
 
 SOON_THRESHOLD = 0.8
 
@@ -40,26 +40,47 @@ def wet_fraction(moving_time_s: int | None, wet_minutes: float | None) -> float:
     return max(0.0, min(1.0, wet_minutes * 60.0 / moving_time_s))
 
 
+DAMP_WEIGHT = 0.35       # Fahrt bei Nebel oder sehr feuchter Luft zählt wie so viel Anteil einer Regenfahrt
+DAMP_WEIGHT_WAX = 0.6    # Wachs-Ketten reagieren empfindlicher: der trockene Film nimmt Feuchte und Schmutz schlecht an
+
+
+def damp_weight_for(rule: MaintenanceRule) -> float:
+    return DAMP_WEIGHT_WAX if rule.label == WAX_LUBE_LABEL else DAMP_WEIGHT
+
+
+def damp_enabled(db: Session, bike_id: int | None) -> bool:
+    """Feuchte Luft und Nebel zählen mit, solange der Besitzer es nicht in den Einstellungen abgeschaltet hat."""
+    if bike_id is None:
+        return True
+    off = db.scalar(select(User.damp_wear).join(Bike, Bike.user_id == User.id).where(Bike.id == bike_id))
+    return off is not False
+
+
 def wear_between(
-    db: Session, bike_id: int | None, start: date | None, end: date | None, wet_factor: float | None
+    db: Session, bike_id: int | None, start: date | None, end: date | None, wet_factor: float | None, damp_weight: float = DAMP_WEIGHT
 ) -> tuple[float, float, float]:
     """Gibt (km, nasse km, wirksame km) im Zeitraum zurück.
+
+    Fahrten bei Nebel oder sehr feuchter Luft (ohne Regen) zählen mit damp_weight als nasse Kilometer.
 
     Wirksame km = km + nasse km * (wet_factor - 1): Ein Kilometer bei Nässe zählt wie wet_factor Kilometer.
     Nasse km sind Fahrstrecke bei Regen/nasser Straße, dazu Nässe beim Abstellen im Freien und Nass-Putzen (zählen nicht als gefahrene km).
     """
     if bike_id is None:
         return 0.0, 0.0, 0.0
-    q = select(Activity.distance_km, Activity.moving_time_s, Activity.wet_minutes, Activity.stand_wet_km).where(Activity.bike_id == bike_id)
+    q = select(Activity.distance_km, Activity.moving_time_s, Activity.wet_minutes, Activity.stand_wet_km, Activity.damp_minutes).where(Activity.bike_id == bike_id)
     if start:
         q = q.where(Activity.start_date >= _since(start))
     if end:
         q = q.where(Activity.start_date < _until(end))
     km = wet = 0.0
-    for dist, moving, wet_min, stand in db.execute(q):
+    damp_on = damp_enabled(db, bike_id)
+    for dist, moving, wet_min, stand, damp_min in db.execute(q):
         dist = dist or 0.0
         km += dist
         wet += dist * wet_fraction(moving, wet_min) + (stand or 0.0)  # Nässe beim Abstellen im Freien
+        if damp_on:
+            wet += dist * wet_fraction(moving, damp_min) * damp_weight  # Nebel, feuchte Luft
     w = select(func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)  # nass geputzt
     if start:
         w = w.where(WashEvent.at >= _since(start))
@@ -260,7 +281,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             "variant": variant, "measure": None, "assessment": None, "check": None,
         }
 
-    km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor)
+    km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor, damp_weight_for(rule))
     stand_km, wash_km = wet_sources(db, comp.bike_id, since, comp.retired_at)
     if last is None:  # noch nie gewartet: Kilometer, die ein gebrauchtes Teil schon hatte, zählen mit
         km += comp.start_km
@@ -276,7 +297,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
     ) else None
     if latest is not None:
         # Gemessener Verschleiß ersetzt die Kilometerschätzung
-        eff_at = wear_between(db, comp.bike_id, since, latest.measured_at, rule.wet_factor)[2]
+        eff_at = wear_between(db, comp.bike_id, since, latest.measured_at, rule.wet_factor, damp_weight_for(rule))[2]
         if last is None:
             eff_at += comp.start_km
         proj = wear_model.project(latest.wear_pct, eff_at, effective, comp.wear_limit_pct, interval_km)
@@ -294,7 +315,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         if insp is not None:
             # Prüfung (gut / beobachten / wechseln) ersetzt die reine Kilometerschätzung ab dem Prüfzeitpunkt
             i_since = local_to_utc(last, entry.performed_time) if entry and entry.performed_time else base
-            eff_at = wear_between(db, comp.bike_id, i_since, insp.performed_at, rule.wet_factor)[2]
+            eff_at = wear_between(db, comp.bike_id, i_since, insp.performed_at, rule.wet_factor, damp_weight_for(rule))[2]
             if last is None:
                 eff_at += comp.start_km
             calc = eff_at / interval_km

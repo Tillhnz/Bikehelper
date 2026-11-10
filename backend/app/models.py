@@ -53,6 +53,7 @@ class User(Base):
     tour_pending: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # True = Rundgang für neue Konten steht noch aus
     whatsnew_seen: Mapped[str | None] = mapped_column(String(32), nullable=True)  # zuletzt gezeigter Neuigkeiten-Hinweis
     wahoo_status: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Ergebnis des letzten Laufs
+    damp_wear: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # feuchte Luft und Nebel zählen beim Verschleiß mit (leer = ja)
     work_storage: Mapped[str | None] = mapped_column(String(10), nullable=True)  # Rad am Arbeitsplatz: "dry" (drinnen/trocken) | "outdoor" (im Freien); leer = nicht erfasst
 
     # Wird beim "Überall abmelden" und bei Passwortänderung erhöht; ältere Login-Tokens werden ungültig
@@ -235,6 +236,7 @@ class Activity(Base):
     headwind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)  # mittlerer Gegenwind entlang der Strecke, negativ = Rückenwind
     weather_pts: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Zahl der Streckenabschnitte mit eigenem Wetter; NULL = nur Startpunkt (alt)
     wet_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Regen oder nasser Straße
+    damp_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)  # Fahrzeit bei Nebel oder sehr feuchter Luft (ohne Regen)
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)  # WMO-Wettercode (höchster während der Fahrt)
     weather_status: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ok | prelim | none; leer = offen
     # Merkmale für Radvorschläge (aus den Fahrdaten; NULL = noch nicht ausgewertet, 0 bzw. "" = nicht vorhanden)

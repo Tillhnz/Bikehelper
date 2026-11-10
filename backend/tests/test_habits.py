@@ -197,3 +197,31 @@ def test_refresh_endpoint_is_throttled():
         first = c.post("/api/refresh", headers=h)
         assert first.status_code == 202 and first.json()["throttled"] is False and first.json()["started"] is False  # intervals.icu nicht verbunden
         assert c.post("/api/refresh", headers=h).json()["throttled"] is True
+
+
+def test_fog_counts_as_partial_wetness_and_can_be_switched_off():
+    from app.weather import core as wcore
+
+    series = {datetime(2026, 5, 4, 9): wcore.Hour(temp=8.0, precip=0.0, humidity=95.0, dew=7.5)}
+    s = wcore.summarize(series, datetime(2026, 5, 4, 8, 15), 1800)
+    assert s.wet_minutes == 0 and s.damp_minutes == 30
+    dry = {datetime(2026, 5, 4, 9): wcore.Hour(temp=18.0, precip=0.0, humidity=50.0, dew=7.0)}
+    assert wcore.summarize(dry, datetime(2026, 5, 4, 8, 15), 1800).damp_minutes == 0
+
+    with TestClient(app) as c:
+        h = _register(c, "nebel@example.com")
+        uid = c.get("/api/me", headers=h).json()["id"]
+        with SessionLocal() as db:
+            bike = Bike(user_id=uid, name="Nebelrad")
+            db.add(bike)
+            db.flush()
+            bike_id = bike.id
+            r = _ride(uid, bike_id, datetime(2026, 5, 4, 8), HOME, WORK, km=10.0)
+            r.moving_time_s, r.damp_minutes, r.wet_minutes = 3600, 60.0, 0.0
+            db.add(r)
+            db.commit()
+            km, wet, eff = wear_between(db, bike_id, None, None, 2.0)
+            assert km == 10 and abs(wet - 3.5) < 1e-6 and abs(eff - 13.5) < 1e-6
+        assert c.put("/api/settings/damp", headers=h, json={"enabled": False}).json()["enabled"] is False
+        with SessionLocal() as db:
+            assert wear_between(db, bike_id, None, None, 2.0)[1:] == (0.0, 10.0)

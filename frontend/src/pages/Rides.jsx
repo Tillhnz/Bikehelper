@@ -256,6 +256,7 @@ function WeatherCell({ a }) {
     <span title={`Wind ${fmtNum(a.wind_kmh, 0)} km/h, Regen ${fmtNum(a.precip_mm)} mm${a.weather_status === "prelim" ? " (vorläufig)" : ""}`}>
       {fmtNum(a.temp_c)} °C{text ? `, ${text}` : ""}
       {wet && <span className="pill pill-soon" style={{ marginLeft: "0.4rem" }}>{Math.round(a.wet_minutes)} min nass</span>}
+      {a.damp_minutes != null && a.damp_minutes >= 10 && <span className="pill" style={{ marginLeft: "0.4rem" }} title="Nebel oder sehr feuchte Luft, ohne Regen. Zählt beim Verschleiß teilweise mit.">{Math.round(a.damp_minutes)} min feucht</span>}
     </span>
   );
 }

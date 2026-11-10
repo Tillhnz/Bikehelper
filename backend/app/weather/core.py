@@ -6,6 +6,9 @@ Annahmen des Modells (bewusst einfach gehalten):
 - Niederschlag ist bei Open-Meteo die Summe der *vorangegangenen* Stunde. Der Wert zur Zeit t gilt also für (t-1h, t].
 - Eine Stunde gilt als nass, wenn mindestens WET_HOUR_MM Niederschlag fiel oder in den DAMP_LOOKBACK_H Stunden
   davor zusammen mindestens DAMP_MM (die Straße ist dann noch feucht).
+- Feucht (nicht nass): Eine Stunde ohne Regen gilt als feucht, wenn die Luftfeuchte mindestens DAMP_HUMIDITY beträgt, der Abstand
+  zwischen Temperatur und Taupunkt höchstens DAMP_SPREAD_C ist oder der Wettercode Nebel meldet. Dann sind Straße und Kette
+  oft klamm, auch ohne dass es regnet.
 - Die Fahrzeit wird als zusammenhängend ab dem Start angenommen (Start + Bewegungszeit).
 - Entlang der Strecke wird die Fahrt in Abschnitte von etwa 12 km geteilt. Jeder Abschnitt bekommt das Wetter an seiner
   Position und zu seiner Zeit; die Zeit wird dabei gleichmäßig über die Strecke verteilt (konstantes Tempo angenommen).
@@ -24,6 +27,9 @@ WET_HOUR_MM = 0.1
 DAMP_LOOKBACK_H = 2
 DAMP_MM = 0.5
 HOUR = timedelta(hours=1)
+DAMP_HUMIDITY = 90.0
+DAMP_SPREAD_C = 1.5
+FOG_CODES = (45, 48)
 
 ARCHIVE_DELAY_DAYS = 7   # jüngere Fahrten stehen noch nicht im Archiv (ERA5 hinkt etwa 5 Tage hinterher)
 MAX_WINDOW_DAYS = 90     # so viele Tage deckt eine Abfrage höchstens ab
@@ -36,6 +42,8 @@ class Hour:
     wind: float | None = None
     wdir: float | None = None
     code: int | None = None
+    humidity: float | None = None
+    dew: float | None = None
 
 
 Series = dict[datetime, Hour]
@@ -48,6 +56,7 @@ class WeatherSummary:
     wind_kmh: float | None
     wet_minutes: float | None
     weather_code: int | None
+    damp_minutes: float | None = None  # Fahrzeit bei Nebel oder sehr feuchter Luft, ohne Regen
     wind_dir: float | None = None      # Grad, aus der der Wind kommt
     headwind_kmh: float | None = None  # positiv = Gegenwind, negativ = Rückenwind
 
@@ -76,6 +85,8 @@ def parse_hourly(payload: dict) -> Series:
             wind=_at(h.get("wind_speed_10m"), i),
             wdir=_at(h.get("wind_direction_10m"), i),
             code=int(code) if code is not None else None,
+            humidity=_at(h.get("relative_humidity_2m"), i),
+            dew=_at(h.get("dew_point_2m"), i),
         )
     return series
 
@@ -139,13 +150,22 @@ def _is_wet(series: Series, t: datetime) -> bool:
     return before >= DAMP_MM
 
 
+def _is_damp(series: Series, t: datetime) -> bool:
+    h = series[t]
+    if h.code in FOG_CODES:
+        return True
+    if h.humidity is not None and h.humidity >= DAMP_HUMIDITY:
+        return True
+    return h.temp is not None and h.dew is not None and h.temp - h.dew <= DAMP_SPREAD_C
+
+
 def summarize(series: Series, start: datetime, duration_s: int | None, direction: tuple[float, float] | None = None) -> WeatherSummary | None:
     """Wetter während der Fahrt (oder eines Abschnitts). Gibt None zurück, wenn für den Zeitraum keine Daten vorliegen.
 
     direction: mittlere Fahrtrichtung als (Ost, Nord)-Anteil (Länge 0 bis 1); damit wird der Gegenwind berechnet."""
     end = start + timedelta(seconds=max(int(duration_s or 0), 60))
 
-    precip = wet_min = 0.0
+    precip = wet_min = damp_min = 0.0
     have_precip = False
     t = floor_hour(start) + HOUR
     while t - HOUR < end:
@@ -157,6 +177,8 @@ def summarize(series: Series, start: datetime, duration_s: int | None, direction
                 precip += h.precip * overlap / 3600
                 if _is_wet(series, t):
                     wet_min += overlap / 60
+                elif _is_damp(series, t):
+                    damp_min += overlap / 60
         t += HOUR
 
     samples = [start, start + (end - start) / 2, end]
@@ -189,6 +211,7 @@ def summarize(series: Series, start: datetime, duration_s: int | None, direction
         precip_mm=round(precip, 2) if have_precip else None,
         wind_kmh=round(sum(winds) / len(winds), 1) if winds else None,
         wet_minutes=round(wet_min, 1) if have_precip else None,
+        damp_minutes=round(damp_min, 1) if have_precip else None,
         weather_code=max(codes) if codes else None,
         wind_dir=wind_dir,
         headwind_kmh=head,
@@ -225,6 +248,7 @@ def combine(parts: list[tuple[WeatherSummary | None, float]]) -> WeatherSummary 
         precip_mm=wsum("precip_mm"),
         wind_kmh=wavg("wind_kmh"),
         wet_minutes=wsum("wet_minutes"),
+        damp_minutes=wsum("damp_minutes"),
         weather_code=max(codes) if codes else None,
         wind_dir=wind_dir,
         headwind_kmh=wavg("headwind_kmh"),

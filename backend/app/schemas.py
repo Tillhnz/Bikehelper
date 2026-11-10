@@ -233,6 +233,7 @@ class ActivityOut(BaseModel):
     headwind_kmh: float | None = None
     weather_pts: int | None = None
     wet_minutes: float | None = None
+    damp_minutes: float | None = None
     weather_code: int | None = None
     weather_status: str | None = None
     bike_auto: bool = False
