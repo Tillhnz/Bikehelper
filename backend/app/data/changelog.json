@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-10.2",
+    "date": "2026-11-10",
+    "title": "Abnutzung in Prozent, mit Erklärung",
+    "changes": [
+      "Bei jeder Wartungsregel steht jetzt der Anteil in Prozent und die gefahrene Strecke, ohne Umrechnung in „wirksame“ Kilometer. Über das kleine „i“ siehst du, woraus sich der Wert zusammensetzt: Strecke, Regen, Nebel und Feuchte, Stehen im Freien, Nass-Putzen, Zeit und Messung."
+    ]
+  },
+  {
     "id": "2026-11-10.1",
     "date": "2026-11-10",
     "title": "Nebel und feuchte Luft zählen beim Verschleiß mit",

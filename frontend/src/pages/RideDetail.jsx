@@ -139,7 +139,7 @@ export default function RideDetail() {
           {a.stand_h != null && (
             <p className="muted small">
               Danach stand das Rad {String(a.stand_h).replace(".", ",")} Stunden im Freien (Arbeitsplatz)
-              {a.stand_wet_km != null ? `, zählt wie ${String(Math.round(a.stand_wet_km * 10) / 10).replace(".", ",")} km Regen` : ""}.
+              {a.stand_wet_km != null ? ", das fließt in den Verschleiß ein" : ""}.
             </p>
           )}
         </div>

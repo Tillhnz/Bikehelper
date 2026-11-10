@@ -165,13 +165,76 @@ const RULE_KINDS = {
   replace: { key: "replace", name: "Tauschen", title: "Verschleißteil: Das Intervall ist der Tauschzeitpunkt. Mit Zustand prüfen kannst du ihn verschieben oder vorziehen." },
 };
 
+const DRIVER_TEXT = {
+  km: "die gefahrene Strecke",
+  time: "die vergangene Zeit",
+  measure: "die Kettenmessung",
+  assessment: "die letzte Prüfung",
+  visual: "die Sichtprüfung",
+};
+
+function WearInfo({ rule, onClose }) {
+  const b = rule.breakdown;
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!b) return null;
+  const pct = (km) => (b.interval_km ? Math.round((km / b.interval_km) * 100) : null);
+  const rows = [
+    { label: "Gefahrene Strecke", km: b.km, note: `${fmtKm(b.km)} km` },
+    b.start_km > 0 && { label: "Vorlaufleistung (gebrauchtes Teil)", km: b.start_km, note: `${fmtKm(b.start_km)} km` },
+    b.ride_wet > 0.05 && { label: "Regen und nasse Straße", km: b.ride_wet, note: `${fmtKm(b.wet_ride_km)} km bei Nässe, zählen ×${fmtNum(b.wet_factor)}` },
+    b.damp > 0.05 && { label: "Nebel und feuchte Luft", km: b.damp, note: "teilweise wie Regen" },
+    b.stand > 0.05 && { label: "Rad stand im Freien", km: b.stand, note: "Arbeitsplatz" },
+    b.wash > 0.05 && { label: "Nass geputzt", km: b.wash, note: "Wasser an Kette und Lagern" },
+  ].filter(Boolean);
+  const total = Math.round(rule.progress * 100);
+  return (
+    <div className="wear-pop" role="dialog" aria-label={`Zusammensetzung der Abnutzung: ${rule.label}`}>
+      <div className="wear-pop-head">
+        <strong>So setzt sich {total} % zusammen</strong>
+        <button type="button" className="link small" onClick={onClose} aria-label="Schließen">Schließen</button>
+      </div>
+      {b.driver && <p className="muted small">Bestimmt wird der Wert durch {DRIVER_TEXT[b.driver] || "die Strecke"}.</p>}
+      <ul className="wear-parts">
+        {rows.map((r) => (
+          <li key={r.label}>
+            <span>{r.label}<span className="muted small"> · {r.note}</span></span>
+            <strong>{r.km > 0 && b.interval_km ? `${r.label === "Gefahrene Strecke" || r.label.startsWith("Vorlauf") ? "" : "+"}${pct(r.km)} %` : "–"}</strong>
+          </li>
+        ))}
+        {b.interval_months && (
+          <li>
+            <span>Zeit<span className="muted small"> · {fmtNum(rule.months_since)} von {b.interval_months} Monaten</span></span>
+            <strong>{Math.round((rule.months_since / b.interval_months) * 100)} %</strong>
+          </li>
+        )}
+        {rule.measure && (
+          <li>
+            <span>Kettenmessung<span className="muted small"> · {fmtNum(rule.measure.wear_pct)} % Längung am {fmtDate(rule.measure.measured_at)}, hochgerechnet {fmtNum(rule.measure.projected_pct)} %</span></span>
+            <strong>{fmtNum(rule.measure.projected_pct / rule.measure.limit_pct * 100, 0)} %</strong>
+          </li>
+        )}
+      </ul>
+      <p className="muted small">
+        100 % entspricht {[b.interval_km && `${fmtKm(b.interval_km)} km`, b.interval_months && `${b.interval_months} Monaten`].filter(Boolean).join(" oder ")}
+        {b.interval_km && b.interval_months ? ", je nachdem was zuerst erreicht ist" : ""}.
+        {b.wet_factor > 1 ? ` Bei Nässe zählt ein Kilometer ×${fmtNum(b.wet_factor)}.` : " Diese Regel reagiert nicht auf Nässe."}
+        {!b.damp_enabled && " Nebel und feuchte Luft sind in den Einstellungen abgeschaltet."}
+      </p>
+    </div>
+  );
+}
+
 function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({ performed_at: today(), time: nowTime(), note: "", variant: rule.variant || "hot_wax", result: "good" });
   const [hintOpen, setHintOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const unknown = rule.status === "unknown";
-  const wet = rule.wet_factor > 1;
   const [chkOpen, setChkOpen] = useState(false);
   const [chk, setChk] = useState({ km: rule.check_interval_km ?? "", months: rule.check_interval_months ?? "" });
   const ck = rule.check;
@@ -203,10 +266,11 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
   const kind = rule.is_inspection ? RULE_KINDS.check : rule.visual_check ? RULE_KINDS.replace : RULE_KINDS.service;
 
   const variantName = rule.variants?.find((v) => v.key === rule.variant)?.name;
+  const pctText = `${Math.min(Math.round(rule.progress * 100), 999)} %`;
   const limits = [
     variantName && `zuletzt ${variantName}`,
-    rule.interval_km && `${fmtKm(rule.km_since)} von ${fmtKm(rule.interval_km)} km`,
-    rule.interval_months && `${fmtNum(rule.months_since)} von ${rule.interval_months} Monaten`,
+    !unknown && pctText,
+    rule.km_since > 0 || rule.interval_km ? `${fmtKm(rule.km_since)} km gefahren` : null,
   ].filter(Boolean).join(" · ");
 
   const a = rule.assessment;
@@ -239,6 +303,9 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
       <div className="rule-bottom">
         <span className="muted small">
           {unknown ? "Trage unten ein Einbaudatum ein oder tippe auf Gewartet." : limits}
+          {!unknown && rule.breakdown && (
+            <button type="button" className="info-btn" onClick={() => setInfoOpen(!infoOpen)} aria-expanded={infoOpen} aria-label="Zusammensetzung der Abnutzung anzeigen" title="Wie setzt sich das zusammen?">i</button>
+          )}
         </span>
         <span className="rule-actions">
           {rule.hint && (
@@ -256,14 +323,7 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
           <button className="link small" onClick={onDelete}>Regel löschen</button>
         </span>
       </div>
-      {wet && !unknown && rule.interval_km && (
-        <p className="muted small wet-line">
-          Nässe zählt ×{fmtNum(rule.wet_factor)}: {fmtKm(rule.wet_km)} km bei Nässe, damit zählen {fmtKm(rule.effective_km)} km
-          statt {fmtKm(rule.km_since)} km.
-          {rule.stand_wet_km > 0 && <> Davon {fmtKm(rule.stand_wet_km)} km durch Stehen im Freien (Arbeitsplatz).</>}
-          {rule.wash_wet_km > 0 && <> Davon {fmtKm(rule.wash_wet_km)} km durch Nass-Putzen.</>}
-        </p>
-      )}
+      {infoOpen && <WearInfo rule={rule} onClose={() => setInfoOpen(false)} />}
       {checkLine && !unknown && <p className="muted small wet-line check-line">{checkLine}</p>}
       {chkOpen && (
         <form className="inline-form" onSubmit={saveCheck}>
@@ -701,14 +761,12 @@ function WashPanel({ bike, onChanged }) {
               <span className="chip chip-strong">Arbeitsplatz im Freien</span>
               <span className="chip">{exp.stands}× · {String(exp.stand_h).replace(".", ",")} h</span>
               <span className="chip chip-wet">{String(exp.stand_wet_h).replace(".", ",")} h nass</span>
-              <span className="chip chip-wet">≈ {fmtKm(exp.stand_wet_km)} km Regen</span>
             </>
           )}
           {exp.washes > 0 && (
             <>
               <span className="chip chip-strong">Nass geputzt</span>
               <span className="chip">{exp.washes}×</span>
-              <span className="chip chip-wet">≈ {fmtKm(exp.wash_wet_km)} km Regen</span>
             </>
           )}
         </div>
@@ -728,7 +786,7 @@ function WashPanel({ bike, onChanged }) {
         <ul className="plain-list small">
           {washes.slice(0, 5).map((w) => (
             <li key={w.id}>
-              {fmtDate(w.at)} · {w.chain_dried ? "Kette getrocknet" : "Kette nicht getrocknet"} · zählt wie {Math.round(w.wet_km)} km Regen{" "}
+              {fmtDate(w.at)} · {w.chain_dried ? "Kette getrocknet" : "Kette nicht getrocknet"} {" "}
               <button className="link small danger" onClick={() => remove(w)}>Löschen</button>
             </li>
           ))}

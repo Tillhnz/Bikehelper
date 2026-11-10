@@ -56,39 +56,50 @@ def damp_enabled(db: Session, bike_id: int | None) -> bool:
     return off is not False
 
 
-def wear_between(
-    db: Session, bike_id: int | None, start: date | None, end: date | None, wet_factor: float | None, damp_weight: float = DAMP_WEIGHT
-) -> tuple[float, float, float]:
-    """Gibt (km, nasse km, wirksame km) im Zeitraum zurück.
-
-    Fahrten bei Nebel oder sehr feuchter Luft (ohne Regen) zählen mit damp_weight als nasse Kilometer.
-
-    Wirksame km = km + nasse km * (wet_factor - 1): Ein Kilometer bei Nässe zählt wie wet_factor Kilometer.
-    Nasse km sind Fahrstrecke bei Regen/nasser Straße, dazu Nässe beim Abstellen im Freien und Nass-Putzen (zählen nicht als gefahrene km).
-    """
+def wear_parts(
+    db: Session, bike_id: int | None, start: date | None, end: date | None, damp_weight: float = DAMP_WEIGHT
+) -> dict[str, float]:
+    """Belastung im Zeitraum, aufgeteilt nach Ursache. Alles außer km sind „nasse Kilometer“ (zählen nicht als gefahrene km):
+    ride_wet = Fahrstrecke bei Regen oder nasser Straße, damp = Nebel/feuchte Luft (mit damp_weight), stand = Standzeit im Freien,
+    wash = Nass-Putzen."""
+    parts = {"km": 0.0, "ride_wet": 0.0, "damp": 0.0, "stand": 0.0, "wash": 0.0}
     if bike_id is None:
-        return 0.0, 0.0, 0.0
+        return parts
     q = select(Activity.distance_km, Activity.moving_time_s, Activity.wet_minutes, Activity.stand_wet_km, Activity.damp_minutes).where(Activity.bike_id == bike_id)
     if start:
         q = q.where(Activity.start_date >= _since(start))
     if end:
         q = q.where(Activity.start_date < _until(end))
-    km = wet = 0.0
     damp_on = damp_enabled(db, bike_id)
     for dist, moving, wet_min, stand, damp_min in db.execute(q):
         dist = dist or 0.0
-        km += dist
-        wet += dist * wet_fraction(moving, wet_min) + (stand or 0.0)  # Nässe beim Abstellen im Freien
+        parts["km"] += dist
+        parts["ride_wet"] += dist * wet_fraction(moving, wet_min)
+        parts["stand"] += stand or 0.0
         if damp_on:
-            wet += dist * wet_fraction(moving, damp_min) * damp_weight  # Nebel, feuchte Luft
-    w = select(func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)  # nass geputzt
+            parts["damp"] += dist * wet_fraction(moving, damp_min) * damp_weight
+    w = select(func.coalesce(func.sum(WashEvent.wet_km), 0.0)).where(WashEvent.bike_id == bike_id)
     if start:
         w = w.where(WashEvent.at >= _since(start))
     if end:
         w = w.where(WashEvent.at < _until(end))
-    wet += float(db.scalar(w) or 0.0)
+    parts["wash"] = float(db.scalar(w) or 0.0)
+    return parts
+
+
+def wear_between(
+    db: Session, bike_id: int | None, start: date | None, end: date | None, wet_factor: float | None, damp_weight: float = DAMP_WEIGHT
+) -> tuple[float, float, float]:
+    """Gibt (km, nasse km, wirksame km) im Zeitraum zurück.
+
+    Wirksame km = km + nasse km * (wet_factor - 1): Ein Kilometer bei Nässe zählt wie wet_factor Kilometer.
+    Nasse km sind Fahrstrecke bei Regen oder nasser Straße, Nebel und feuchte Luft (mit damp_weight), Standzeit im Freien und
+    Nass-Putzen. Sie zählen nicht als gefahrene km.
+    """
+    p = wear_parts(db, bike_id, start, end, damp_weight)
+    wet = p["ride_wet"] + p["damp"] + p["stand"] + p["wash"]
     factor = wet_factor if wet_factor and wet_factor > 1 else 1.0
-    return km, wet, km + wet * (factor - 1)
+    return p["km"], wet, p["km"] + wet * (factor - 1)
 
 
 def wet_sources(db: Session, bike_id: int | None, start: date | None, end: date | None) -> tuple[float, float]:
@@ -281,14 +292,19 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             "variant": variant, "measure": None, "assessment": None, "check": None,
         }
 
-    km, wet_km, effective = wear_between(db, comp.bike_id, since, comp.retired_at, rule.wet_factor, damp_weight_for(rule))
-    stand_km, wash_km = wet_sources(db, comp.bike_id, since, comp.retired_at)
+    parts = wear_parts(db, comp.bike_id, since, comp.retired_at, damp_weight_for(rule))
+    wet_f = rule.wet_factor if rule.wet_factor and rule.wet_factor > 1 else 1.0
+    km = parts["km"]
+    wet_km = parts["ride_wet"] + parts["damp"] + parts["stand"] + parts["wash"]
+    effective = km + wet_km * (wet_f - 1)
+    stand_km, wash_km = parts["stand"], parts["wash"]
     if last is None:  # noch nie gewartet: Kilometer, die ein gebrauchtes Teil schon hatte, zählen mit
         km += comp.start_km
         effective += comp.start_km
     months_since = months_between(base, today)
 
     ratios = []
+    sources: list[str] = []  # woher jeder Wert in ratios kommt (für die Anzeige, was den Fortschritt bestimmt)
     measure = None
     # Messwerte einer früheren Kette (vor dem letzten Kettenwechsel) zählen nicht
     mine = [m for m in comp.measurements if last is None or m.measured_at >= last]
@@ -302,6 +318,7 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             eff_at += comp.start_km
         proj = wear_model.project(latest.wear_pct, eff_at, effective, comp.wear_limit_pct, interval_km)
         ratios.append(proj.ratio)
+        sources.append("measure")
         factor = effective / km if km > 0 else 1.0
         measure = {
             "measured_at": latest.measured_at.isoformat(), "wear_pct": proj.measured_pct,
@@ -329,8 +346,10 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
             }
             interval_km = eff_at + (1 - at) * interval_km
         ratios.append(ratio)
+        sources.append("assessment" if insp is not None else "km")
     if interval_months:
         ratios.append(months_since / interval_months)
+        sources.append("time")
     progress = max(ratios) if ratios else 0.0
     if visual_replace:
         progress = max(progress, 1.0)
@@ -345,7 +364,23 @@ def rule_state(db: Session, comp: Component, rule: MaintenanceRule, today: date 
         state = "soon"
     else:
         state = "ok"
+    extra = wet_f - 1  # Zuschlag je nassem Kilometer
+    breakdown = {
+        "driver": "visual" if visual_replace and progress >= 1 and (not ratios or max(ratios) < 1) else (sources[ratios.index(max(ratios))] if ratios else None),
+        "interval_km": round(interval_km) if interval_km else None,
+        "interval_months": interval_months or None,
+        "wet_factor": wet_f,
+        "km": round(km - (comp.start_km if last is None else 0.0), 1),
+        "start_km": round(comp.start_km, 1) if last is None and comp.start_km else 0,
+        "ride_wet": round(parts["ride_wet"] * extra, 1),
+        "damp": round(parts["damp"] * extra, 1),
+        "stand": round(parts["stand"] * extra, 1),
+        "wash": round(parts["wash"] * extra, 1),
+        "wet_ride_km": round(parts["ride_wet"], 1),
+        "damp_enabled": damp_enabled(db, comp.bike_id),
+    }
     return {
+        "breakdown": breakdown,
         "km_since": round(km, 1),
         "wet_km": round(wet_km, 1),
         "stand_wet_km": round(stand_km, 1),

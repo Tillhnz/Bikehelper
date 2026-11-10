@@ -114,7 +114,6 @@ function WorkplaceSettings() {
                   {st.storage !== "outdoor" ? <span className="chip chip-mute">trocken, zählt nicht</span> : x.wet_km == null ? <span className="chip chip-mute">wird berechnet</span> : (
                     <>
                       <span className="chip chip-wet">{x.wet_h != null ? `${String(Math.round(x.wet_h * 10) / 10).replace(".", ",")} h nass` : "ohne Wetter"}</span>
-                      <span className="chip chip-wet">≈ {String(Math.round(x.wet_km * 10) / 10).replace(".", ",")} km Regen</span>
                     </>
                   )}
                 </span>

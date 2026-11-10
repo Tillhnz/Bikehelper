@@ -167,6 +167,7 @@ class RuleOut(RuleIn):
     visual_check: bool = False  # Wechselregel: wird über Sichtprüfung oder „Teil gewechselt“ erledigt, nicht über „Erledigt“
     is_inspection: bool = False  # Prüfregel: beim Eintragen wird ein Ergebnis gewählt
     assessment: dict | None = None  # Prüfergebnis, das Intervall dieser Regel beeinflusst (Prüf- und Wechselregel)
+    breakdown: dict | None = None  # Zusammensetzung des Fortschritts (Anzeige)
     km_since: float
     wet_km: float
     stand_wet_km: float = 0  # davon Nässe durch Stehen im Freien (Arbeitsplatz)

@@ -375,7 +375,6 @@ function StandChips({ p, label }) {
       ) : (
         <>
           <span className="chip chip-wet" title="Stunden Regen oder nasse Straße während der Standzeit">{p.wet_h != null ? `${num1(p.wet_h)} h nass` : "ohne Wetterdaten"}</span>
-          <span className="chip chip-wet" title="So viel Verschleiß durch Nässe zählt die Standzeit">≈ {num1(p.wet_km)} km Regen</span>
         </>
       )}
     </span>

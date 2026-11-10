@@ -225,3 +225,23 @@ def test_fog_counts_as_partial_wetness_and_can_be_switched_off():
         assert c.put("/api/settings/damp", headers=h, json={"enabled": False}).json()["enabled"] is False
         with SessionLocal() as db:
             assert wear_between(db, bike_id, None, None, 2.0)[1:] == (0.0, 10.0)
+
+
+def test_rules_explain_their_wear_breakdown():
+    with TestClient(app) as c:
+        h = _register(c, "zusammensetzung@example.com")
+        uid = c.get("/api/me", headers=h).json()["id"]
+        bike = c.post("/api/bikes", headers=h, json={"name": "Zerlegt", "type": "road"}).json()
+        with SessionLocal() as db:
+            r = _ride(uid, bike["id"], datetime(2026, 5, 4, 8), HOME, WORK, km=100.0)
+            r.moving_time_s, r.wet_minutes = 3600, 30.0  # halbe Fahrt im Regen
+            db.add(r)
+            db.commit()
+        c.post(f"/api/bikes/{bike['id']}/washes", headers=h, json={"chain_dried": True})
+        rules = []
+        for comp in c.get(f"/api/components?bike_id={bike['id']}", headers=h).json():
+            rules += [r for r in c.get(f"/api/components/{comp['id']}/rules", headers=h).json() if r.get("breakdown") and r["wet_factor"] > 1]
+        assert rules
+        b = rules[0]["breakdown"]
+        assert b["km"] >= 100 and b["ride_wet"] > 0 and b["wash"] > 0 and b["interval_km"]
+        assert b["driver"] in ("km", "time", "assessment", "measure")
