@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-11-14.1",
+    "date": "2026-11-14",
+    "title": "Besser auf dem Laptop",
+    "changes": [
+      "Die Seitenleiste lässt sich auf niedrigen Laptop-Bildschirmen scrollen – Abmelden und Version sind nicht mehr abgeschnitten.",
+      "Auf Laptop-Breiten ist die Seitenleiste schmaler und der Rand kleiner, auf großen Bildschirmen nutzt der Inhalt mehr Breite. Fenster passen auch auf niedrige Bildschirme."
+    ]
+  },
+  {
     "id": "2026-11-10.2",
     "date": "2026-11-10",
     "title": "Abnutzung in Prozent, mit Erklärung",
