@@ -138,8 +138,8 @@ def test_route_is_split_and_direction_follows_the_route():
 
 def test_combine_adds_rain_and_averages_wind():
     from app.weather.core import WeatherSummary, combine
-    a = WeatherSummary(10.0, 1.0, 20.0, 10.0, 61, 270.0, 20.0)
-    b = WeatherSummary(14.0, 0.0, 20.0, 0.0, 3, 270.0, -20.0)
+    a = WeatherSummary(10.0, 1.0, 20.0, 10.0, 61, wind_dir=270.0, headwind_kmh=20.0)
+    b = WeatherSummary(14.0, 0.0, 20.0, 0.0, 3, wind_dir=270.0, headwind_kmh=-20.0)
     c = combine([(a, 1800), (b, 1800), (None, 600)])
     assert c.precip_mm == 1.0 and c.wet_minutes == 10.0 and c.weather_code == 61
     assert c.temp_c == 12.0 and c.headwind_kmh == 0.0 and c.wind_dir == 270

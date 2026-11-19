@@ -231,7 +231,7 @@ def test_rules_explain_their_wear_breakdown():
     with TestClient(app) as c:
         h = _register(c, "zusammensetzung@example.com")
         uid = c.get("/api/me", headers=h).json()["id"]
-        bike = c.post("/api/bikes", headers=h, json={"name": "Zerlegt", "type": "road"}).json()
+        bike = c.post("/api/bikes", headers=h, json={"name": "Zerlegt", "type": "road", "purchased_at": "2026-05-01"}).json()
         with SessionLocal() as db:
             r = _ride(uid, bike["id"], datetime(2026, 5, 4, 8), HOME, WORK, km=100.0)
             r.moving_time_s, r.wet_minutes = 3600, 30.0  # halbe Fahrt im Regen
