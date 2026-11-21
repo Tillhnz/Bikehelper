@@ -1641,7 +1641,7 @@ h1 { text-shadow: 0 2px 24px color-mix(in srgb, var(--celeste) 25%, transparent)
 .fit-chevron{display:inline-block;transition:transform .2s;font-size:1.4rem;line-height:1;color:var(--mute)}
 .fit-chevron.open{transform:rotate(90deg)}
 .fit-diagram{margin:.8rem 0 0;display:grid;gap:.6rem}
-.fit-diagram svg{width:100%;height:auto;max-height:300px;background:var(--panel-2);border-radius:var(--r-ctl)}
+.fit-diagram svg{width:100%;height:auto;background:var(--panel-2);border-radius:var(--r-ctl)}
 .fit-dg-ground{stroke:var(--line);stroke-width:1.5}
 .fit-dg-wheel circle{fill:none;stroke:var(--line);stroke-width:2}
 .fit-dg-axis{stroke:var(--line);stroke-dasharray:3 4}

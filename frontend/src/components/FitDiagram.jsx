@@ -1,7 +1,7 @@
 // Schematische Seitenansicht: Sattel- und Lenkerposition aus dem Maßblatt, Ausgangsposition gestrichelt, optimierte Position farbig.
 // Ursprung ist das Tretlager (x nach vorn, y nach oben, alles in cm). Die Zeichnung zeigt Lage und Abstände, kein Rahmenmodell.
 const SEAT_ANGLE = (73.5 * Math.PI) / 180;
-const W = 640, H = 330, SCALE = 3.6, OX = 250, OY = 285;
+const W = 560, H = 380, SCALE = 3.2, OX = 262, OY = 282;
 const px = (x) => OX + x * SCALE;
 const py = (y) => OY - y * SCALE;
 const fmt = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
@@ -50,10 +50,10 @@ export default function FitDiagram({ initial, optimized, crankMm }) {
   return (
     <figure className="fit-diagram">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Schematische Seitenansicht mit Sattel- und Lenkerposition, vorher und optimiert">
-        <line x1="0" y1={py(-33.5)} x2={W} y2={py(-33.5)} className="fit-dg-ground" />
+        <line x1="0" y1={py(-26.5)} x2={W} y2={py(-26.5)} className="fit-dg-ground" />
         <g className="fit-dg-wheel">
-          <circle cx={px(-42)} cy={py(0)} r={33.5 * SCALE} />
-          <circle cx={px(56)} cy={py(0)} r={33.5 * SCALE} />
+          <circle cx={px(-42)} cy={py(7)} r={33.5 * SCALE} />
+          <circle cx={px(56)} cy={py(7)} r={33.5 * SCALE} />
         </g>
         <line x1={px(0)} y1={py(-4)} x2={px(0)} y2={py(ref.sy + 6)} className="fit-dg-axis" />
         {a && <Rider p={a} cls="fit-dg-old" />}
@@ -66,7 +66,7 @@ export default function FitDiagram({ initial, optimized, crankMm }) {
             <Badge n="4" x={px(ref.bar.x) + 16} y={py((ref.sy + ref.bar.y) / 2)} />
           </g>
         )}
-        <text x="10" y="20" className="fit-dg-note">schematisch, Tretlager = Nullpunkt</text>
+        <text x="10" y="16" className="fit-dg-note">schematisch, Tretlager = Nullpunkt</text>
       </svg>
       <figcaption>
         <div className="chips">

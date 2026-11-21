@@ -851,7 +851,7 @@ function FittingPanel({ bike }) {
   }
   const shown = all ? fits : fits.slice(0, 1);
   const key = `bh-fit-open-${bike.id}`;
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== "0"; } catch { return true; } });
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch { return false; } });
   const toggle = () => setOpen((o) => { try { localStorage.setItem(key, o ? "0" : "1"); } catch { /* ohne Speicher */ } return !o; });
   const latest = fits[0];
 
