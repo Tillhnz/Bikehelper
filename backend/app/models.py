@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
 from sqlalchemy import (
-    BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, UniqueConstraint, func,
+    JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -557,3 +557,21 @@ class ActivityTag(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     state: Mapped[str] = mapped_column(String(10), default="manual")
     reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class BikeFitting(Base):
+    """Ein Bikefitting für ein Rad: Messwerte vorher (initial) und nachher (optimized) laut Maßblatt des Fitters."""
+    __tablename__ = "bike_fittings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bike_id: Mapped[int] = mapped_column(ForeignKey("bikes.id", ondelete="CASCADE"), index=True)
+    fitted_on: Mapped[date] = mapped_column(Date, index=True)
+    fitter: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    saddle_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    pedal_system: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    crank_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    frame_size: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    initial: Mapped[dict] = mapped_column(JSON, default=dict)      # Ausgangsposition: {Feld: Wert}
+    optimized: Mapped[dict] = mapped_column(JSON, default=dict)    # optimierte Position
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)  # Tipps des Fitters, Einlegesohlen, Sonstiges

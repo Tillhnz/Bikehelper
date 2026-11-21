@@ -245,3 +245,29 @@ def test_rules_explain_their_wear_breakdown():
         b = rules[0]["breakdown"]
         assert b["km"] >= 100 and b["ride_wet"] > 0 and b["wash"] > 0 and b["interval_km"]
         assert b["driver"] in ("km", "time", "assessment", "measure")
+
+
+def test_bike_fitting_is_stored_per_bike_and_validated():
+    with TestClient(app) as c:
+        h = _register(c, "fitting@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Orca", "type": "road"}).json()
+        body = {
+            "fitted_on": "2026-11-21", "fitter": "Dobat-Cycling", "saddle_model": "Fizik Antares", "pedal_system": "Look Keo",
+            "crank_mm": 172.5, "frame_size": "57",
+            "initial": {"saddle_height": 80.3, "saddle_setback": -8.5, "saddle_to_bar": 70.0, "drop": 8.0, "bar_width": 420,
+                        "stem_length": 90, "stem_angle": 6, "saddle_tilt": 1.2, "lever_tilt": "STI stark innen"},
+            "optimized": {"saddle_height": 79.2, "saddle_setback": -7.3, "saddle_to_bar": 68.5, "drop": 5.0, "saddle_tilt": 2.8,
+                          "lever_tilt": "STI neutral innen", "bar_width": ""},
+            "notes": "Lenker mit 360 bis 380 mm Breite",
+        }
+        r = c.post(f"/api/bikes/{bike['id']}/fittings", headers=h, json=body)
+        assert r.status_code == 201
+        fit = r.json()
+        assert fit["optimized"]["saddle_height"] == 79.2 and "bar_width" not in fit["optimized"] and fit["initial"]["lever_tilt"] == "STI stark innen"
+        assert c.post(f"/api/bikes/{bike['id']}/fittings", headers=h, json={**body, "initial": {"saddle_height": 800}}).status_code == 422
+        assert c.post(f"/api/bikes/{bike['id']}/fittings", headers=h, json={**body, "initial": {"unbekannt": 1}}).status_code == 422
+        assert c.put(f"/api/fittings/{fit['id']}", headers=h, json={**body, "fitter": "Anderer"}).json()["fitter"] == "Anderer"
+        assert len(c.get(f"/api/bikes/{bike['id']}/fittings", headers=h).json()) == 1
+        other = _register(c, "fremd@example.com")
+        assert c.delete(f"/api/fittings/{fit['id']}", headers=other).status_code == 404
+        assert c.delete(f"/api/fittings/{fit['id']}", headers=h).status_code == 204

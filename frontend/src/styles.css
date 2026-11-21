@@ -1612,3 +1612,25 @@ h1 { text-shadow: 0 2px 24px color-mix(in srgb, var(--celeste) 25%, transparent)
   .main { padding-bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
   .toasts { bottom: calc(6.4rem + env(safe-area-inset-bottom)); }
 }
+
+/* Bikefitting */
+.fit-panel-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.fit-panel-head h2{margin:0}
+.fit-card{margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--line)}
+.fit-card-top{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem}
+.fit-card-top .rule-actions{margin-left:auto}
+.fit-table{margin-top:.6rem;display:grid;gap:0}
+.fit-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.9fr);gap:.5rem;align-items:center;padding:.35rem 0;border-top:1px solid var(--line);font-size:.9rem}
+.fit-row-h{border-top:0;color:var(--mute);font-size:.78rem}
+.fit-delta{text-align:right}
+.fit-notes{margin:.7rem 0 0;padding:.6rem .8rem;border-radius:var(--r-ctl);background:var(--panel-2);white-space:pre-wrap}
+.fit-form{display:grid;gap:1rem;margin-top:.8rem}
+.fit-head-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem}
+.fit-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:.5rem .6rem;align-items:center}
+.fit-col-h{color:var(--mute);font-size:.78rem}
+.fit-label{font-size:.9rem}
+@media (max-width:560px){
+  .fit-row{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);}
+  .fit-row > span:nth-child(4){grid-column:1 / -1;text-align:left}
+  .fit-delta:empty{display:none}
+}

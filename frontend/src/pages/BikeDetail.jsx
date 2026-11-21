@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BIKE_TYPES, CATEGORIES, CHAIN_LUBES, api, fmtDate, fmtKm, fmtNum, nowTime, safeUrl, toTime, today } from "../api.js";
 import BikeFields, { bikePayload } from "../components/BikeFields.jsx";
@@ -722,6 +722,147 @@ function BikeEdit({ bike, onSaved, onCancel }) {
   );
 }
 
+const FIT_HEAD = [
+  ["fitter", "Fitter", "text"], ["saddle_model", "Sattel", "text"], ["pedal_system", "Pedalsystem", "text"],
+  ["crank_mm", "Kurbellänge (mm)", "number"], ["frame_size", "Rahmengröße", "text"],
+];
+
+const fitNum = (v) => String(Math.round(v * 100) / 100).replace(".", ",");
+const fitSign = (v) => (v > 0 ? "+" : v < 0 ? "−" : "±") + fitNum(Math.abs(v));
+
+function FittingForm({ fields, initial, onSave, onCancel }) {
+  const toForm = (f) => ({
+    fitted_on: f?.fitted_on || today(),
+    fitter: f?.fitter || "", saddle_model: f?.saddle_model || "", pedal_system: f?.pedal_system || "",
+    crank_mm: f?.crank_mm ?? "", frame_size: f?.frame_size || "", notes: f?.notes || "",
+    initial: Object.fromEntries(fields.map((x) => [x.key, f?.initial?.[x.key] ?? ""])),
+    optimized: Object.fromEntries(fields.map((x) => [x.key, f?.optimized?.[x.key] ?? ""])),
+  });
+  const [form, setForm] = useState(toForm(initial));
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const setVal = (col, k, v) => setForm((p) => ({ ...p, [col]: { ...p[col], [k]: v } }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true); setError("");
+    const num = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".")));
+    const clean = (col) => Object.fromEntries(Object.entries(col).filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => [k, fields.find((x) => x.key === k)?.kind === "num" ? num(v) : v]));
+    try {
+      await onSave({
+        fitted_on: form.fitted_on, fitter: form.fitter || null, saddle_model: form.saddle_model || null, pedal_system: form.pedal_system || null,
+        crank_mm: num(form.crank_mm), frame_size: form.frame_size || null, notes: form.notes || null,
+        initial: clean(form.initial), optimized: clean(form.optimized),
+      });
+    } catch (err) { setError(err.message); setBusy(false); }
+  }
+
+  return (
+    <form className="fit-form" onSubmit={submit}>
+      <div className="fit-head-inputs">
+        <label>Datum<input type="date" max={today()} value={form.fitted_on} onChange={(e) => set("fitted_on", e.target.value)} required /></label>
+        {FIT_HEAD.map(([k, label, type]) => (
+          <label key={k}>{label}<input type={type} step={type === "number" ? "0.5" : undefined} value={form[k]} onChange={(e) => set(k, e.target.value)} /></label>
+        ))}
+      </div>
+      <div className="fit-grid" role="group" aria-label="Messwerte">
+        <span className="fit-col-h">Messwert</span><span className="fit-col-h">Ausgangsposition</span><span className="fit-col-h">Optimiert</span>
+        {fields.map((f) => (
+          <Fragment key={f.key}>
+            <span className="fit-label">{f.label}{f.unit && <span className="muted small"> ({f.unit})</span>}</span>
+            {["initial", "optimized"].map((col) => (
+              <input key={col} aria-label={`${f.label}, ${col === "initial" ? "Ausgangsposition" : "optimiert"}`}
+                type={f.kind === "num" ? "number" : "text"} step={f.kind === "num" ? "0.1" : undefined}
+                value={form[col][f.key]} onChange={(e) => setVal(col, f.key, e.target.value)} />
+            ))}
+          </Fragment>
+        ))}
+      </div>
+      <label>Tipps und Notizen<textarea rows="3" maxLength="2000" value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="z. B. Lenker mit 360 bis 380 mm Breite, Einlegesohlen, Hinweise des Fitters" /></label>
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="actions">
+        <button className="btn primary" disabled={busy}>Speichern</button>
+        <button type="button" className="btn" onClick={onCancel}>Abbrechen</button>
+      </div>
+    </form>
+  );
+}
+
+function FittingCard({ fit, fields, onEdit, onDelete, latest }) {
+  const rows = fields.filter((f) => fit.initial?.[f.key] != null || fit.optimized?.[f.key] != null);
+  const show = (f, v) => (v == null ? "–" : f.kind === "num" ? `${fitNum(v)} ${f.unit}` : v);
+  const head = [
+    fit.saddle_model && ["Sattel", fit.saddle_model], fit.pedal_system && ["Pedale", fit.pedal_system],
+    fit.crank_mm && ["Kurbel", `${fitNum(fit.crank_mm)} mm`], fit.frame_size && ["Rahmen", fit.frame_size],
+  ].filter(Boolean);
+  return (
+    <div className="fit-card">
+      <div className="fit-card-top">
+        <strong>{fmtDate(fit.fitted_on)}{fit.fitter ? ` · ${fit.fitter}` : ""}</strong>
+        {latest && <span className="chip chip-strong">aktuell</span>}
+        <span className="rule-actions">
+          <button className="link small" onClick={onEdit}>Bearbeiten</button>
+          <button className="link small danger" onClick={onDelete}>Löschen</button>
+        </span>
+      </div>
+      {head.length > 0 && <div className="chips">{head.map(([k, v]) => <span key={k} className="chip">{k}: {v}</span>)}</div>}
+      {rows.length > 0 && (
+        <div className="fit-table" role="table" aria-label="Messwerte">
+          <div className="fit-row fit-row-h" role="row"><span role="columnheader">Messwert</span><span role="columnheader">Vorher</span><span role="columnheader">Optimiert</span><span role="columnheader">Änderung</span></div>
+          {rows.map((f) => {
+            const a = fit.initial?.[f.key]; const b = fit.optimized?.[f.key];
+            return (
+              <div key={f.key} className="fit-row" role="row">
+                <span role="cell">{f.label}</span>
+                <span role="cell">{show(f, a)}</span>
+                <span role="cell"><strong>{show(f, b)}</strong></span>
+                <span role="cell" className="fit-delta">{f.kind === "num" && a != null && b != null && a !== b ? <span className="chip chip-wet">{fitSign(b - a)} {f.unit}</span> : ""}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {fit.notes && <p className="small fit-notes">{fit.notes}</p>}
+    </div>
+  );
+}
+
+function FittingPanel({ bike }) {
+  const [fields, setFields] = useState([]);
+  const [fits, setFits] = useState([]);
+  const [editing, setEditing] = useState(null); // null | "new" | fitting
+  const [all, setAll] = useState(false);
+
+  const load = useCallback(() => api.get(`/bikes/${bike.id}/fittings`).then(setFits).catch(() => {}), [bike.id]);
+  useEffect(() => { load(); api.get("/fitting/fields").then(setFields).catch(() => {}); }, [load]);
+
+  async function save(data) {
+    if (editing === "new") await api.post(`/bikes/${bike.id}/fittings`, data);
+    else await api.put(`/fittings/${editing.id}`, data);
+    setEditing(null); toast("Fitting gespeichert."); await load();
+  }
+  async function remove(f) {
+    if (!await confirmDialog(`Das Fitting vom ${fmtDate(f.fitted_on)} wirklich löschen?`)) return;
+    await api.del(`/fittings/${f.id}`); await load();
+  }
+  const shown = all ? fits : fits.slice(0, 1);
+
+  return (
+    <section className="panel fit-panel">
+      <div className="fit-panel-head">
+        <h2>Bikefitting</h2>
+        {!editing && <button className="btn small primary" onClick={() => setEditing("new")}>Fitting eintragen</button>}
+      </div>
+      {fits.length === 0 && !editing && <p className="muted small">Trage hier die Werte aus dem Maßblatt deines Fitters ein: Sattelhöhe, Versatz, Vorbau, Lenker und mehr, vorher und nachher.</p>}
+      {editing && fields.length > 0 && <FittingForm fields={fields} initial={editing === "new" ? null : editing} onSave={save} onCancel={() => setEditing(null)} />}
+      {!editing && shown.map((f, i) => <FittingCard key={f.id} fit={f} fields={fields} latest={i === 0 && fits.length > 1} onEdit={() => setEditing(f)} onDelete={() => remove(f)} />)}
+      {!editing && fits.length > 1 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Frühere ausblenden" : `Frühere Fittings anzeigen (${fits.length - 1})`}</button>}
+    </section>
+  );
+}
+
 function WashPanel({ bike, onChanged }) {
   const today = new Date().toISOString().slice(0, 10);
   const [washes, setWashes] = useState([]);
@@ -890,6 +1031,8 @@ export default function BikeDetail() {
       )}
 
       <TireSets bike={bike} onChanged={load} expandSignal={expandSignal} />
+
+      {!bike.shared_from && <FittingPanel bike={bike} />}
 
       {!bike.shared_from && <WashPanel bike={bike} onChanged={load} />}
 

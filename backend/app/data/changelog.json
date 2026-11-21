@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-11-21.2",
+    "date": "2026-11-21",
+    "title": "Bikefitting und schwebende Menüleiste",
+    "changes": [
+      "Neu am Rad: der Bereich „Bikefitting“. Du trägst die Werte aus dem Maßblatt deines Fitters ein: Sattel, Pedalsystem, Kurbellänge, Rahmengröße, Sattelhöhe, Sattelversatz, Sattelspitze bis Armauflagen, Überhöhung, Lenkerbreite, Vorbaulänge und -winkel, Sattelneigung und Bremsgriffneigung, jeweils für die Ausgangs- und die optimierte Position. Die Änderung zwischen beiden wird angezeigt, dazu Tipps und Notizen. Mehrere Fittings pro Rad bleiben als Verlauf erhalten.",
+      "Die Menüleiste ist jetzt schwebend: am Rechner als abgesetzte Seitenleiste, auf dem Handy als Kopfzeile und Tabs, die sich vom Rand lösen."
+    ]
+  },
+  {
     "id": "2026-11-21.1",
     "date": "2026-11-21",
     "title": "Neues Glas-Design",
