@@ -1,5 +1,5 @@
 """Bikefitting: Messwerte aus dem Maßblatt des Fitters je Rad (Ausgangsposition und optimierte Position)."""
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import BikeFitting, User
+from ..models import BikeFitCapture, BikeFitting, User
 from ..security import current_user
 from .garage import _own_bike
 
@@ -123,4 +123,68 @@ def update_fitting(fitting_id: int, data: FittingIn, user: User = Depends(curren
 @router.delete("/fittings/{fitting_id}", status_code=204)
 def delete_fitting(fitting_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     db.delete(_own_fitting(db, user, fitting_id))
+    db.commit()
+
+
+# ---------- Kameraanalyse: gespeicherte Messungen ----------
+
+CAPTURE_KEYS = {
+    "side": {"knee_bdc": (60, 200), "knee_min": (30, 200), "hip": (10, 180), "back": (0, 90), "elbow": (60, 200), "arm_torso": (10, 140), "frames": (0, 100000)},
+    "front": {"knee_dev_l": (-60, 60), "knee_dev_r": (-60, 60), "pelvis_tilt": (0, 45), "pelvis_range": (0, 90), "frames": (0, 100000)},
+}
+
+
+class CaptureIn(BaseModel):
+    metrics: dict
+    note: str | None = Field(default=None, max_length=300)
+
+    @field_validator("metrics")
+    @classmethod
+    def _metrics(cls, v):
+        out: dict = {}
+        for view, vals in v.items():
+            if view not in CAPTURE_KEYS or not isinstance(vals, dict):
+                raise ValueError("Unbekannte Ansicht in den Messwerten.")
+            clean = {}
+            for k, n in vals.items():
+                if k not in CAPTURE_KEYS[view]:
+                    raise ValueError(f"Unbekannter Messwert: {k}")
+                lo, hi = CAPTURE_KEYS[view][k]
+                if isinstance(n, bool) or not isinstance(n, (int, float)) or not lo <= n <= hi:
+                    raise ValueError(f"Wert außerhalb des Bereichs: {k}")
+                clean[k] = round(float(n), 1)
+            if clean:
+                out[view] = clean
+        if not out:
+            raise ValueError("Keine Messwerte übergeben.")
+        return out
+
+
+def _capture_out(c: BikeFitCapture) -> dict:
+    return {"id": c.id, "at": c.at.isoformat() + "Z", "metrics": c.metrics, "note": c.note}
+
+
+@router.get("/bikes/{bike_id}/fit-captures")
+def list_captures(bike_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _own_bike(db, user, bike_id)
+    rows = db.scalars(select(BikeFitCapture).where(BikeFitCapture.bike_id == bike_id, BikeFitCapture.user_id == user.id)
+                      .order_by(BikeFitCapture.at.desc()).limit(30)).all()
+    return [_capture_out(c) for c in rows]
+
+
+@router.post("/bikes/{bike_id}/fit-captures", status_code=201)
+def add_capture(bike_id: int, data: CaptureIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _own_bike(db, user, bike_id)
+    c = BikeFitCapture(user_id=user.id, bike_id=bike_id, at=datetime.utcnow(), metrics=data.metrics, note=data.note)
+    db.add(c)
+    db.commit()
+    return _capture_out(c)
+
+
+@router.delete("/fit-captures/{capture_id}", status_code=204)
+def delete_capture(capture_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    c = db.get(BikeFitCapture, capture_id)
+    if not c or c.user_id != user.id:
+        raise HTTPException(404, "Messung nicht gefunden")
+    db.delete(c)
     db.commit()

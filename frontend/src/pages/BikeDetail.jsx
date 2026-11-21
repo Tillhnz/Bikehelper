@@ -8,6 +8,8 @@ import TireSets from "../components/TireSets.jsx";
 import { EmptyState, Gauge, Odometer, StatusPill } from "../components/ui.jsx";
 import { confirmDialog, Loading, toast } from "../components/feedback.jsx";
 import CheckGuide from "../components/CheckGuide.jsx";
+import FitCamera from "../components/FitCamera.jsx";
+import FitDiagram from "../components/FitDiagram.jsx";
 
 function ruleIntervalText(r) {
   return [r.interval_km && `${fmtKm(r.interval_km)} km`, r.interval_months && `${r.interval_months} Monate`]
@@ -848,17 +850,31 @@ function FittingPanel({ bike }) {
     await api.del(`/fittings/${f.id}`); await load();
   }
   const shown = all ? fits : fits.slice(0, 1);
+  const key = `bh-fit-open-${bike.id}`;
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== "0"; } catch { return true; } });
+  const toggle = () => setOpen((o) => { try { localStorage.setItem(key, o ? "0" : "1"); } catch { /* ohne Speicher */ } return !o; });
+  const latest = fits[0];
 
   return (
     <section className="panel fit-panel">
       <div className="fit-panel-head">
-        <h2>Bikefitting</h2>
-        {!editing && <button className="btn small primary" onClick={() => setEditing("new")}>Fitting eintragen</button>}
+        <button className="fit-toggle" onClick={toggle} aria-expanded={open} aria-controls={`fit-body-${bike.id}`}>
+          <span className={`fit-chevron${open ? " open" : ""}`} aria-hidden="true">›</span>
+          <h2>Bikefitting</h2>
+          {!open && latest && <span className="muted small">Stand {fmtDate(latest.fitted_on)}</span>}
+        </button>
+        {open && !editing && <button className="btn small primary" onClick={() => setEditing("new")}>Fitting eintragen</button>}
       </div>
-      {fits.length === 0 && !editing && <p className="muted small">Trage hier die Werte aus dem Maßblatt deines Fitters ein: Sattelhöhe, Versatz, Vorbau, Lenker und mehr, vorher und nachher.</p>}
-      {editing && fields.length > 0 && <FittingForm fields={fields} initial={editing === "new" ? null : editing} onSave={save} onCancel={() => setEditing(null)} />}
-      {!editing && shown.map((f, i) => <FittingCard key={f.id} fit={f} fields={fields} latest={i === 0 && fits.length > 1} onEdit={() => setEditing(f)} onDelete={() => remove(f)} />)}
-      {!editing && fits.length > 1 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Frühere ausblenden" : `Frühere Fittings anzeigen (${fits.length - 1})`}</button>}
+      {open && (
+        <div id={`fit-body-${bike.id}`}>
+          {fits.length === 0 && !editing && <p className="muted small">Trage hier die Werte aus dem Maßblatt deines Fitters ein: Sattelhöhe, Versatz, Vorbau, Lenker und mehr, vorher und nachher.</p>}
+          {editing && fields.length > 0 && <FittingForm fields={fields} initial={editing === "new" ? null : editing} onSave={save} onCancel={() => setEditing(null)} />}
+          {!editing && latest && <FitDiagram initial={latest.initial} optimized={latest.optimized} crankMm={latest.crank_mm} />}
+          {!editing && shown.map((f, i) => <FittingCard key={f.id} fit={f} fields={fields} latest={i === 0 && fits.length > 1} onEdit={() => setEditing(f)} onDelete={() => remove(f)} />)}
+          {!editing && fits.length > 1 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Frühere ausblenden" : `Frühere Fittings anzeigen (${fits.length - 1})`}</button>}
+          {!editing && <FitCamera bike={bike} />}
+        </div>
+      )}
     </section>
   );
 }

@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-11-21.3",
+    "date": "2026-11-21",
+    "title": "Fitting-Zeichnung, Einklappen und Kameraanalyse",
+    "changes": [
+      "Der Bereich „Bikefitting“ lässt sich jetzt einklappen (der Zustand wird je Rad im Browser gemerkt) und zeigt eine schematische Seitenansicht: Sattel und Lenker in der Ausgangsposition gestrichelt, in der optimierten Position farbig, mit den Maßen 1 bis 4 wie im Maßblatt.",
+      "Neu: Kameraanalyse (Beta). Die Webcam, optional dazu eine zweite Kamera, misst in 15 Sekunden Kniewinkel unten, Rücken-, Ellbogen- und Armwinkel von der Seite sowie Kniespur und Beckenneigung von vorn und vergleicht sie mit typischen Bereichen. Die Erkennung läuft nur im Browser, es werden keine Bilder hochgeladen, gespeichert werden nur die Winkelwerte. Es braucht eine https-Adresse und ein Update des Frontends, weil dabei die Bewegungserkennung eingebaut wird."
+    ]
+  },
+  {
     "id": "2026-11-21.2",
     "date": "2026-11-21",
     "title": "Bikefitting und schwebende Menüleiste",

@@ -271,3 +271,20 @@ def test_bike_fitting_is_stored_per_bike_and_validated():
         other = _register(c, "fremd@example.com")
         assert c.delete(f"/api/fittings/{fit['id']}", headers=other).status_code == 404
         assert c.delete(f"/api/fittings/{fit['id']}", headers=h).status_code == 204
+
+
+def test_fit_capture_validation_and_ownership():
+    with TestClient(app) as c:
+        h = _register(c, "capture@example.com")
+        bike = c.post("/api/bikes", headers=h, json={"name": "Orca", "type": "road"}).json()
+        url = f"/api/bikes/{bike['id']}/fit-captures"
+        r = c.post(url, headers=h, json={"metrics": {"side": {"knee_bdc": 147.3, "back": 41, "frames": 300}}})
+        assert r.status_code == 201 and r.json()["metrics"]["side"]["knee_bdc"] == 147.3
+        assert c.post(url, headers=h, json={"metrics": {"side": {"knee_bdc": 5}}}).status_code == 422
+        assert c.post(url, headers=h, json={"metrics": {"side": {"unbekannt": 5}}}).status_code == 422
+        assert c.post(url, headers=h, json={"metrics": {}}).status_code == 422
+        assert len(c.get(url, headers=h).json()) == 1
+        other = _register(c, "capture2@example.com")
+        assert c.get(url, headers=other).status_code == 404
+        assert c.delete(f"/api/fit-captures/{r.json()['id']}", headers=other).status_code == 404
+        assert c.delete(f"/api/fit-captures/{r.json()['id']}", headers=h).status_code == 204

@@ -1634,3 +1634,38 @@ h1 { text-shadow: 0 2px 24px color-mix(in srgb, var(--celeste) 25%, transparent)
   .fit-row > span:nth-child(4){grid-column:1 / -1;text-align:left}
   .fit-delta:empty{display:none}
 }
+
+/* Bikefitting: Einklappen, Diagramm, Kameraanalyse */
+.fit-toggle{display:flex;align-items:center;gap:.6rem;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.fit-toggle h2{margin:0}
+.fit-chevron{display:inline-block;transition:transform .2s;font-size:1.4rem;line-height:1;color:var(--mute)}
+.fit-chevron.open{transform:rotate(90deg)}
+.fit-diagram{margin:.8rem 0 0;display:grid;gap:.6rem}
+.fit-diagram svg{width:100%;height:auto;max-height:300px;background:var(--panel-2);border-radius:var(--r-ctl)}
+.fit-dg-ground{stroke:var(--line);stroke-width:1.5}
+.fit-dg-wheel circle{fill:none;stroke:var(--line);stroke-width:2}
+.fit-dg-axis{stroke:var(--line);stroke-dasharray:3 4}
+.fit-dg-old path,.fit-dg-old .fit-dg-crank{fill:none;stroke:var(--mute);stroke-width:2.5;stroke-dasharray:6 5;stroke-linecap:round}
+.fit-dg-old .fit-dg-dot{fill:var(--mute);stroke:none}
+.fit-dg-new path,.fit-dg-new .fit-dg-crank{fill:none;stroke:var(--celeste);stroke-width:3.5;stroke-linecap:round}
+.fit-dg-new .fit-dg-dot{fill:var(--celeste);stroke:none}
+.fit-dg-crank{stroke-width:1.5!important}
+.fit-dg-badges circle{fill:var(--panel);stroke:var(--celeste);stroke-width:1.5}
+.fit-dg-badges text{fill:var(--chalk);font-size:12px;font-weight:700}
+.fit-dg-note{fill:var(--mute);font-size:11px}
+.fit-key{display:inline-block;width:.9rem;height:0;border-top:3px solid;margin-right:.4rem;vertical-align:middle}
+.fit-key-old{border-color:var(--mute);border-top-style:dashed}
+.fit-key-new{border-color:var(--celeste)}
+.fit-dg-legend{list-style:none;margin:.5rem 0 0;padding:0;display:grid;gap:.25rem;font-size:.88rem}
+.fit-badge-n{display:inline-grid;place-items:center;width:1.3rem;height:1.3rem;margin-right:.5rem;border-radius:50%;border:1.5px solid var(--celeste);font-size:.75rem;font-weight:700}
+.cam-panel{margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--line);display:grid;gap:.7rem}
+.cam-panel h3{margin:0;display:flex;align-items:center;gap:.5rem}
+.cam-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.8rem}
+.cam-stage{display:grid;gap:.4rem;align-content:start}
+.cam-view{position:relative;border-radius:var(--r-ctl);overflow:hidden;background:#000;aspect-ratio:16/9}
+.cam-view video,.cam-view canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.cam-row{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
+.cam-hint{grid-column:1 / -1;color:var(--amber)}
+.cam-history summary{cursor:pointer;color:var(--mute);font-size:.9rem}
+.cam-hist-item{margin-top:.8rem;padding-top:.6rem;border-top:1px solid var(--line)}
+@media (max-width:640px){.cam-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.cam-row > span:nth-child(3){grid-column:1 / -1}}

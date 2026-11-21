@@ -575,3 +575,15 @@ class BikeFitting(Base):
     initial: Mapped[dict] = mapped_column(JSON, default=dict)      # Ausgangsposition: {Feld: Wert}
     optimized: Mapped[dict] = mapped_column(JSON, default=dict)    # optimierte Position
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)  # Tipps des Fitters, Einlegesohlen, Sonstiges
+
+
+class BikeFitCapture(Base):
+    """Ergebnis einer Kameraanalyse der Sitzposition (nur Messwerte, keine Bilder)."""
+    __tablename__ = "bike_fit_captures"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    bike_id: Mapped[int] = mapped_column(ForeignKey("bikes.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)   # {"side": {...}, "front": {...}}
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)

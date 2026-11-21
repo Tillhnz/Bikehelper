@@ -198,6 +198,12 @@ Der mitgelieferte Katalog (`backend/app/data/tires.csv`) ist bewusst klein: Er e
 
 Eine Stunde ohne Regen gilt als *feucht*, wenn die Luftfeuchte mindestens 90 % beträgt, die Temperatur höchstens 1,5 Grad über dem Taupunkt liegt oder der Wettercode Nebel meldet (Open-Meteo). Die Fahrzeit in solchen Stunden steht als `damp_minutes` an der Fahrt. Beim Verschleiß zählt sie mit 35 % einer Regenfahrt, bei der Wachsregel mit 60 %, und nur bei Regeln mit Nässefaktor. Die Werte stehen in `services.py` (`DAMP_WEIGHT`, `DAMP_WEIGHT_WAX`). Nutzer können es unter *Einstellungen → Nebel und feuchte Luft* abschalten. Bei älteren Fahrten holt der Wetterlauf die Feuchte nach.
 
+## Bikefitting und Kameraanalyse
+
+Am Rad trägst du die Werte aus dem Maßblatt deines Fitters ein (Ausgangs- und optimierte Position). Der Bereich ist einklappbar und zeichnet eine schematische Seitenansicht mit beiden Positionen.
+
+Die **Kameraanalyse** (Beta) nutzt `getUserMedia` im Browser, also nur über HTTPS oder localhost. Die Pose-Erkennung (MediaPipe Pose Landmarker) läuft komplett im Browser, Bilder verlassen den Rechner nicht, gespeichert werden nur Winkelwerte (`bike_fit_captures`). Bibliothek, wasm und Modell legt das Frontend-Dockerfile beim Bauen unter `/mediapipe/` ab (benötigt dabei Internet, Modell von `storage.googleapis.com`); danach lädt der Browser nichts von Fremdservern. Dafür erlauben `security-headers.conf` und `page-headers.conf` `camera=(self)`, `'wasm-unsafe-eval'` und `blob:` für Worker und Medien. Ohne Docker-Build (`npm run dev`) musst du `@mediapipe/tasks-vision` selbst installieren und wasm und Modell nach `frontend/public/mediapipe/` legen.
+
 ## Reifen: Lebensdauer und Sichtprüfung
 
 Jeder Reifensatz zeigt, wie viele Kilometer er gefahren ist und (wenn du eine erwartete Lebensdauer einträgst) wie viele noch übrig sind. Dazu kommt ein Prüfintervall für die Sichtprüfung (Standard 1.000 km). Mit „Geprüft“ beginnt der Zähler neu. Ab 80 % wird ein Satz „bald fällig“, ab 100 % „fällig“, und der montierte Satz erscheint dann unter „Das steht an“. Erinnerungen per E-Mail oder ntfy gibt es dafür noch nicht.
