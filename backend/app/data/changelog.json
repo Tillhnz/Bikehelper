@@ -1,5 +1,15 @@
 [
   {
+    "id": "2026-11-21.4",
+    "date": "2026-11-21",
+    "title": "Fitting: maßstäbliche Zeichnung und drehbares 3D-Modell",
+    "changes": [
+      "Die Zeichnung im Bikefitting ist jetzt maßstäblich: ein echter Rennradrahmen in der Geometrie deiner Rahmengröße, mit Laufrädern, Gabel, Kurbel, Sattel und Lenkerbügel. Sattelhöhe, Sattelversatz, Sattelspitze bis Auflage und Überhöhung sind als Maßlinien mit Zahlen eingezeichnet, die Ausgangsposition gestrichelt daneben.",
+      "Neu daneben: ein drehbares 3D-Modell. Mit der Maus ziehen oder den Pfeiltasten drehen, dazu die Ansichten Schräg, Seite, Vorn und Oben. Von vorn sieht man auch die Lenkerbreite, von oben die Sattelstellung.",
+      "Der Bereich Bikefitting ist standardmäßig eingeklappt."
+    ]
+  },
+  {
     "id": "2026-11-21.3",
     "date": "2026-11-21",
     "title": "Fitting-Zeichnung, Einklappen und Kameraanalyse",

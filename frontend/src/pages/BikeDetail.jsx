@@ -10,6 +10,7 @@ import { confirmDialog, Loading, toast } from "../components/feedback.jsx";
 import CheckGuide from "../components/CheckGuide.jsx";
 import FitCamera from "../components/FitCamera.jsx";
 import FitDiagram from "../components/FitDiagram.jsx";
+import FitModel3D from "../components/FitModel3D.jsx";
 
 function ruleIntervalText(r) {
   return [r.interval_km && `${fmtKm(r.interval_km)} km`, r.interval_months && `${r.interval_months} Monate`]
@@ -831,6 +832,21 @@ function FittingCard({ fit, fields, onEdit, onDelete, latest }) {
   );
 }
 
+function FitViews({ fit }) {
+  const [view, setView] = useState("side");
+  const props = { initial: fit.initial, optimized: fit.optimized, crankMm: fit.crank_mm, frameSize: fit.frame_size };
+  return (
+    <div className="fit-views">
+      <div className="seg" role="tablist" aria-label="Darstellung">
+        {[["side", "Seitenansicht"], ["model", "3D-Modell"]].map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={view === k} className={`btn small${view === k ? " primary" : ""}`} onClick={() => setView(k)}>{label}</button>
+        ))}
+      </div>
+      {view === "side" ? <FitDiagram {...props} /> : <FitModel3D {...props} />}
+    </div>
+  );
+}
+
 function FittingPanel({ bike }) {
   const [fields, setFields] = useState([]);
   const [fits, setFits] = useState([]);
@@ -869,7 +885,7 @@ function FittingPanel({ bike }) {
         <div id={`fit-body-${bike.id}`}>
           {fits.length === 0 && !editing && <p className="muted small">Trage hier die Werte aus dem Maßblatt deines Fitters ein: Sattelhöhe, Versatz, Vorbau, Lenker und mehr, vorher und nachher.</p>}
           {editing && fields.length > 0 && <FittingForm fields={fields} initial={editing === "new" ? null : editing} onSave={save} onCancel={() => setEditing(null)} />}
-          {!editing && latest && <FitDiagram initial={latest.initial} optimized={latest.optimized} crankMm={latest.crank_mm} />}
+          {!editing && latest && <FitViews fit={latest} />}
           {!editing && shown.map((f, i) => <FittingCard key={f.id} fit={f} fields={fields} latest={i === 0 && fits.length > 1} onEdit={() => setEditing(f)} onDelete={() => remove(f)} />)}
           {!editing && fits.length > 1 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Frühere ausblenden" : `Frühere Fittings anzeigen (${fits.length - 1})`}</button>}
           {!editing && <FitCamera bike={bike} />}

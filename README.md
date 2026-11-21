@@ -200,7 +200,12 @@ Eine Stunde ohne Regen gilt als *feucht*, wenn die Luftfeuchte mindestens 90 % b
 
 ## Bikefitting und Kameraanalyse
 
-Am Rad trägst du die Werte aus dem Maßblatt deines Fitters ein (Ausgangs- und optimierte Position). Der Bereich ist einklappbar und zeichnet eine schematische Seitenansicht mit beiden Positionen.
+Am Rad trägst du die Werte aus dem Maßblatt deines Fitters ein (Ausgangs- und optimierte Position). Der Bereich ist einklappbar und zeigt zwei Darstellungen:
+
+* **Seitenansicht:** maßstäbliche technische Zeichnung (1 Einheit = 1 cm, Ursprung ist das Tretlager) mit Maßlinien für Sattelhöhe, Sattelversatz, Sattelspitze bis Auflage und Überhöhung. Ausgangsposition gestrichelt, optimierte Position farbig.
+* **3D-Modell:** drehbares Drahtmodell (Ziehen oder Pfeiltasten, Ansichten Schräg/Seite/Vorn/Oben), zeigt zusätzlich Lenkerbreite und Sattelstellung.
+
+Die Geometrie liegt in `frontend/src/components/fitGeometry.js`: Stack und Reach kommen aus einer Tabelle üblicher Rennradmaße nach Rahmengröße, Gabel und Hinterbau werden daraus gerechnet. Nur Sattel, Lenker und Vorbau folgen den eingetragenen Werten. Projiziert wird von Hand, es gibt keine 3D-Bibliothek.
 
 Die **Kameraanalyse** (Beta) nutzt `getUserMedia` im Browser, also nur über HTTPS oder localhost. Die Pose-Erkennung (MediaPipe Pose Landmarker) läuft komplett im Browser, Bilder verlassen den Rechner nicht, gespeichert werden nur Winkelwerte (`bike_fit_captures`). Bibliothek, wasm und Modell legt das Frontend-Dockerfile beim Bauen unter `/mediapipe/` ab (benötigt dabei Internet, Modell von `storage.googleapis.com`); danach lädt der Browser nichts von Fremdservern. Dafür erlauben `security-headers.conf` und `page-headers.conf` `camera=(self)`, `'wasm-unsafe-eval'` und `blob:` für Worker und Medien. Ohne Docker-Build (`npm run dev`) musst du `@mediapipe/tasks-vision` selbst installieren und wasm und Modell nach `frontend/public/mediapipe/` legen.
 
