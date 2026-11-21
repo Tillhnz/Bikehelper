@@ -278,8 +278,10 @@ def test_fit_capture_validation_and_ownership():
         h = _register(c, "capture@example.com")
         bike = c.post("/api/bikes", headers=h, json={"name": "Orca", "type": "road"}).json()
         url = f"/api/bikes/{bike['id']}/fit-captures"
-        r = c.post(url, headers=h, json={"metrics": {"side": {"knee_bdc": 147.3, "back": 41, "frames": 300}}})
+        r = c.post(url, headers=h, json={"metrics": {"side": {"knee_bdc": 147.3, "back": 41, "cadence": 86, "hip_min": 74.5, "frames": 300},
+                                                      "front": {"knee_dev_l": -3.2, "pelvis_range": 4.1, "frames": 280}}})
         assert r.status_code == 201 and r.json()["metrics"]["side"]["knee_bdc"] == 147.3
+        assert r.json()["metrics"]["front"]["knee_dev_l"] == -3.2
         assert c.post(url, headers=h, json={"metrics": {"side": {"knee_bdc": 5}}}).status_code == 422
         assert c.post(url, headers=h, json={"metrics": {"side": {"unbekannt": 5}}}).status_code == 422
         assert c.post(url, headers=h, json={"metrics": {}}).status_code == 422

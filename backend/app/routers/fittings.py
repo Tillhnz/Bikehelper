@@ -129,8 +129,11 @@ def delete_fitting(fitting_id: int, user: User = Depends(current_user), db: Sess
 # ---------- Kameraanalyse: gespeicherte Messungen ----------
 
 CAPTURE_KEYS = {
-    "side": {"knee_bdc": (60, 200), "knee_min": (30, 200), "hip": (10, 180), "back": (0, 90), "elbow": (60, 200), "arm_torso": (10, 140), "frames": (0, 100000)},
-    "front": {"knee_dev_l": (-60, 60), "knee_dev_r": (-60, 60), "pelvis_tilt": (0, 45), "pelvis_range": (0, 90), "frames": (0, 100000)},
+    "side": {"knee_bdc": (60, 200), "knee_min": (20, 200), "knee_spread": (0, 90), "hip_min": (10, 180),
+             "back": (0, 90), "elbow": (60, 200), "arm_torso": (10, 180), "ankle": (30, 200),
+             "cadence": (20, 200), "cycles": (0, 500), "frames": (0, 100000)},
+    "front": {"knee_dev_l": (-60, 60), "knee_dev_r": (-60, 60), "knee_sway_l": (0, 120), "knee_sway_r": (0, 120),
+              "pelvis_tilt": (0, 45), "pelvis_range": (0, 90), "shoulder_tilt": (0, 45), "frames": (0, 100000)},
 }
 
 

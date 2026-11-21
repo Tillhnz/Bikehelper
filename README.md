@@ -207,7 +207,20 @@ Am Rad trägst du die Werte aus dem Maßblatt deines Fitters ein (Ausgangs- und 
 
 Die Geometrie liegt in `frontend/src/components/fitGeometry.js`: Stack und Reach kommen aus einer Tabelle üblicher Rennradmaße nach Rahmengröße, Gabel und Hinterbau werden daraus gerechnet. Nur Sattel, Lenker und Vorbau folgen den eingetragenen Werten. Projiziert wird von Hand, es gibt keine 3D-Bibliothek.
 
-Die **Kameraanalyse** (Beta) nutzt `getUserMedia` im Browser, also nur über HTTPS oder localhost. Die Pose-Erkennung (MediaPipe Pose Landmarker) läuft komplett im Browser, Bilder verlassen den Rechner nicht, gespeichert werden nur Winkelwerte (`bike_fit_captures`). Bibliothek, wasm und Modell legt das Frontend-Dockerfile beim Bauen unter `/mediapipe/` ab (benötigt dabei Internet, Modell von `storage.googleapis.com`); danach lädt der Browser nichts von Fremdservern. Dafür erlauben `security-headers.conf` und `page-headers.conf` `camera=(self)`, `'wasm-unsafe-eval'` und `blob:` für Worker und Medien. Ohne Docker-Build (`npm run dev`) musst du `@mediapipe/tasks-vision` selbst installieren und wasm und Modell nach `frontend/public/mediapipe/` legen.
+Die **Kameraanalyse** (Beta) misst die Sitzposition aus einem Video. Ablauf: Kamera seitlich stellen, 15 s aufnehmen, Kamera vor das Rad stellen, noch einmal 15 s aufnehmen. Zwei Kameras gleichzeitig braucht es nicht. Danach wird die Aufnahme Bild für Bild ausgewertet (20 Abtastungen je Sekunde) und in einem Abspieler mit Skelett, Winkelbögen und Hilfslinien gezeigt, Bild für Bild durchsteppbar.
+
+Gemessen wird von der Seite: Kniewinkel bei größter Streckung und stärkster Beugung, engster Hüftwinkel, Rücken zur Waagerechten, Ellbogen, Arm zu Oberkörper, Trittfrequenz. Von vorn: Kniespur links und rechts, Beckenschaukeln, Schulterschiefe. Daraus entstehen Handlungsempfehlungen mit konkreter Zahl („Sattel etwa 10 mm höher“), bei eingetragenem Fitting mit Zielwert. Gerechnet wird mit etwa 5° Kniewinkel je cm Sattelhöhe, jeder Vorschlag ist auf 1 cm begrenzt.
+
+Richtwerte (Rennrad, Hände am Bremsgriff): Kniebeugung unten 25 bis 35°, also 145 bis 155° Kniewinkel; Rumpf 30 bis 60° je nach Fahrertyp; Ellbogenbeugung 20 bis 30°, also 145 bis 165°; Hüftwinkel oben rund 77° ± 5. Quelle: [Swart & Holliday, *Cycling Biomechanics Optimization*](https://pmc.ncbi.nlm.nih.gov/articles/PMC9219349). Für die Kniespur in der Frontansicht gibt es keinen belastbaren Richtwert, die 6 % sind eine Faustzahl.
+
+Zwei Dinge, die bei solchen Messungen gern schiefgehen und hier bewusst gelöst sind:
+
+* Die Punkte des Modells sind **je Achse getrennt** auf 0 bis 1 normiert. Ohne Korrektur mit dem Seitenverhältnis sind alle Winkel verzerrt (bei 16:9 rund 9° beim Kniewinkel). `fitPose.js` rechnet x deshalb überall mit `Breite/Höhe` hoch.
+* Der Kniewinkel wird **je Tretumdrehung** als Maximum genommen und über die Umdrehungen gemittelt, nicht am tiefsten Punkt des Fußes abgelesen. Die Umdrehungen kommen aus dem Verlauf der Knöchelhöhe.
+
+`npm test` prüft diese Rechnung mit erzeugten Körperpunkten gegen die bekannte Geometrie (Seitenverhältnisse 16:9, 4:3, 1:1, Trittfrequenz, Reaktion auf eine höhere Sattelposition). Die CI führt das mit aus.
+
+Technik: `getUserMedia` und `MediaRecorder` im Browser, also nur über HTTPS oder localhost. Die Pose-Erkennung (MediaPipe Pose Landmarker) läuft komplett im Browser, Bilder verlassen den Rechner nicht. Zum Server gehen nur Zahlen (`bike_fit_captures`). Videos bleiben auf Wunsch in IndexedDB dieses Browsers, höchstens sechs je Rad, zum Vergleich vorher und nachher nebeneinander. Bibliothek, wasm und Modell legt das Frontend-Dockerfile beim Bauen unter `/mediapipe/` ab (dafür braucht der Build Internet, Modell von `storage.googleapis.com`). Dafür erlauben `security-headers.conf` und `page-headers.conf` `camera=(self)`, `'wasm-unsafe-eval'` und `blob:` für Worker und Medien. Ohne Docker-Build musst du `@mediapipe/tasks-vision` selbst installieren und wasm und Modell nach `frontend/public/mediapipe/` legen.
 
 ## Reifen: Lebensdauer und Sichtprüfung
 

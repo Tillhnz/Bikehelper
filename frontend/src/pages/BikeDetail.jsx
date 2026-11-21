@@ -888,7 +888,7 @@ function FittingPanel({ bike }) {
           {!editing && latest && <FitViews fit={latest} />}
           {!editing && shown.map((f, i) => <FittingCard key={f.id} fit={f} fields={fields} latest={i === 0 && fits.length > 1} onEdit={() => setEditing(f)} onDelete={() => remove(f)} />)}
           {!editing && fits.length > 1 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Frühere ausblenden" : `Frühere Fittings anzeigen (${fits.length - 1})`}</button>}
-          {!editing && <FitCamera bike={bike} />}
+          {!editing && <FitCamera bike={bike} fitting={latest} />}
         </div>
       )}
     </section>

@@ -35,6 +35,8 @@ jobs:
         with:
           node-version: "22"
       - run: npm install --no-audit --no-fund
+      - name: Messlogik prüfen
+        run: npm test
       - name: Bauen
         run: npm run build
 

@@ -1,5 +1,18 @@
 [
   {
+    "id": "2026-11-21.5",
+    "date": "2026-11-21",
+    "title": "Kameraanalyse: Aufnahme, Player und Handlungsempfehlungen",
+    "changes": [
+      "Die Kameraanalyse nimmt jetzt auf, statt nur live zu messen. Seite und Front gehen nacheinander: Wer nur eine Kamera hat, nimmt erst die Seite auf, stellt die Kamera um und nimmt dann die Front auf.",
+      "Im Bild sind jetzt Linien zu sehen: Skelett, Winkelbögen mit Zahlen an Knie, Hüfte und Ellbogen, die Waagerechte für den Rückenwinkel und in der Frontansicht die Linie Hüfte–Knöchel mit der Abweichung des Knies.",
+      "Nach der Aufnahme wird sie Bild für Bild ausgewertet. Im Abspieler kannst du Bild für Bild vor und zurück und direkt zu den Stellen mit der größten Kniestreckung springen.",
+      "Aus den Messwerten kommen jetzt Handlungsempfehlungen mit Zahl: zum Beispiel „Sattel etwa 10 mm höher“, bei eingetragenem Fitting mit dem konkreten Zielwert. Vorschläge sind auf einen Zentimeter begrenzt und empfehlen Schritte von 5 mm.",
+      "Videos lassen sich auf Wunsch im Browser behalten (höchstens sechs je Rad) und zwei davon nebeneinander abspielen, mit der Tabelle der Unterschiede. Die Videos verlassen den Rechner nicht, zum Server gehen weiterhin nur die Zahlen.",
+      "Messfehler behoben: Die erkannten Punkte sind je Achse getrennt normiert. Ohne Korrektur mit dem Seitenverhältnis des Bildes waren alle Winkel verzerrt, bei 16:9 um rund 9 Grad. Dazu werden die Werte jetzt über die einzelnen Tretumdrehungen gemittelt statt über den tiefsten Punkt des Fußes."
+    ]
+  },
+  {
     "id": "2026-11-21.4",
     "date": "2026-11-21",
     "title": "Fitting: maßstäbliche Zeichnung und drehbares 3D-Modell",

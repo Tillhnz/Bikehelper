@@ -1,340 +1,553 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, fmtDate } from "../api.js";
+import { api, fmtDateTime } from "../api.js";
 import { confirmDialog, toast } from "./feedback.jsx";
+import { FRONT_RANGES, RANGES, advise, analyseFront, analyseSide, framePose } from "./fitPose.js";
+import { drawPose, packPoses, poseAt } from "./fitDraw.js";
+import { MAX_PER_BIKE, deleteClip, listClips, loadClip, saveClip } from "./fitClips.js";
 
-// Kameraanalyse der Sitzposition. Alles läuft im Browser: Die Videobilder verlassen den Rechner nicht, gespeichert werden nur Winkelwerte.
-// Pose-Erkennung: MediaPipe Pose Landmarker. Bibliothek, wasm und Modell liegen unter /mediapipe/ (werden beim Bauen des Frontends angelegt).
+// Kameraanalyse der Sitzposition. Aufnahme, Auswertung und Abspielen laufen im Browser:
+// Die Bilder verlassen den Rechner nicht. Zum Server gehen nur Zahlen, und das nur auf Knopfdruck.
+// Die Erkennung (MediaPipe Pose Landmarker) liegt unter /mediapipe/ und wird beim Bauen des Frontends abgelegt.
 const CAPTURE_S = 15;
-const L = { shoulder: 11, elbow: 13, wrist: 15, hip: 23, knee: 25, ankle: 27 };
-const R = { shoulder: 12, elbow: 14, wrist: 16, hip: 24, knee: 26, ankle: 28 };
-const BONES = [[11, 13], [13, 15], [11, 23], [23, 25], [25, 27], [12, 14], [14, 16], [12, 24], [24, 26], [26, 28], [11, 12], [23, 24]];
+const STEP_FPS = 20;              // so dicht wird die Aufnahme nachher abgetastet
 
-// Typische Bereiche: Orientierung, keine Vorgabe. Jede Person und jedes Rad ist anders.
-const RANGES = {
-  knee_bdc: { label: "Kniewinkel unten (Pedal im tiefsten Punkt)", lo: 140, hi: 155, unit: "°",
-    low: "Das Knie ist unten stark gebeugt, der Sattel könnte etwas höher stehen.", high: "Das Bein ist unten fast durchgestreckt, der Sattel könnte etwas niedriger stehen." },
-  back: { label: "Rückenwinkel zur Waagerechten", lo: 35, hi: 50, unit: "°",
-    low: "Sehr gestreckte, sportliche Haltung.", high: "Aufrechte Haltung, entspannt, aber mit mehr Luftwiderstand." },
-  elbow: { label: "Ellbogenwinkel", lo: 145, hi: 170, unit: "°",
-    low: "Die Arme sind stark angewinkelt, der Lenker könnte zu weit entfernt oder zu tief sein.", high: "Die Arme sind fast durchgestreckt, Schultern und Handgelenke werden stärker belastet." },
-  arm_torso: { label: "Winkel Arm zu Oberkörper", lo: 75, hi: 95, unit: "°",
-    low: "Eher kurze Reichweite zum Lenker.", high: "Eher lange Reichweite zum Lenker." },
+const VIEWS = {
+  side: {
+    name: "Seitenansicht", short: "Seite",
+    how: "Kamera seitlich neben das Rad, im rechten Winkel, auf Hüfthöhe, 2 bis 3 m entfernt. Die ganze Person von Kopf bis Pedal muss ins Bild.",
+    gives: "Kniewinkel, Hüfte, Rücken, Ellbogen",
+  },
+  front: {
+    name: "Frontansicht", short: "Front",
+    how: "Kamera mittig vor das Rad, auf Hüfthöhe. Hüfte, Knie und Füße müssen ins Bild, am besten in enger Kleidung.",
+    gives: "Kniespur, Beckenschaukeln, Schulterschiefe",
+  },
 };
 
-const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-function angle(a, b, c) { // Winkel bei b in Grad
-  const u = sub(a, b), v = sub(c, b);
-  const n = Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y);
-  if (!n) return null;
-  return (Math.acos(Math.max(-1, Math.min(1, (u.x * v.x + u.y * v.y) / n))) * 180) / Math.PI;
-}
-const median = (xs) => { const s = xs.filter((x) => x != null).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
-const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
-const fmt = (v) => String(r1(v)).replace(".", ",");
+// Nur diese Zahlen gehen zum Server (passend zur Prüfung im Backend)
+const SAVE_KEYS = {
+  side: ["knee_bdc", "knee_min", "knee_spread", "hip_min", "back", "elbow", "arm_torso", "ankle", "cadence", "cycles", "frames"],
+  front: ["knee_dev_l", "knee_dev_r", "knee_sway_l", "knee_sway_r", "pelvis_tilt", "pelvis_range", "shoulder_tilt", "frames"],
+};
+const forServer = (res) => Object.fromEntries(Object.entries(res)
+  .flatMap(([view, m]) => (!m || m.error ? [] : [[view, Object.fromEntries(SAVE_KEYS[view].filter((k) => typeof m[k] === "number").map((k) => [k, m[k]]))]])));
 
-function pickSide(lm) { // die der Kamera zugewandte Körperseite (höhere Sichtbarkeit)
-  const vis = (m) => ["shoulder", "hip", "knee", "ankle"].reduce((s, k) => s + (lm[m[k]]?.visibility ?? 0), 0);
-  const m = vis(L) >= vis(R) ? L : R;
-  return Object.fromEntries(Object.entries(m).map(([k, i]) => [k, lm[i]]));
-}
+const fmt = (x) => (x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ","));
+const pct = (n) => `${Math.round(n * 100)} %`;
 
-function sideSample(lm) {
-  const p = pickSide(lm);
-  const need = ["shoulder", "hip", "knee", "ankle"];
-  if (need.some((k) => !p[k] || (p[k].visibility ?? 0) < 0.5)) return null;
-  return {
-    ankleY: p.ankle.y,
-    knee: angle(p.hip, p.knee, p.ankle),
-    hip: angle(p.shoulder, p.hip, p.knee),
-    back: (Math.atan2(Math.abs(p.hip.y - p.shoulder.y), Math.abs(p.hip.x - p.shoulder.x)) * 180) / Math.PI,
-    elbow: p.elbow && p.wrist && (p.elbow.visibility ?? 0) > 0.4 ? angle(p.shoulder, p.elbow, p.wrist) : null,
-    armTorso: p.elbow && (p.elbow.visibility ?? 0) > 0.4 ? angle(p.hip, p.shoulder, p.elbow) : null,
-  };
-}
+// ---------- Erkennung ----------
 
-function frontSample(lm) {
-  const ok = [23, 24, 25, 26, 27, 28].every((i) => (lm[i]?.visibility ?? 0) >= 0.5);
-  if (!ok) return null;
-  const dev = (h, k, a) => { // seitliche Abweichung des Knies von der Linie Hüfte-Knöchel, in % der Beinlänge
-    const t = (lm[k].y - lm[h].y) / ((lm[a].y - lm[h].y) || 1);
-    const lineX = lm[h].x + t * (lm[a].x - lm[h].x);
-    const leg = Math.hypot(lm[a].x - lm[h].x, lm[a].y - lm[h].y) || 1;
-    return ((lm[k].x - lineX) / leg) * 100;
-  };
-  const tilt = (Math.atan2(lm[24].y - lm[23].y, lm[24].x - lm[23].x) * 180) / Math.PI;
-  return { devL: dev(23, 25, 27), devR: dev(24, 26, 28), tilt };
-}
-
-function summarizeSide(s) {
-  if (s.length < 20) return null;
-  const ys = s.map((x) => x.ankleY);
-  const lo = Math.min(...ys), hi = Math.max(...ys);
-  const bottom = s.filter((x) => x.ankleY >= hi - (hi - lo) * 0.1 && x.knee != null); // Fuß am tiefsten
-  const top = s.filter((x) => x.ankleY <= lo + (hi - lo) * 0.1 && x.knee != null);
-  if (hi - lo < 0.03 || bottom.length < 3) return { error: "Es war kaum Tretbewegung zu sehen. Bitte die ganze Pedalumdrehung im Bild lassen und die Kamera ruhig halten." };
-  return {
-    knee_bdc: r1(median(bottom.map((x) => x.knee))), knee_min: r1(median(top.map((x) => x.knee))),
-    hip: r1(median(s.map((x) => x.hip))), back: r1(median(s.map((x) => x.back))),
-    elbow: r1(median(s.map((x) => x.elbow))), arm_torso: r1(median(s.map((x) => x.armTorso))), frames: s.length,
-  };
-}
-
-function summarizeFront(s) {
-  if (s.length < 20) return null;
-  const tilts = s.map((x) => x.tilt);
-  return { knee_dev_l: r1(median(s.map((x) => x.devL))), knee_dev_r: r1(median(s.map((x) => x.devR))),
-    pelvis_tilt: r1(Math.abs(median(tilts))), pelvis_range: r1(Math.max(...tilts) - Math.min(...tilts)), frames: s.length };
-}
-
-let landmarkerLib = null;
+let visionLib = null;
 async function makeLandmarker() {
-  if (!landmarkerLib) {
+  if (!visionLib) {
     const lib = await import("@mediapipe/tasks-vision");
-    landmarkerLib = { lib, fileset: await lib.FilesetResolver.forVisionTasks("/mediapipe/wasm") };
+    visionLib = { lib, fileset: await lib.FilesetResolver.forVisionTasks("/mediapipe/wasm") };
   }
-  const { lib, fileset } = landmarkerLib;
+  const { lib, fileset } = visionLib;
   const make = (delegate) => lib.PoseLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: "/mediapipe/pose_landmarker_lite.task", delegate }, runningMode: "VIDEO", numPoses: 1,
+    baseOptions: { modelAssetPath: "/mediapipe/pose_landmarker_lite.task", delegate },
+    runningMode: "VIDEO", numPoses: 1, minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
   });
   try { return await make("GPU"); } catch { return make("CPU"); }
 }
 
-function draw(canvas, video, lm) {
-  const ctx = canvas.getContext("2d");
-  canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!lm) return;
-  ctx.lineWidth = 3; ctx.strokeStyle = "#5fd3c0"; ctx.fillStyle = "#ffffff";
-  for (const [a, b] of BONES) {
-    if ((lm[a].visibility ?? 0) < 0.5 || (lm[b].visibility ?? 0) < 0.5) continue;
-    ctx.beginPath(); ctx.moveTo(lm[a].x * canvas.width, lm[a].y * canvas.height); ctx.lineTo(lm[b].x * canvas.width, lm[b].y * canvas.height); ctx.stroke();
-  }
-  for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) {
-    if ((lm[i].visibility ?? 0) < 0.5) continue;
-    ctx.beginPath(); ctx.arc(lm[i].x * canvas.width, lm[i].y * canvas.height, 4, 0, 7); ctx.fill();
+const seek = (video, t) => new Promise((res) => {
+  let fired = false;
+  const go = () => { if (!fired) { fired = true; video.removeEventListener("seeked", go); res(); } };
+  video.addEventListener("seeked", go);
+  video.currentTime = t;
+  setTimeout(go, 400);
+});
+
+/** Aufnahme Bild für Bild auswerten. Gibt die Messwerte und die Punkte je Bild zurück. */
+async function analyseClip(blob, view, onProgress) {
+  const landmarker = await makeLandmarker();
+  const url = URL.createObjectURL(blob);
+  const video = document.createElement("video");
+  video.src = url; video.muted = true; video.playsInline = true; video.preload = "auto";
+  try {
+    await new Promise((res, rej) => {
+      video.onloadeddata = () => res();
+      video.onerror = () => rej(new Error("Die Aufnahme lässt sich nicht lesen."));
+      setTimeout(() => rej(new Error("Die Aufnahme lässt sich nicht lesen.")), 15000);
+    });
+    let dur = video.duration;
+    if (!Number.isFinite(dur) || dur <= 0) {                     // manche Browser melden die Länge erst am Ende
+      await seek(video, 3600);
+      dur = Number.isFinite(video.duration) ? video.duration : CAPTURE_S;
+    }
+    const aspect = (video.videoWidth || 16) / (video.videoHeight || 9);
+    const frames = [];
+    let stamp = 0;
+    for (let t = 0; t < dur - 0.02; t += 1 / STEP_FPS) {
+      await seek(video, t);
+      const found = landmarker.detectForVideo(video, (stamp += 50));
+      const lm = found.landmarks?.[0];
+      if (lm) frames.push({ t, lm, pose: framePose(lm, aspect) });
+      onProgress?.(Math.min(1, t / dur));
+    }
+    const metrics = view === "side" ? analyseSide(frames) : analyseFront(frames);
+    return { metrics, aspect, duration: dur, ...packPoses(frames) };
+  } finally {
+    landmarker.close?.();
+    URL.revokeObjectURL(url);
   }
 }
 
-function Stage({ title, devices, deviceId, setDeviceId, optional, videoRef, canvasRef, active }) {
+// ---------- Anzeige ----------
+
+function Row({ label, value, unit, range, hint }) {
+  const bad = range && value != null && (value < range.lo || value > range.hi);
   return (
-    <div className="cam-stage">
-      <label>{title}
-        <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)} disabled={active}>
-          {optional && <option value="">nicht verwenden</option>}
-          {devices.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${i + 1}`}</option>)}
-        </select>
-      </label>
-      {deviceId && (
-        <div className="cam-view">
-          <video ref={videoRef} muted playsInline />
-          <canvas ref={canvasRef} />
+    <div className="fit-row cam-row" role="row">
+      <span role="cell">{label}</span>
+      <span role="cell"><span className={`chip ${value == null ? "chip-mute" : bad ? "chip-wet" : "chip-strong"}`}>{fmt(value)} {unit}</span></span>
+      <span role="cell" className="muted small">{range ? `üblich ${range.lo} bis ${range.hi} ${unit}` : hint || ""}</span>
+    </div>
+  );
+}
+
+function Metrics({ metrics, view }) {
+  if (!metrics || metrics.error) return <p className="error small">{metrics?.error}</p>;
+  if (view === "side") {
+    return (
+      <div className="fit-table" role="table" aria-label="Messwerte Seitenansicht">
+        <div className="fit-row fit-row-h cam-row" role="row"><span>Seitenansicht</span><span>gemessen</span><span>Einordnung</span></div>
+        {["knee_bdc", "knee_min", "hip_min", "back", "elbow", "arm_torso", "cadence"].map((k) => (
+          <Row key={k} label={RANGES[k].label} value={metrics[k]} unit={RANGES[k].unit} range={RANGES[k]} />
+        ))}
+        <Row label="Ausgewertete Umdrehungen" value={metrics.cycles} unit="" hint={`${metrics.frames} Bilder, Körperseite ${metrics.side === "l" ? "links" : "rechts"}`} />
+      </div>
+    );
+  }
+  return (
+    <div className="fit-table" role="table" aria-label="Messwerte Frontansicht">
+      <div className="fit-row fit-row-h cam-row" role="row"><span>Frontansicht</span><span>gemessen</span><span>Einordnung</span></div>
+      <Row label="Kniespur links" value={metrics.knee_dev_l} unit="%" range={FRONT_RANGES.knee_dev_l} />
+      <Row label="Kniespur rechts" value={metrics.knee_dev_r} unit="%" range={FRONT_RANGES.knee_dev_r} />
+      <Row label="Beckenschaukeln" value={metrics.pelvis_range} unit="°" range={FRONT_RANGES.pelvis_range} />
+      <Row label="Schulterschiefe" value={metrics.shoulder_tilt} unit="°" range={FRONT_RANGES.shoulder_tilt} />
+      <p className="muted small" style={{ gridColumn: "1 / -1", margin: ".4rem 0 0" }}>
+        Kniespur: Abweichung von der Linie Hüfte–Knöchel in Prozent der Beinlänge, plus heißt nach innen. Dafür gibt es keinen belastbaren Richtwert, die Grenze von 6 % ist eine Faustzahl.
+      </p>
+    </div>
+  );
+}
+
+function Advice({ items }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="cam-advice">
+      {items.map((a, i) => (
+        <li key={i} className={`cam-tip cam-${a.level}`}>
+          <strong>{a.title}</strong>
+          <span>{a.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Abspieler mit eingezeichneten Linien und Winkeln. */
+function Player({ src, times, poses, view, marks, label }) {
+  const video = useRef(null), canvas = useRef(null), raf = useRef(0);
+  const [t, setT] = useState(0);
+  const [dur, setDur] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  const paint = useCallback(() => {
+    const v = video.current, c = canvas.current;
+    if (!v || !c) return;
+    drawPose(c, v, poseAt(times, poses, v.currentTime), view);
+    setT(v.currentTime);
+  }, [times, poses, view]);
+
+  useEffect(() => {
+    const loop = () => { paint(); raf.current = requestAnimationFrame(loop); };
+    raf.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf.current);
+  }, [paint]);
+
+  const jump = (to) => { if (video.current) { video.current.currentTime = Math.max(0, Math.min(dur, to)); paint(); } };
+  const toggle = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) { v.play().catch(() => {}); setPlaying(true); } else { v.pause(); setPlaying(false); }
+  };
+
+  return (
+    <div className="cam-player">
+      <div className="cam-view">
+        <video ref={video} src={src} muted playsInline loop
+          onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
+          onPause={() => setPlaying(false)} onPlay={() => setPlaying(true)} onClick={toggle} />
+        <canvas ref={canvas} />
+        {label && <span className="cam-tag">{label}</span>}
+      </div>
+      <div className="cam-controls">
+        <button type="button" className="btn small" onClick={toggle} aria-label={playing ? "Anhalten" : "Abspielen"}>{playing ? "❚❚" : "▶"}</button>
+        <button type="button" className="btn small" onClick={() => jump(t - 1 / STEP_FPS)} aria-label="Ein Bild zurück">‹</button>
+        <button type="button" className="btn small" onClick={() => jump(t + 1 / STEP_FPS)} aria-label="Ein Bild vor">›</button>
+        <input type="range" min="0" max={dur || 1} step="0.02" value={t} aria-label="Zeitpunkt"
+          onChange={(e) => { if (video.current) video.current.pause(); jump(Number(e.target.value)); }} />
+        <span className="muted small cam-time">{t.toFixed(1)} s</span>
+      </div>
+      {marks?.length > 0 && (
+        <div className="chips">
+          <span className="muted small">Größte Kniestreckung:</span>
+          {marks.slice(0, 8).map((m, i) => <button key={i} type="button" className="chip chip-mute" onClick={() => { video.current?.pause(); jump(m); }}>{fmt(m)} s</button>)}
         </div>
       )}
     </div>
   );
 }
 
-function Result({ metrics }) {
-  const side = metrics.side, front = metrics.front;
-  const key = { knee_bdc: "knee_bdc", back: "back", elbow: "elbow", arm_torso: "arm_torso" };
-  return (
-    <div className="cam-result">
-      {side && (
-        <div className="fit-table" role="table" aria-label="Seitenansicht">
-          <div className="fit-row fit-row-h cam-row" role="row"><span>Seitenansicht</span><span>Messwert</span><span>Typisch</span></div>
-          {Object.entries(key).map(([k, m]) => {
-            const r = RANGES[k]; const v = side[m];
-            if (v == null) return null;
-            const state = v < r.lo ? "low" : v > r.hi ? "high" : "ok";
-            return (
-              <div key={k} className="fit-row cam-row" role="row">
-                <span>{r.label}</span>
-                <span><span className={`chip ${state === "ok" ? "chip-strong" : "chip-wet"}`}>{fmt(v)} {r.unit}</span></span>
-                <span className="muted small">{r.lo} bis {r.hi} {r.unit}</span>
-                {state !== "ok" && <span className="cam-hint small">{r[state]}</span>}
-              </div>
-            );
-          })}
-          {side.hip != null && <div className="fit-row cam-row"><span>Hüftwinkel</span><span><span className="chip">{fmt(side.hip)} °</span></span><span className="muted small">Orientierung</span></div>}
-        </div>
-      )}
-      {front && (
-        <div className="fit-table" role="table" aria-label="Frontansicht">
-          <div className="fit-row fit-row-h cam-row" role="row"><span>Frontansicht</span><span>Messwert</span><span>Hinweis</span></div>
-          <div className="fit-row cam-row"><span>Knie seitlich (links / rechts)</span>
-            <span><span className="chip">{fmt(front.knee_dev_l)} % / {fmt(front.knee_dev_r)} %</span></span>
-            <span className="muted small">Abweichung von der Linie Hüfte–Knöchel, in % der Beinlänge. Gut ist nah an 0 und auf beiden Seiten ähnlich.</span></div>
-          <div className="fit-row cam-row"><span>Becken, Neigung</span>
-            <span><span className="chip">{fmt(front.pelvis_tilt)} °</span><span className="chip chip-mute">Schwankung {fmt(front.pelvis_range)} °</span></span>
-            <span className="muted small">Eine große Schwankung kann auf einen zu hohen Sattel hindeuten.</span></div>
-        </div>
-      )}
-      <p className="muted small">Das sind Orientierungswerte aus einem Kamerabild, keine Diagnose. Kamera auf Hüfthöhe, Abstand 2 bis 3 m, die Person im Ganzen im Bild und gleichmäßig treten. Für feine Einstellungen bleibt der Fitter die bessere Quelle.</p>
-    </div>
-  );
-}
+// ---------- Hauptteil ----------
 
-export default function FitCamera({ bike }) {
-  const [state, setState] = useState("idle"); // idle | loading | ready | running | error
+export default function FitCamera({ bike, fitting }) {
+  const [stage, setStage] = useState("idle");      // idle | setup | record | analyse | review
   const [error, setError] = useState("");
   const [devices, setDevices] = useState([]);
-  const [sideId, setSideId] = useState("");
-  const [frontId, setFrontId] = useState("");
+  const [deviceId, setDeviceId] = useState("");
+  const [view, setView] = useState("side");
   const [left, setLeft] = useState(CAPTURE_S);
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const sideVideo = useRef(null), frontVideo = useRef(null), sideCanvas = useRef(null), frontCanvas = useRef(null);
-  const streams = useRef([]);
-  const stop = useRef(false);
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState({});        // { side: {metrics, blob, url, times, poses}, front: {...} }
+  const [shown, setShown] = useState("side");
+  const [clips, setClips] = useState([]);
+  const [saved, setSaved] = useState([]);
+  const [compare, setCompare] = useState([]);      // bis zu zwei Kennungen aus dem Zwischenspeicher
+  const [busy, setBusy] = useState(false);
 
-  const loadHistory = useCallback(() => api.get(`/bikes/${bike.id}/fit-captures`).then(setHistory).catch(() => {}), [bike.id]);
+  const live = useRef(null), overlay = useRef(null), viewRef = useRef(view), urls = useRef([]);
+  viewRef.current = view;
+  const stream = useRef(null), recorder = useRef(null), landmarker = useRef(null), raf = useRef(0), stop = useRef(false);
+
+  const loadHistory = useCallback(async () => {
+    api.get(`/bikes/${bike.id}/fit-captures`).then(setSaved).catch(() => {});
+    listClips(bike.id).then(setClips).catch(() => {});
+  }, [bike.id]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const release = useCallback(() => {
     stop.current = true;
-    streams.current.forEach((s) => s.getTracks().forEach((t) => t.stop()));
-    streams.current = [];
+    cancelAnimationFrame(raf.current);
+    try { recorder.current?.state === "recording" && recorder.current.stop(); } catch { /* egal */ }
+    stream.current?.getTracks().forEach((t) => t.stop());
+    stream.current = null;
+    landmarker.current?.close?.();
+    landmarker.current = null;
   }, []);
-  useEffect(() => release, [release]);
+  useEffect(() => () => { release(); urls.current.forEach(URL.revokeObjectURL); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const secure = typeof window !== "undefined" && window.isSecureContext && navigator.mediaDevices?.getUserMedia;
 
-  async function open() {
-    setError(""); setState("loading");
+  async function findCameras() {
+    setError(""); setBusy(true);
     try {
-      const probe = await navigator.mediaDevices.getUserMedia({ video: true }); // erst die Erlaubnis, danach haben die Kameras Namen
+      const probe = await navigator.mediaDevices.getUserMedia({ video: true });
       probe.getTracks().forEach((t) => t.stop());
       const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
       if (!cams.length) throw new Error("Es wurde keine Kamera gefunden.");
-      setDevices(cams); setSideId(cams[0].deviceId); setFrontId(""); setState("ready");
+      setDevices(cams); setDeviceId(cams[0].deviceId); setStage("setup");
     } catch (e) {
-      setState("error");
-      setError(e?.name === "NotAllowedError" ? "Der Zugriff auf die Kamera wurde verweigert. Erlaube ihn in der Adressleiste des Browsers und versuche es noch einmal."
+      setError(e?.name === "NotAllowedError"
+        ? "Der Zugriff auf die Kamera wurde abgelehnt. Erlaube ihn in der Adressleiste des Browsers und versuche es noch einmal."
         : e?.message || "Die Kamera lässt sich nicht öffnen.");
-    }
+    } finally { setBusy(false); }
   }
 
-  const live = state === "ready" || state === "running";
-  useEffect(() => { // Vorschau starten, sobald eine Kamera gewählt ist
-    if (!live) return undefined;
+  // Vorschau mit eingezeichnetem Skelett, damit man die Kamera ausrichten kann
+  useEffect(() => {
+    if (stage !== "setup" && stage !== "record") return undefined;
     let dead = false;
-    const started = [];
+    stop.current = false;
     (async () => {
-      for (const [id, ref] of [[sideId, sideVideo], [frontId, frontVideo]]) {
-        if (!id || !ref.current) continue;
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: 1280 }, height: { ideal: 720 } } });
-          if (dead) { s.getTracks().forEach((t) => t.stop()); return; }
-          ref.current.srcObject = s; await ref.current.play().catch(() => {});
-          started.push(s);
-        } catch { setError("Eine Kamera ist nicht verfügbar. Vielleicht nutzt sie gerade ein anderes Programm."); }
+      try {
+        stream.current?.getTracks().forEach((t) => t.stop());
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : true,
+        });
+        if (dead) { s.getTracks().forEach((t) => t.stop()); return; }
+        stream.current = s;
+        if (live.current) { live.current.srcObject = s; await live.current.play().catch(() => {}); }
+        if (!landmarker.current) landmarker.current = await makeLandmarker();
+        let stamp = 0, last = -1;
+        const loop = () => {
+          if (dead || stop.current) return;
+          const v = live.current;
+          if (v && v.readyState >= 2 && v.currentTime !== last && landmarker.current) {
+            last = v.currentTime;
+            try {
+              const found = landmarker.current.detectForVideo(v, (stamp += 40));
+              if (overlay.current) drawPose(overlay.current, v, found.landmarks?.[0], viewRef.current);
+            } catch { /* einzelne Bilder dürfen ausfallen */ }
+          }
+          raf.current = requestAnimationFrame(loop);
+        };
+        raf.current = requestAnimationFrame(loop);
+      } catch (e) {
+        setError(e?.message || "Die Kamera ist belegt. Schließe andere Programme, die sie nutzen.");
       }
-      streams.current = started;
     })();
-    return () => { dead = true; started.forEach((s) => s.getTracks().forEach((t) => t.stop())); };
-  }, [live, sideId, frontId]);
+    return () => { dead = true; cancelAnimationFrame(raf.current); };
+  }, [stage === "setup" || stage === "record", deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function capture() {
-    if (!sideId || sideId === frontId) { setError("Wähle für die Seitenansicht eine Kamera, und für die Front eine andere."); return; }
-    setError(""); setResult(null); setState("running"); stop.current = false;
-    let sideLm = null, frontLm = null;
+  function pickMime() {
+    const list = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+    return list.find((m) => window.MediaRecorder?.isTypeSupported?.(m)) || "";
+  }
+
+  async function record() {
+    if (!stream.current) { setError("Die Kamera läuft nicht."); return; }
+    if (!window.MediaRecorder) { setError("Dieser Browser kann kein Video aufnehmen."); return; }
+    setError(""); setStage("record"); setLeft(CAPTURE_S);
+    const mimeType = pickMime();
+    const chunks = [];
+    const rec = new MediaRecorder(stream.current, mimeType ? { mimeType, videoBitsPerSecond: 2_500_000 } : undefined);
+    recorder.current = rec;
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    const finished = new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: mimeType || "video/webm" })); });
+    rec.start(250);
+    const t0 = Date.now();
+    const tick = setInterval(() => setLeft(Math.max(0, Math.ceil(CAPTURE_S - (Date.now() - t0) / 1000))), 200);
+    await new Promise((r) => setTimeout(r, CAPTURE_S * 1000));
+    clearInterval(tick);
+    try { rec.stop(); } catch { /* war schon aus */ }
+    const blob = await finished;
+    setStage("analyse"); setProgress(0);
     try {
-      sideLm = await makeLandmarker();
-      if (frontId) frontLm = await makeLandmarker();
-    } catch {
-      setState("ready");
-      setError("Die Bewegungserkennung konnte nicht geladen werden. Fehlen die Dateien unter /mediapipe/? Dann das Frontend neu bauen (./install.sh update).");
-      return;
+      const out = await analyseClip(blob, view, setProgress);
+      const url = URL.createObjectURL(blob);
+      urls.current.push(url);
+      setResult((p) => {
+        p[view]?.url && URL.revokeObjectURL(p[view].url);
+        return { ...p, [view]: { ...out, blob, url, view } };
+      });
+      setShown(view);
+      setStage("review");
+      if (out.metrics?.error) setError(out.metrics.error);
+    } catch (e) {
+      setError(e?.message || "Die Auswertung ist fehlgeschlagen.");
+      setStage("setup");
     }
-    const sideS = [], frontS = [];
-    const t0 = performance.now();
-    let lastSide = -1, lastFront = -1;
-    const tick = () => {
-      if (stop.current) return;
-      const elapsed = (performance.now() - t0) / 1000;
-      setLeft(Math.max(0, Math.ceil(CAPTURE_S - elapsed)));
-      const sv = sideVideo.current, fv = frontVideo.current;
-      if (sv && sv.readyState >= 2 && sv.currentTime !== lastSide) {
-        lastSide = sv.currentTime;
-        const lm = sideLm.detectForVideo(sv, performance.now()).landmarks?.[0];
-        if (sideCanvas.current) draw(sideCanvas.current, sv, lm);
-        const x = lm && sideSample(lm); if (x) sideS.push(x);
-      }
-      if (frontLm && fv && fv.readyState >= 2 && fv.currentTime !== lastFront) {
-        lastFront = fv.currentTime;
-        const lm = frontLm.detectForVideo(fv, performance.now()).landmarks?.[0];
-        if (frontCanvas.current) draw(frontCanvas.current, fv, lm);
-        const x = lm && frontSample(lm); if (x) frontS.push(x);
-      }
-      if (elapsed >= CAPTURE_S) return finish();
-      requestAnimationFrame(tick);
-    };
-    const finish = () => {
-      sideLm.close?.(); frontLm?.close?.();
-      const side = summarizeSide(sideS), front = frontLm ? summarizeFront(frontS) : null;
-      setState("ready"); setLeft(CAPTURE_S);
-      if (side?.error) { setError(side.error); return; }
-      if (!side && !front) { setError("Es wurde keine Person erkannt. Mehr Licht, ganze Person im Bild und der Kamera die Seite zuwenden."); return; }
-      setResult({ ...(side ? { side } : {}), ...(front ? { front } : {}) });
-    };
-    requestAnimationFrame(tick);
   }
 
-  async function save() {
-    setSaving(true);
-    try { await api.post(`/bikes/${bike.id}/fit-captures`, { metrics: result }); toast("Messung gespeichert."); setResult(null); await loadHistory(); }
-    catch (e) { setError(e.message); } finally { setSaving(false); }
-  }
-  async function remove(c) {
-    if (!await confirmDialog(`Die Messung vom ${fmtDate(c.at)} löschen?`)) return;
-    await api.del(`/fit-captures/${c.id}`); await loadHistory();
-  }
-  function close() { release(); setState("idle"); setResult(null); setError(""); }
+  const metrics = Object.fromEntries(Object.entries(result).map(([k, r]) => [k, r.metrics]));
+  const tips = Object.keys(metrics).length ? advise(metrics, fitting) : [];
 
-  const active = state === "running";
+  async function saveMeasurement() {
+    const payload = forServer(metrics);
+    if (!Object.keys(payload).length) { setError("Es gibt keine gültigen Messwerte zum Speichern."); return; }
+    setBusy(true);
+    try {
+      await api.post(`/bikes/${bike.id}/fit-captures`, { metrics: payload });
+      toast("Messung gespeichert.");
+      await loadHistory();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function keepClip(v) {
+    const r = result[v];
+    if (!r) return;
+    setBusy(true);
+    try {
+      await saveClip({ bikeId: bike.id, view: v, blob: r.blob, metrics: r.metrics, times: r.times, poses: r.poses });
+      toast(`Video behalten. Es bleibt in diesem Browser, höchstens ${MAX_PER_BIKE} Aufnahmen je Rad.`);
+      await loadHistory();
+    } catch (e) { setError(e.message || "Das Video ließ sich nicht zwischenspeichern."); } finally { setBusy(false); }
+  }
+
+  async function removeClip(c) {
+    if (!await confirmDialog(`Die Aufnahme vom ${fmtDateTime(c.at)} löschen?`)) return;
+    await deleteClip(c.id);
+    setCompare((p) => p.filter((x) => x !== c.id));
+    await loadHistory();
+  }
+
+  async function removeSaved(c) {
+    if (!await confirmDialog(`Die Messung vom ${fmtDateTime(c.at)} löschen?`)) return;
+    await api.del(`/fit-captures/${c.id}`);
+    await loadHistory();
+  }
+
+  function close() {
+    release();
+    urls.current.forEach(URL.revokeObjectURL);
+    urls.current = [];
+    setResult({}); setStage("idle"); setError("");
+  }
+
+  const shots = Object.keys(result);
+
   return (
     <div className="cam-panel">
       <h3>Kameraanalyse <span className="chip chip-mute">Beta</span></h3>
-      <p className="muted small">Die Webcam sieht dich von der Seite auf dem Rad (Rolle oder Trainer), eine zweite Kamera optional von vorn. Die Auswertung läuft nur in deinem Browser, es wird kein Bild hochgeladen oder gespeichert, nur die Winkelwerte.</p>
-      {!secure && <p className="error small">Der Browser erlaubt Kameras nur über HTTPS (oder localhost). Öffne BikeHelper über die https-Adresse.</p>}
-      {secure && state === "idle" && <button className="btn" onClick={open}>Kameras suchen</button>}
-      {state === "loading" && <p className="muted small">Kameras werden gesucht. Bitte den Zugriff im Browser erlauben.</p>}
-      {(state === "ready" || state === "running") && (
+      <p className="muted small">
+        Die Kamera sieht dich auf dem Rad (Rolle oder Trainer) und misst die Winkel deiner Sitzposition. Erst die Seite, dann
+        bei Bedarf die Front: Wenn du nur eine Kamera hast, stellst du sie einfach nacheinander um. Erkennung und Auswertung
+        laufen nur in deinem Browser, es wird kein Bild hochgeladen. Videos bleiben auf Wunsch in diesem Browser, zum Vergleich
+        vorher und nachher.
+      </p>
+
+      {!secure && <p className="error small">Der Browser gibt die Kamera nur über HTTPS frei (oder auf localhost). Öffne BikeHelper über die https-Adresse.</p>}
+      {secure && stage === "idle" && <div className="actions"><button className="btn primary" onClick={findCameras} disabled={busy}>Kameraanalyse starten</button></div>}
+
+      {(stage === "setup" || stage === "record") && (
         <>
-          <div className="cam-grid">
-            <Stage title="Seitenansicht" devices={devices} deviceId={sideId} setDeviceId={setSideId} videoRef={sideVideo} canvasRef={sideCanvas} active={active} />
-            <Stage title="Frontansicht (optional)" devices={devices.filter((d) => d.deviceId !== sideId)} deviceId={frontId} setDeviceId={setFrontId} optional videoRef={frontVideo} canvasRef={frontCanvas} active={active} />
+          <div className="cam-setup">
+            <div className="seg">
+              {Object.entries(VIEWS).map(([k, cfg]) => (
+                <button key={k} type="button" className={`btn small${view === k ? " primary" : ""}`} disabled={stage === "record"}
+                  onClick={() => setView(k)}>{cfg.short}{result[k] ? " ✓" : ""}</button>
+              ))}
+            </div>
+            {devices.length > 1 && (
+              <label className="cam-pick">Kamera
+                <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)} disabled={stage === "record"}>
+                  {devices.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${i + 1}`}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+          <p className="muted small">{VIEWS[view].how} Gemessen wird: {VIEWS[view].gives}.</p>
+          <div className="cam-view">
+            <video ref={live} muted playsInline />
+            <canvas ref={overlay} />
+            {stage === "record" && <span className="cam-rec">● Aufnahme, noch {left} s</span>}
           </div>
           <div className="actions">
-            <button className="btn primary" onClick={capture} disabled={active}>{active ? `Messe … noch ${left} s` : `Messung starten (${CAPTURE_S} s)`}</button>
-            <button className="btn" onClick={close} disabled={active}>Kameras schließen</button>
+            <button className="btn primary" onClick={record} disabled={stage === "record"}>
+              {stage === "record" ? `Läuft … ${left} s` : `${VIEWS[view].name} aufnehmen (${CAPTURE_S} s)`}
+            </button>
+            {shots.length > 0 && stage === "setup" && <button className="btn" onClick={() => setStage("review")}>Zur Auswertung</button>}
+            <button className="btn" onClick={close} disabled={stage === "record"}>Kamera schließen</button>
           </div>
-          {!active && <p className="muted small">Trete gleichmäßig in deiner normalen Haltung. Die Messung nutzt die ganze Pedalumdrehung.</p>}
+          <p className="muted small">Trete gleichmäßig in deiner gewohnten Haltung, am besten mit 80 bis 90 Umdrehungen. Die Linien im Bild zeigen, was erkannt wird.</p>
         </>
       )}
+
+      {stage === "analyse" && (
+        <div className="cam-progress">
+          <p className="muted small">Die Aufnahme wird Bild für Bild ausgewertet … {pct(progress)}</p>
+          <progress value={progress} max="1" />
+        </div>
+      )}
+
       {error && <p className="error small" role="alert">{error}</p>}
-      {result && (
-        <>
-          <Result metrics={result} />
+
+      {stage === "review" && shots.length > 0 && (
+        <div className="cam-review">
+          {shots.length > 1 && (
+            <div className="seg">
+              {shots.map((k) => (
+                <button key={k} type="button" className={`btn small${shown === k ? " primary" : ""}`} onClick={() => setShown(k)}>{VIEWS[k].name}</button>
+              ))}
+            </div>
+          )}
+          {result[shown] && (
+            <Player src={result[shown].url} times={result[shown].times} poses={result[shown].poses} view={shown}
+              marks={result[shown].metrics?.marks} label={VIEWS[shown].name} />
+          )}
+          <Metrics metrics={result[shown]?.metrics} view={shown} />
+          <h4>Was du daraus machen kannst</h4>
+          <Advice items={tips} />
+          <p className="muted small">
+            Die Vorschläge rechnen mit etwa 5 Grad Kniewinkel je Zentimeter Sattelhöhe und sind auf einen Zentimeter begrenzt.
+            Ändere immer nur eine Sache und fahre sie ein paar Ausfahrten, bevor du weitermisst. Bei Schmerzen ist ein Fitter
+            oder Arzt die richtige Adresse, nicht diese Rechnung.
+          </p>
           <div className="actions">
-            <button className="btn primary" onClick={save} disabled={saving}>Messung speichern</button>
-            <button className="btn" onClick={() => setResult(null)}>Verwerfen</button>
+            <button className="btn primary" onClick={saveMeasurement} disabled={busy}>Messwerte speichern</button>
+            <button className="btn" onClick={() => keepClip(shown)} disabled={busy}>Video behalten</button>
+            <button className="btn" onClick={() => setStage("setup")}>Weitere Aufnahme</button>
+            <button className="btn" onClick={close}>Fertig</button>
           </div>
-        </>
+        </div>
       )}
-      {history.length > 0 && (
+
+      {(clips.length > 0 || saved.length > 0) && (
         <details className="cam-history">
-          <summary>Gespeicherte Messungen ({history.length})</summary>
-          {history.map((c) => (
+          <summary>Gespeichertes ({saved.length} Messungen, {clips.length} Videos)</summary>
+          {clips.length > 0 && (
+            <>
+              <p className="muted small">Videos liegen nur in diesem Browser. Wähle zwei aus, um vorher und nachher nebeneinander zu sehen.</p>
+              <ul className="cam-clips">
+                {clips.map((c) => (
+                  <li key={c.id}>
+                    <label>
+                      <input type="checkbox" checked={compare.includes(c.id)}
+                        onChange={(e) => setCompare((p) => (e.target.checked ? [...p, c.id].slice(-2) : p.filter((x) => x !== c.id)))} />
+                      {fmtDateTime(c.at)} · {VIEWS[c.view]?.short || c.view} · {Math.round(c.bytes / 1e5) / 10} MB
+                    </label>
+                    <button className="link small danger" onClick={() => removeClip(c)}>Löschen</button>
+                  </li>
+                ))}
+              </ul>
+              {compare.length === 2 && <CompareClips ids={compare} />}
+            </>
+          )}
+          {saved.map((c) => (
             <div key={c.id} className="cam-hist-item">
-              <div className="fit-card-top"><strong>{fmtDate(c.at)}</strong>
-                <span className="rule-actions"><button className="link small danger" onClick={() => remove(c)}>Löschen</button></span></div>
-              <Result metrics={c.metrics} />
+              <div className="fit-card-top">
+                <strong>{fmtDateTime(c.at)}</strong>
+                <span className="rule-actions"><button className="link small danger" onClick={() => removeSaved(c)}>Löschen</button></span>
+              </div>
+              {Object.entries(c.metrics || {}).map(([v, m]) => <Metrics key={v} metrics={m} view={v} />)}
             </div>
           ))}
         </details>
       )}
+    </div>
+  );
+}
+
+/** Zwei zwischengespeicherte Aufnahmen nebeneinander, mit den Unterschieden. */
+function CompareClips({ ids }) {
+  const [pair, setPair] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    const urls = [];
+    (async () => {
+      const loaded = await Promise.all(ids.map(loadClip));
+      if (dead || loaded.some((x) => !x)) return;
+      const withUrl = loaded.map((c) => { const url = URL.createObjectURL(c.blob); urls.push(url); return { ...c, url }; });
+      withUrl.sort((a, b) => (a.at < b.at ? -1 : 1));
+      setPair(withUrl);
+    })();
+    return () => { dead = true; urls.forEach(URL.revokeObjectURL); setPair(null); };
+  }, [ids.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!pair) return <p className="muted small">Aufnahmen werden geladen …</p>;
+  const [a, b] = pair;
+  const keys = a.view === b.view && a.view === "side"
+    ? ["knee_bdc", "knee_min", "hip_min", "back", "elbow", "cadence"]
+    : a.view === b.view ? ["knee_dev_l", "knee_dev_r", "pelvis_range", "shoulder_tilt"] : [];
+  const R = a.view === "side" ? RANGES : FRONT_RANGES;
+  return (
+    <div className="cam-compare">
+      <div className="cam-compare-grid">
+        {pair.map((c, i) => (
+          <Player key={c.id} src={c.url} times={c.times} poses={c.poses} view={c.view}
+            marks={c.metrics?.marks} label={`${i === 0 ? "vorher" : "nachher"} · ${fmtDateTime(c.at)}`} />
+        ))}
+      </div>
+      {keys.length > 0 ? (
+        <div className="fit-table" role="table" aria-label="Unterschied">
+          <div className="fit-row fit-row-h cam-row" role="row"><span>Messwert</span><span>vorher → nachher</span><span>Änderung</span></div>
+          {keys.map((k) => {
+            const x = a.metrics?.[k], y = b.metrics?.[k];
+            if (x == null && y == null) return null;
+            return (
+              <div key={k} className="fit-row cam-row" role="row">
+                <span>{R[k]?.label || k}</span>
+                <span>{fmt(x)} → <strong>{fmt(y)}</strong> {R[k]?.unit}</span>
+                <span>{x != null && y != null && <span className="chip chip-wet">{y - x > 0 ? "+" : y - x < 0 ? "−" : "±"}{fmt(Math.abs(y - x))} {R[k]?.unit}</span>}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className="muted small">Für einen Vergleich der Zahlen müssen beide Aufnahmen dieselbe Ansicht zeigen.</p>}
     </div>
   );
 }
