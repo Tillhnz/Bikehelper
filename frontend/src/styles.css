@@ -1641,18 +1641,23 @@ h1 { text-shadow: 0 2px 24px color-mix(in srgb, var(--celeste) 25%, transparent)
 .fit-chevron{display:inline-block;transition:transform .2s;font-size:1.4rem;line-height:1;color:var(--mute)}
 .fit-chevron.open{transform:rotate(90deg)}
 .fit-diagram{margin:.8rem 0 0;display:grid;gap:.6rem}
-.fit-diagram svg{width:100%;height:auto;background:var(--panel-2);border-radius:var(--r-ctl)}
-.fit-dg-ground{stroke:var(--line);stroke-width:1.5}
-.fit-dg-wheel circle{fill:none;stroke:var(--line);stroke-width:2}
-.fit-dg-axis{stroke:var(--line);stroke-dasharray:3 4}
-.fit-dg-old path,.fit-dg-old .fit-dg-crank{fill:none;stroke:var(--mute);stroke-width:2.5;stroke-dasharray:6 5;stroke-linecap:round}
-.fit-dg-old .fit-dg-dot{fill:var(--mute);stroke:none}
-.fit-dg-new path,.fit-dg-new .fit-dg-crank{fill:none;stroke:var(--celeste);stroke-width:3.5;stroke-linecap:round}
-.fit-dg-new .fit-dg-dot{fill:var(--celeste);stroke:none}
-.fit-dg-crank{stroke-width:1.5!important}
-.fit-dg-badges circle{fill:var(--panel);stroke:var(--celeste);stroke-width:1.5}
-.fit-dg-badges text{fill:var(--chalk);font-size:12px;font-weight:700}
-.fit-dg-note{fill:var(--mute);font-size:11px}
+.fit-diagram svg{display:block;width:100%;height:auto;max-width:760px;margin:0 auto;background:var(--panel-2);border-radius:var(--r-ctl)}
+.fit-dg-ground{stroke:var(--line);stroke-width:.5}
+.fit-dg-wheel circle{fill:none;stroke:var(--mute);stroke-opacity:.45;stroke-width:1.4}
+.fit-dg-frame path{fill:none;stroke:var(--mute);stroke-width:1.1;stroke-linecap:round}
+.fit-dg-frame .fit-dg-head{stroke-width:2.2}
+.fit-dg-frame .fit-dg-crank{stroke-width:1.6}
+.fit-dg-bb{fill:var(--mute)}
+.fit-dg-axis{stroke:var(--line);stroke-width:.3;stroke-dasharray:1.5 1.5}
+.fit-dg-old path{fill:none;stroke:var(--mute);stroke-width:1.1;stroke-dasharray:2.4 1.8;stroke-linecap:round}
+.fit-dg-old .fit-dg-saddle{stroke-width:1.8}
+.fit-dg-old .fit-dg-dot{fill:var(--mute)}
+.fit-dg-new path{fill:none;stroke:var(--celeste);stroke-width:1.5;stroke-linecap:round}
+.fit-dg-new .fit-dg-saddle{stroke-width:2.2}
+.fit-dg-new .fit-dg-dot{fill:var(--celeste)}
+.fit-dg-dim path{fill:none;stroke:var(--celeste);stroke-opacity:.8;stroke-width:.5}
+.fit-dg-badge{fill:var(--panel);stroke:var(--celeste);stroke-width:.5}
+.fit-dg-badge-t{fill:var(--chalk);font-size:4px;font-weight:700}
 .fit-key{display:inline-block;width:.9rem;height:0;border-top:3px solid;margin-right:.4rem;vertical-align:middle}
 .fit-key-old{border-color:var(--mute);border-top-style:dashed}
 .fit-key-new{border-color:var(--celeste)}
