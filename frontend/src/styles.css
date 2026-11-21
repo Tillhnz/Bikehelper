@@ -1484,3 +1484,113 @@ a.update-hint:hover{background:var(--celeste);color:var(--celeste-ink)}
 
 /* Fenster passen auch auf niedrige Bildschirme */
 .modal { max-height: calc(100vh - 2rem); overflow-y: auto; }
+
+/* =====================================================================
+   Glas-Design (wie BodyBase)
+   Weich verlaufende, farbige Lichter hinter der Seite; Flächen sind halbdurchsichtiges Glas mit feiner Lichtkante oben.
+   Karten bewusst ohne backdrop-filter (auf dem Handy teuer, und fixierte Fenster würden in Karten eingesperrt);
+   Weichzeichner nur bei Leisten, Fenstern und Hinweisen, die über anderem Inhalt liegen.
+   ===================================================================== */
+
+:root {
+  --ink: #080d15;
+  --ink-2: rgba(255, 255, 255, 0.045);
+  --panel: rgba(22, 34, 47, 0.58);
+  --panel-2: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.09);
+  --glass-strong: rgba(15, 24, 35, 0.8);
+  --glass-hi: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 24px 60px -34px rgba(0, 0, 0, 0.9), 0 2px 10px -6px rgba(0, 0, 0, 0.5);
+  --r-panel: 20px;
+  --r-ctl: 10px;
+  --aura-1: rgba(111, 211, 195, 0.30);
+  --aura-2: rgba(90, 169, 255, 0.30);
+  --aura-3: rgba(167, 139, 250, 0.26);
+  --aura-4: rgba(242, 184, 75, 0.18);
+}
+:root[data-theme="light"] {
+  --ink: #eaf0f4; --ink-2: rgba(255, 255, 255, 0.55); --panel: rgba(255, 255, 255, 0.64); --panel-2: rgba(255, 255, 255, 0.55);
+  --line: rgba(20, 40, 70, 0.11);
+  --glass-strong: rgba(255, 255, 255, 0.86); --glass-hi: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 24px 50px -32px rgba(30, 60, 90, 0.4), 0 2px 8px -6px rgba(30, 60, 90, 0.22);
+  --aura-1: rgba(60, 190, 170, 0.30); --aura-2: rgba(90, 160, 255, 0.28); --aura-3: rgba(190, 150, 255, 0.28); --aura-4: rgba(255, 200, 120, 0.30);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ink: #eaf0f4; --ink-2: rgba(255, 255, 255, 0.55); --panel: rgba(255, 255, 255, 0.64); --panel-2: rgba(255, 255, 255, 0.55);
+    --line: rgba(20, 40, 70, 0.11);
+    --glass-strong: rgba(255, 255, 255, 0.86); --glass-hi: rgba(255, 255, 255, 0.95);
+    --glass-shadow: 0 24px 50px -32px rgba(30, 60, 90, 0.4), 0 2px 8px -6px rgba(30, 60, 90, 0.22);
+    --aura-1: rgba(60, 190, 170, 0.30); --aura-2: rgba(90, 160, 255, 0.28); --aura-3: rgba(190, 150, 255, 0.28); --aura-4: rgba(255, 200, 120, 0.30);
+  }
+}
+
+/* Lichter hinter allem (fest, auch auf iOS, daher eigene Ebene statt background-attachment) */
+body { background: var(--ink); }
+body::before {
+  content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42vmax 34vmax at 10% 6%, var(--aura-1), transparent 70%),
+    radial-gradient(38vmax 32vmax at 92% 14%, var(--aura-2), transparent 70%),
+    radial-gradient(46vmax 36vmax at 70% 96%, var(--aura-3), transparent 70%),
+    radial-gradient(34vmax 30vmax at 4% 78%, var(--aura-4), transparent 70%);
+  filter: saturate(115%);
+  animation: aura 40s ease-in-out infinite alternate;
+}
+@keyframes aura { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-2vmax, 1.5vmax, 0) scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+/* Glasflächen */
+.panel, .kpi, .bike-card, .component, .tire-set, .table-wrap, .home-bike, .time-bar, .record-card, .upload-banner,
+.wet-notice, .notice, .notice-card, .import-fold, .pressure-box, .login-art {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--glass-hi) 55%, transparent) 0%, transparent 38%), var(--panel);
+  border-color: var(--line);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+}
+.catalog-results, .wear-pop { background: var(--glass-strong); }
+.wear-pop { backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+
+/* Leisten und Fenster mit Weichzeichner */
+@media (min-width: 801px) {
+  .sidebar { background: var(--panel); border-right: 1px solid var(--line); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: inset -1px 0 0 var(--glass-hi); }
+}
+@media (max-width: 800px) {
+  .sidebar { background: color-mix(in srgb, var(--glass-strong) 70%, transparent); border-bottom: 1px solid var(--line); }
+  .sidebar nav { background: var(--glass-strong); backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%);
+    border-top: 1px solid var(--line); box-shadow: 0 -12px 40px -24px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-hi); }
+  :root[data-theme="light"] .sidebar nav { background: var(--glass-strong); }
+}
+.modal-back { background: rgba(4, 8, 14, 0.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.modal, .tour-card { background: var(--glass-strong); backdrop-filter: blur(30px) saturate(160%); -webkit-backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 40px 90px -30px rgba(0, 0, 0, 0.7); border-radius: 24px; }
+.toast, .update-toast, .map-badge { background: var(--glass-strong); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); }
+.update-toast { box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 60px -24px rgba(0, 0, 0, 0.6); }
+/* Mitlaufende Leisten müssen Inhalt dahinter abdecken, daher kräftigeres Glas */
+.select-bar, .pressure-bar { background: var(--glass-strong); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+.compare-table tbody th { background: var(--glass-strong); }
+.advisor-results { scrollbar-color: var(--line) transparent; }
+
+/* Bedienelemente aus Glas */
+.btn { background: var(--panel-2); border-color: var(--line); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.btn:hover { background: color-mix(in srgb, var(--chalk) 10%, transparent); border-color: color-mix(in srgb, var(--chalk) 22%, transparent); }
+:root[data-theme="light"] .btn:hover { background: color-mix(in srgb, var(--chalk) 8%, transparent); }
+.btn.primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 26px -12px color-mix(in srgb, var(--celeste) 85%, transparent); border-color: transparent; }
+.btn.primary:hover { background: color-mix(in srgb, var(--celeste) 88%, white); }
+input, select, textarea { background: var(--ink-2); border-color: var(--line); border-radius: var(--r-ctl); }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--celeste) 25%, transparent); }
+.theme-toggle, .pill, .chip, .tag-plus { backdrop-filter: none; }
+.theme-toggle { background: var(--panel-2); box-shadow: inset 0 1px 0 var(--glass-hi); }
+h1 { text-shadow: 0 2px 24px color-mix(in srgb, var(--celeste) 25%, transparent); }
+
+/* Ohne Weichzeichner-Unterstützung oder bei Wunsch nach weniger Transparenz: kräftigere Flächen */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass-strong: rgba(15, 24, 35, 0.96); }
+  :root[data-theme="light"] { --glass-strong: rgba(255, 255, 255, 0.98); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root { --panel: #16222f; --panel-2: #1b2a3a; --ink-2: #121c28; --glass-strong: #101a26; --line: #263749; }
+  :root[data-theme="light"] { --panel: #ffffff; --panel-2: #eef3f6; --ink-2: #e9eef2; --glass-strong: #ffffff; --line: #d2dce4; }
+  body::before { display: none; }
+  .modal, .tour-card, .toast, .update-toast, .sidebar, .sidebar nav, .select-bar, .pressure-bar, .modal-back { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

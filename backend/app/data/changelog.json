@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-21.1",
+    "date": "2026-11-21",
+    "title": "Neues Glas-Design",
+    "changes": [
+      "BikeHelper hat jetzt das Glas-Design von BodyBase: weich verlaufende, farbige Lichter im Hintergrund, halbdurchsichtige Karten mit feiner Lichtkante, Weichzeichner bei Seitenleiste, Fenstern und Hinweisen. Es gilt für die dunkle und die helle Darstellung. Wer in den Systemeinstellungen weniger Transparenz wählt, bekommt wieder deckende Flächen."
+    ]
+  },
+  {
     "id": "2026-11-14.1",
     "date": "2026-11-14",
     "title": "Besser auf dem Laptop",
