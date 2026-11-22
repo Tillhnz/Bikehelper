@@ -143,6 +143,30 @@ CATALOG: dict[str, ComponentTemplate] = {
                  "Bei Nässe verschleißen vor allem organische Beläge schneller.",
         ),
     )),
+    "pads_front": ComponentTemplate("pads_front", "Bremsbeläge vorn", (
+        RuleTemplate(
+            "Belagstärke prüfen vorn", interval_km=500, wet_factor=2.0,
+            hint="Alle 200 bis 500 km kontrollieren. Wechseln, wenn der Belag dünner als 1 bis 1,5 mm ist.",
+        ),
+        RuleTemplate(
+            "Bremsbeläge vorn wechseln", interval_km=1200, wet_factor=2.0,
+            hint="Vorn geht der größere Teil der Bremskraft durch, die Beläge halten deshalb kürzer als hinten. "
+                 "Richtwert bei Scheibenbremsen: organische Beläge 500 bis 1.000 km, halbmetallische 700 bis 1.500 km, gesinterte 1.000 bis 2.000 km. "
+                 "Bei Nässe verschleißen vor allem organische Beläge schneller.",
+        ),
+    )),
+    "pads_rear": ComponentTemplate("pads_rear", "Bremsbeläge hinten", (
+        RuleTemplate(
+            "Belagstärke prüfen hinten", interval_km=500, wet_factor=2.0,
+            hint="Alle 200 bis 500 km kontrollieren. Wechseln, wenn der Belag dünner als 1 bis 1,5 mm ist.",
+        ),
+        RuleTemplate(
+            "Bremsbeläge hinten wechseln", interval_km=1800, wet_factor=2.0,
+            hint="Hinten halten die Beläge meist länger als vorn, weil dort weniger Bremskraft anliegt. "
+                 "Wer viel im Gelände oder lange Abfahrten mit schleifender Hinterbremse fährt, verbraucht sie schneller. "
+                 "Richtwert: organische Beläge 500 bis 1.000 km, halbmetallische 700 bis 1.500 km, gesinterte 1.000 bis 2.000 km.",
+        ),
+    )),
     "rotor_front": ComponentTemplate("rotor_front", "Bremsscheibe vorn", (
         RuleTemplate(
             "Bremsscheibe vorn wechseln", interval_km=6000, wet_factor=1.5,
@@ -229,18 +253,18 @@ CATALOG: dict[str, ComponentTemplate] = {
 
 BIKE_TEMPLATES: dict[str, tuple[str, ...]] = {
     "road": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "pads_front", "pads_rear", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "bar_tape", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "gravel": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "pads_front", "pads_rear", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "bar_tape", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
     "mtb": (
-        "chain", "cassette", "chainring", "pulleys", "brake_pads", "rotor_front", "rotor_rear", "brake_fluid",
+        "chain", "cassette", "chainring", "pulleys", "pads_front", "pads_rear", "rotor_front", "rotor_rear", "brake_fluid",
         "cables", "sealant", "headset", "bottom_bracket", "hubs", "pedals", "fasteners",
     ),
-    "other": ("chain", "cassette", "pulleys", "brake_pads", "cables", "pedals"),
+    "other": ("chain", "cassette", "pulleys", "pads_front", "pads_rear", "cables", "pedals"),
 }
 
 
@@ -251,12 +275,14 @@ def categories_for(bike_type: str) -> tuple[str, ...]:
 # Reifen verwaltet die Reifensatz-Verwaltung (Kilometer je Mantelsatz). Ältere Reifen-Komponenten bleiben erhalten,
 # zählen aber nicht mehr zur Wartung und werden nicht mehr neu angelegt.
 LEGACY_CATEGORIES = ("tire_front", "tire_rear")
+# Nicht mehr neu anlegbar, vorhandene Komponenten zählen aber weiter mit (Bremsbeläge gibt es jetzt vorn und hinten).
+HIDDEN_CATEGORIES = LEGACY_CATEGORIES + ("brake_pads",)
 
 
 def catalog_payload() -> dict:
     """Für die Oberfläche: Katalog je Kategorie und die Vorlagen je Radtyp."""
     return {
-        "components": {k: asdict(v) for k, v in CATALOG.items() if k not in LEGACY_CATEGORIES},
+        "components": {k: asdict(v) for k, v in CATALOG.items() if k not in HIDDEN_CATEGORIES},
         "chain_lubes": {k: {"name": v["name"], "lube": asdict(v["lube"]), "wear": asdict(v["wear"])} for k, v in CHAIN_LUBES.items()},
         "wax_variants": WAX_VARIANTS,
         "checks": {k: asdict(v) for k, v in CHECKS.items()},
@@ -331,7 +357,11 @@ GUIDES: dict[str, tuple[Guide, ...]] = {
         Guide("Reifen und Schlauch aus- und einbauen", _PT + "tire-and-tube-removal-and-installation", PT, True),
     ) + _G_TUBELESS[:1],
     "Belagstärke prüfen": _G_PADS[:2],
+    "Belagstärke prüfen vorn": _G_PADS[:2],
+    "Belagstärke prüfen hinten": _G_PADS[:2],
     "Bremsbeläge wechseln": _G_PADS,
+    "Bremsbeläge vorn wechseln": _G_PADS,
+    "Bremsbeläge hinten wechseln": _G_PADS,
     "Bremsscheibe vorn wechseln": _G_ROTOR,
     "Bremsscheibe hinten wechseln": _G_ROTOR,
     "Bremse entlüften, Flüssigkeit wechseln": (
@@ -397,7 +427,11 @@ CHECK_DEFAULTS: dict[str, tuple[float | None, int | None]] = {
     "Nabenlager warten": (None, 6),
 }
 
-INSPECTIONS = {"Belagstärke prüfen": "Bremsbeläge wechseln"}
+INSPECTIONS = {
+    "Belagstärke prüfen": "Bremsbeläge wechseln",            # alte Sammelkomponente
+    "Belagstärke prüfen vorn": "Bremsbeläge vorn wechseln",
+    "Belagstärke prüfen hinten": "Bremsbeläge hinten wechseln",
+}
 WEAR_TO_INSPECTION = {v: k for k, v in INSPECTIONS.items()}
 INSPECTION_RESULTS = ("good", "watch", "replace")
 
@@ -755,3 +789,7 @@ CHECKS: dict[str, Check] = {
     ),
 }
 CHECKS["rotor_rear"] = CHECKS["rotor_front"]  # beide Scheiben werden gleich geprüft
+
+
+# Die Prüfung der Beläge ist vorn und hinten dieselbe.
+CHECKS["pads_front"] = CHECKS["pads_rear"] = CHECKS["brake_pads"]

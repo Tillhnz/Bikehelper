@@ -12,7 +12,7 @@ from . import audit, federation, notify, suggest, updatewatch
 from .database import Base, SessionLocal, ensure_columns, engine
 from .routers import account as account_router, activities, admin as admin_router, advisor, auth, garage, home, mechanic as mechanic_router, inventory, mapconfig, notifications, places as places_router, stats as stats_router, tire_catalog as tire_catalog_router, tires, intervals as intervals_router, groups as groups_router, version as version_router, weather as weather_router, federation as federation_router, habits as habits_router, fittings as fittings_router
 from . import server_settings
-from .services import migrate_add_rotors, migrate_legacy_lube
+from .services import migrate_add_rotors, migrate_legacy_lube, migrate_split_pads
 from .geo import service as geo_service
 from .intervals import service as intervals_service
 from .weather import service as weather_service
@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         migrate_legacy_lube(db)
         migrate_add_rotors(db)
+        migrate_split_pads(db)
         bootstrap_roles(db)
         server_settings.apply_overrides(db)
     audit.event("System", "server.start", "BikeHelper gestartet")

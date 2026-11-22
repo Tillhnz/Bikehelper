@@ -1,5 +1,14 @@
 [
   {
+    "id": "2026-11-22.1",
+    "date": "2026-11-22",
+    "title": "Bremsbeläge vorn und hinten getrennt",
+    "changes": [
+      "Bremsbeläge sind jetzt zwei Komponenten statt einer. Vorn liegt mehr Bremskraft an, deshalb steht dort als Richtwert 1.200 km, hinten 1.800 km. Jede Seite zählt für sich und hat ihre eigene Prüf- und Wechselregel.",
+      "Bestehende Räder werden beim Update einmalig aufgeteilt: Die vorhandene Komponente wird zu den vorderen Belägen und behält Wartungsverlauf, Prüfergebnisse und Einbaudatum. Die hinteren kommen neu dazu und übernehmen dieselbe Vorgeschichte, weil bisher beides zusammen eingetragen wurde. Wer sie nicht braucht, löscht sie einfach, sie kommen nicht wieder."
+    ]
+  },
+  {
     "id": "2026-11-21.5",
     "date": "2026-11-21",
     "title": "Kameraanalyse: Aufnahme, Player und Handlungsempfehlungen",

@@ -77,7 +77,8 @@ Beim Anlegen eines Rades (oder über „Standardkomponenten ergänzen“) entste
 | Kassette | wechseln | 9.000 km | 1,5 |
 | Kettenblätter | wechseln | 20.000 km | 1,5 |
 | Reifen vorn / hinten | wechseln | 6.000 / 4.000 km | – |
-| Bremsbeläge | prüfen / wechseln | 500 / 1.500 km | 2,0 |
+| Bremsbeläge vorn | prüfen / wechseln | 500 / 1.200 km | 2,0 |
+| Bremsbeläge hinten | prüfen / wechseln | 500 / 1.800 km | 2,0 |
 | Bremsscheibe vorn / hinten | wechseln | 6.000 / 9.000 km | 1,5 |
 | Bremsflüssigkeit | wechseln | 12 Monate | – |
 | Züge | erneuern | 5.000 km oder 12 Monate | 1,3 |
@@ -108,6 +109,12 @@ Die Quellen nennen für Heißwachs 300 bis 600 km (BikeRadar, SILCA, CyclingCera
 **Reifen:** Auf der Seite eines Rades legst du jeden Reifensatz (Mäntel) an und wählst, welcher montiert ist. Die Fahrten des Rades zählen ab dem Montagetag automatisch auf den montierten Satz, bis du einen anderen montierst. So siehst du die Kilometer je Satz, auch wenn du Sätze wechselst und später wieder aufziehst. Zeiträume lassen sich nachtragen, ändern und löschen. Breite und Tubeless-Angabe des montierten Satzes übernimmt das Rad für den Ratgeber. Optional trägst du eine erwartete Lebensdauer ein, dann zeigt eine Anzeige den Verbrauch.
 
 **Daten wieder entfernen:** Einbaudaten lassen sich ändern oder entfernen, Wartungseinträge einzeln löschen (im Wartungsverlauf der Komponente), ausgemusterte Teile wieder einbauen.
+
+### Bremsbeläge vorn und hinten
+
+Beläge sind zwei getrennte Komponenten (`pads_front`, `pads_rear`), weil vorn deutlich mehr Bremskraft anliegt und die Beläge dort schneller verschleißen. Jede Seite hat ihre eigene Prüf- und Wechselregel und ihren eigenen Zähler.
+
+Bestehende Räder mit der alten Sammelkomponente „Bremsbeläge“ werden beim Update einmalig aufgeteilt (`migrate_split_pads`, Merker `migration_pads_split_v1`): Die vorhandene Komponente wird zur vorderen, damit Wartungseinträge, Prüfergebnisse und Einbaudatum erhalten bleiben; die hintere kommt neu dazu und bekommt dieselbe Vorgeschichte kopiert, weil bisher beides zusammen eingetragen wurde. Stand die Wechselregel noch auf dem alten Standard von 1.500 km, bekommt vorn 1.200 km. Eigene Regeln bleiben unverändert bei der vorderen Komponente. Wer die hinteren nicht will, löscht sie: Die Migration läuft nur einmal.
 
 ### Prüfergebnis bei Bremsbelägen
 

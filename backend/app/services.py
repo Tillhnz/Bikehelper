@@ -499,7 +499,7 @@ def migrate_add_rotors(db: Session) -> int:
         if bike.type not in ("road", "gravel", "mtb") or bike.retired:
             continue
         active = [c for c in bike.components if not c.retired_at]
-        if not any(c.category == "brake_pads" for c in active):
+        if not any(c.category in ("brake_pads", "pads_front", "pads_rear") for c in active):
             continue
         if any(c.category in ("rotor_front", "rotor_rear") for c in bike.components):
             continue
@@ -507,6 +507,71 @@ def migrate_add_rotors(db: Session) -> int:
     db.add(AppSetting(key=ROTOR_MIGRATION_KEY, value="done"))
     db.commit()
     return added
+
+
+PADS_MIGRATION_KEY = "migration_pads_split_v1"
+
+# So heißen die Regeln der alten Sammelkomponente vorn und hinten
+PADS_RULES = {
+    "Belagstärke prüfen": ("Belagstärke prüfen vorn", "Belagstärke prüfen hinten"),
+    "Bremsbeläge wechseln": ("Bremsbeläge vorn wechseln", "Bremsbeläge hinten wechseln"),
+}
+OLD_PADS_INTERVAL = 1500.0  # Standard der alten Sammelregel
+
+
+def migrate_split_pads(db: Session) -> int:
+    """Einmalig: Aus der Komponente "Bremsbeläge" werden zwei, vorn und hinten.
+
+    Vorn und hinten nutzen sich unterschiedlich schnell ab. Die vorhandene Komponente wird zur vorderen,
+    damit Wartungseinträge, Prüfergebnisse und Einbaudatum erhalten bleiben. Die hintere kommt neu dazu und
+    bekommt dieselbe Vorgeschichte kopiert, weil bisher beide zusammen eingetragen wurden. Läuft nur einmal
+    (Merker in app_settings), gelöschte Komponenten kommen also nicht zurück.
+    """
+    if db.get(AppSetting, PADS_MIGRATION_KEY) is not None:
+        return 0
+    split = 0
+    comps = db.scalars(select(Component).where(Component.category == "brake_pads", Component.retired_at.is_(None))).all()
+    for comp in comps:
+        bike = comp.bike
+        if bike is None or any(c.category in ("pads_front", "pads_rear") for c in bike.components):
+            continue
+        comp.category = "pads_front"
+        if comp.name == "Bremsbeläge":
+            comp.name = "Bremsbeläge vorn"
+        for r in comp.rules:
+            names = PADS_RULES.get(r.label)
+            if not names:
+                continue  # eigene Regel: Name bleibt, sie gilt jetzt für vorn
+            r.label = names[0]
+            if r.label == "Bremsbeläge vorn wechseln" and r.interval_km == OLD_PADS_INTERVAL:
+                r.interval_km = CATALOG["pads_front"].rules[1].interval_km  # Standard war unverändert
+        db.flush()
+        rear = create_default_components(db, comp.user_id, bike, ["pads_rear"])
+        if not rear:
+            continue
+        rear = rear[0]
+        rear.start_km, rear.installed_at, rear.brand = comp.start_km, comp.installed_at, comp.brand
+        db.flush()
+        back = {names[0]: names[1] for names in PADS_RULES.values()}
+        rear_rules = {r.label: r for r in rear.rules}
+        front_rules = {r.id: r for r in comp.rules}
+        for log in comp.logs:
+            rule_id = None
+            if log.rule_id is not None:
+                src = front_rules.get(log.rule_id)
+                tgt = rear_rules.get(back.get(src.label, "")) if src else None
+                if tgt is None:
+                    continue  # eigene Regel ohne Gegenstück hinten
+                rule_id = tgt.id
+            db.add(MaintenanceLog(
+                component_id=rear.id, rule_id=rule_id, performed_at=log.performed_at, performed_time=log.performed_time,
+                note=((log.note + " · ") if log.note else "") + "aus der gemeinsamen Bremsbelag-Historie übernommen",
+                result=log.result, performed_by=log.performed_by,
+            ))
+        split += 1
+    db.add(AppSetting(key=PADS_MIGRATION_KEY, value="done"))
+    db.commit()
+    return split
 
 
 # ---------- Reifensätze ----------
