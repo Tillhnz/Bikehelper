@@ -1,5 +1,16 @@
 [
   {
+    "id": "2026-11-22.2",
+    "date": "2026-11-22",
+    "title": "Nässe zählt nur noch, wo sie wirkt, dazu Restreichweite mit Spanne",
+    "changes": [
+      "Korrektur: Dass das nasse Rad im Freien steht oder nass geputzt wird, zählte bisher auf jedes Teil mit Nässefaktor, also auch auf die Bremsbeläge. Beläge nutzen sich aber beim Bremsen ab, nicht beim Herumstehen. Standzeit und Nass-Putzen wirken jetzt nur noch auf Kette, Kassette, Kettenblätter, Schaltröllchen, Züge und Lager. Prozentwerte an Bremsen und anderen Teilen fallen dadurch.",
+      "Neu unter jeder Regel: Wie weit das Teil noch reicht, als Spanne. Die Schätzung rechnet mit dem Nässeanteil der bisherigen Strecke, daneben stehen der beste Fall (alles trocken) und der schlechteste (durchweg Nässe). Ist eine Regel überzogen, steht dort um wie viele Kilometer.",
+      "Die Kopfzeile einer Regel zeigt jetzt, dass der Prozentwert Nässe enthält: „152 % · 1.821 km gefahren · durch Nässe wie 2.736 km · von 1.800 km“. Vorher standen 152 % neben 1.821 km und einem Intervall von 1.800 km, was wie ein Rechenfehler aussah.",
+      "„Angepasstes Intervall“ steht nur noch da, wo die Prüfung das Intervall wirklich verändert. Lag die Schätzung schon über der Schwelle, bestätigt die Prüfung sie nur."
+    ]
+  },
+  {
     "id": "2026-11-22.1",
     "date": "2026-11-22",
     "title": "Bremsbeläge vorn und hinten getrennt",

@@ -274,6 +274,12 @@ def categories_for(bike_type: str) -> tuple[str, ...]:
 
 # Reifen verwaltet die Reifensatz-Verwaltung (Kilometer je Mantelsatz). Ältere Reifen-Komponenten bleiben erhalten,
 # zählen aber nicht mehr zur Wartung und werden nicht mehr neu angelegt.
+# Welche Nässe zählt für welches Teil?
+# Fahren bei Nässe wirkt auf alles mit Nässefaktor. Stehen im Freien und Nass-Putzen altern dagegen nur Teile,
+# die dabei wirklich leiden: Antrieb, Züge und Lager rosten oder verlieren ihr Schmiermittel. Bremsbeläge nutzen
+# sich beim Bremsen ab, nicht beim Herumstehen, und Bremsscheiben wischen den Flugrost beim ersten Bremsen wieder weg.
+SOAK_CATEGORIES = frozenset({"chain", "cassette", "chainring", "pulleys", "cables", "hubs", "bottom_bracket", "headset"})
+
 LEGACY_CATEGORIES = ("tire_front", "tire_rear")
 # Nicht mehr neu anlegbar, vorhandene Komponenten zählen aber weiter mit (Bremsbeläge gibt es jetzt vorn und hinten).
 HIDDEN_CATEGORIES = LEGACY_CATEGORIES + ("brake_pads",)

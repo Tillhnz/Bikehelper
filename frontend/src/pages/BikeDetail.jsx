@@ -201,6 +201,7 @@ function WearInfo({ rule, onClose }) {
         <button type="button" className="link small" onClick={onClose} aria-label="Schließen">Schließen</button>
       </div>
       {b.driver && <p className="muted small">Bestimmt wird der Wert durch {DRIVER_TEXT[b.driver] || "die Strecke"}.</p>}
+      {b.soak === false && <p className="muted small">Stehen im Freien und Nass-Putzen zählen bei diesem Teil nicht mit: Es nutzt sich beim Fahren ab, nicht beim Herumstehen.</p>}
       <ul className="wear-parts">
         {rows.map((r) => (
           <li key={r.label}>
@@ -270,11 +271,23 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
 
   const variantName = rule.variants?.find((v) => v.key === rule.variant)?.name;
   const pctText = `${Math.min(Math.round(rule.progress * 100), 999)} %`;
+  const wetExtra = Math.round((rule.effective_km ?? 0) - (rule.km_since ?? 0));
   const limits = [
     variantName && `zuletzt ${variantName}`,
     !unknown && pctText,
     rule.km_since > 0 || rule.interval_km ? `${fmtKm(rule.km_since)} km gefahren` : null,
+    // Der Prozentwert rechnet mit Nässe. Ohne diesen Zusatz sieht die Zeile aus, als würde sie sich verrechnen.
+    wetExtra > 0 ? `durch Nässe wie ${fmtKm(rule.effective_km)} km` : null,
+    !unknown && rule.interval_km ? `von ${fmtKm(rule.interval_km)} km` : null,
   ].filter(Boolean).join(" · ");
+
+  // Restreichweite als Spanne: trocken hält das Teil länger, bei Dauernässe kürzer.
+  const lf = rule.left;
+  const leftLine = !unknown && lf && (lf.km != null
+    ? (lf.km > 0
+        ? `Noch etwa ${fmtKm(lf.km)} km${lf.km_dry > lf.km_wet && lf.km_dry - lf.km_wet > 10 ? ` · trocken ${fmtKm(lf.km_dry)} km, durchweg bei Nässe ${fmtKm(lf.km_wet)} km` : ""}${lf.months != null ? ` · oder ${fmtNum(lf.months, 0)} ${Math.round(lf.months) === 1 ? "Monat" : "Monate"}` : ""}.`
+        : `Überfällig: etwa ${fmtKm(-lf.km)} km über dem Intervall.`)
+    : (lf.months != null ? `Noch etwa ${fmtNum(lf.months, 0)} ${Math.round(lf.months) === 1 ? "Monat" : "Monate"}.` : null));
 
   const a = rule.assessment;
   const RESULTS = CHECK_RESULT;
@@ -285,7 +298,7 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
       : `Zustand am ${fmtDate(a.date)}: okay, Intervall startet neu.`);
   const assessLine = visualLine || a && (rule.is_inspection
     ? `Letzte Prüfung am ${fmtDate(a.date)}: ${RESULTS[a.result]}${a.result === "watch" ? ", früher erneut prüfen" : ""}.`
-    : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}, angepasstes Intervall ${fmtKm(a.interval_km)} km.`);
+    : `Nach der Prüfung am ${fmtDate(a.date)} (${RESULTS[a.result]}): ${a.result === "replace" ? "jetzt wechseln" : `noch etwa ${fmtKm(a.km_left)} km`}${a.changed ? `, angepasstes Intervall ${fmtKm(a.interval_km)} km` : ", das bestätigt die Schätzung aus den Kilometern"}.`);
 
   async function submit(e) {
     e.preventDefault();
@@ -327,6 +340,7 @@ function RuleRow({ rule, onDelete, onDone, onChanged, disabled }) {
         </span>
       </div>
       {infoOpen && <WearInfo rule={rule} onClose={() => setInfoOpen(false)} />}
+      {leftLine && <p className="muted small wet-line">{leftLine}</p>}
       {checkLine && !unknown && <p className="muted small wet-line check-line">{checkLine}</p>}
       {chkOpen && (
         <form className="inline-form" onSubmit={saveCheck}>

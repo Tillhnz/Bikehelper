@@ -168,6 +168,7 @@ class RuleOut(RuleIn):
     is_inspection: bool = False  # Prüfregel: beim Eintragen wird ein Ergebnis gewählt
     assessment: dict | None = None  # Prüfergebnis, das Intervall dieser Regel beeinflusst (Prüf- und Wechselregel)
     breakdown: dict | None = None  # Zusammensetzung des Fortschritts (Anzeige)
+    left: dict | None = None  # Restreichweite: km (wie bisher), km_dry (alles trocken), km_wet (durchweg nass), months
     km_since: float
     wet_km: float
     stand_wet_km: float = 0  # davon Nässe durch Stehen im Freien (Arbeitsplatz)
